@@ -1,6 +1,6 @@
 # Demetre Seturidze
 # Chess
-# Pieces
+# Game
 
 from files.player import * 
 

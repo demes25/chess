@@ -28,21 +28,21 @@ class GUI:
     def __init__(
         self,
         setup : Callable[[], Game],
-        dims : Tuple[int, int],
-        colors : Tuple[Color, Color] = ((250, 242, 210), (90, 50, 35)),
-        player_colors : List[Color] = [(220, 192, 180), (130, 80, 70)],
+        tile_dims : Tuple[int, int], # the size of a tile
+        colors : Tuple[Color, Color] = ((250, 242, 210), (90, 50, 35)), # square colors
+        player_colors : List[Color] = [(220, 192, 180), (130, 80, 70)], # player colors 
 
-        checkmate_color : Color = (214, 45, 25),
-        stalemate_color : Color = (125, 89, 50),
+        checkmate_color : Color = (214, 45, 25), # color of the checkmate text
+        stalemate_color : Color = (125, 89, 50), # color of the stalemate text
 
-        game_over_color : Color = (170, 120, 100),
-        text_color : Color = (220, 192, 180),
+        game_over_color : Color = (170, 120, 100), # color of the game over screen
+        text_color : Color = (220, 192, 180), # color of general text 
 
         caption : str = 'Chussy',
 
         sprite_size : float = 0.95, # proportion of each tile that the sprite takes up.
-        title_font_size : float = 0.5,
-        caption_font_size : float = 0.3
+        title_font_size : float = 0.5, # proporitons of each tile that is the height of the text
+        caption_font_size : float = 0.3 
     ):
         self.setup = setup 
         self.game = setup()
@@ -52,18 +52,16 @@ class GUI:
         assert self.game.rank == 2
         assert len(self.game.players) == 2 
 
-        self.center = (dims[0]//2, dims[1]//2)
+        self.tile_W, self.tile_H = tile_dims 
+        self.COLS, self.ROWS = self.game.board.shape
+        self.width = self.COLS * self.tile_W
+        self.height = self.ROWS * self.tile_H 
 
-        self.screen = pg.display.set_mode(dims)
+        self.screen = pg.display.set_mode((self.width, self.height))
+
+        self.center = (self.width//2, self.height//2)
 
         pg.display.set_caption(caption)
-
-        self.COLS, self.ROWS = self.game.board.shape
-
-        self.width, self.height = dims 
-
-        self.tile_W = self.width // self.COLS
-        self.tile_H = self.height // self.ROWS
 
         self.colors = colors 
 
