@@ -2,10 +2,11 @@
 # Chess
 # Pieces
 
-from player import * 
+from files.player import * 
 
 #TODO: add castling, promotion, en passant (i.e. special visibility and special moves)
-
+#TODO: add restartability, move history, takebacks, show previous positions, etc...
+#TODO: i was able to move my king into a check by a pawn. take care of this.
 class Game:
     def __init__(
         self,
@@ -230,6 +231,8 @@ class Game:
                 return 'Cannot capture own piece.'
             elif self.attacks(piece, target):
                 return None 
+            else:
+                return 'Illegal capture.'
         
         # check otherwise legality
         if not self.sees(piece, piece.displacement(target), inclusive=True):
@@ -237,8 +240,8 @@ class Game:
         
         return None 
     
-    # executes a move, returns 0 by default, 1 if capture, 2 if declares check, 3 if checkmate, 4 if stalemate
-    def move(self, piece : Piece, target : tuple | Vector) -> int:
+    # executes a move, returns the nature of the move (move, take, check, etc...)
+    def move(self, piece : Piece, target : tuple | Vector) -> str:
         player = piece.player
 
         illegality = self.illegality(piece, target)
@@ -246,12 +249,12 @@ class Game:
             raise Exception(illegality)
         
         player.in_check = False 
-        result = 0
+        result = 'move'
 
         target_piece = self.at(target)
         if target_piece is not None:
             target_piece.die()
-            result = 1
+            result = 'take'
 
         self.board[target] = self.board[piece.position]
         self.board[piece.position] = -1 
@@ -268,7 +271,7 @@ class Game:
         piece.has_moved = True 
 
         if self.update_checks():
-            result = 2
+            result = 'check'
 
         # update turns and moves
         self.turn = (self.turn + 1) % len(self.players)
@@ -278,9 +281,9 @@ class Game:
         current_player = self.players[self.turn]
         if not self.has_legal_moves(self.players[self.turn]):
             if current_player.in_check:
-                result = 3 # checkmate 
+                result = 'checkmate'  
             else:
-                result = 4 # stalemate
+                result = 'stalemate' 
 
         return result 
             

@@ -1,11 +1,9 @@
-from sets import *
+from files.sets import *
 
-game = Standard.Set()
-
-from gui import *
+from files.gui import *
 
 pg.init()
 
-bs = BoardScreen(game, (640, 640))
+bs = GUI(Standard.Set, (640, 640))
 bs.run()
 
