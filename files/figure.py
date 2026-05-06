@@ -22,9 +22,6 @@ class Figure:
     
         first : List[Move] = [], # list of valid first moves
         first_exclusive : bool = False, # True if can ONLY do the above first moves 
-
-        promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
-        promotion_axis : int = -1 # the promotion axis
         ):
 
         # ensure the piece has something that it can do
@@ -40,9 +37,6 @@ class Figure:
         self.first_exclusive = first_exclusive
 
         self.dim = dim 
-        
-        self.promotes = promotes
-        self.promotion_axis = promotion_axis
 
         self.value = value  
         self.name = name
@@ -52,13 +46,19 @@ class Piece:
     def __init__(
         self,
         figure : Figure,
-        position : tuple
+        position : tuple,
+
+        promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
+        promotion_axis : int = -1 # the promotion axis
     ):
         self.player : Player | None = None 
         self.figure = figure
         self.position = position
         self.history = [position]
         self.vector = np.array(self.position)
+
+        self.promotes = promotes
+        self.promotion_axis = promotion_axis
 
         self.dead = False
         self.sprite = None

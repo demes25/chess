@@ -195,8 +195,8 @@ class Game:
         piece.has_moved = True 
 
         # we check for the possibility of promotion. 
-        index = piece.figure.promotion_axis
-        if piece.figure.promotes:
+        index = piece.promotion_axis
+        if piece.promotes:
             sign = 1 if piece.position[index] - piece.history[0][index] > 0 else -1
             # if we are at the edge of the board in the correct axis, we promote
             if not self.in_bounds(piece.vector + sign * self.basis[index]):

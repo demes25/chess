@@ -310,11 +310,8 @@ class Chess(GameSet):
                 ]
             )
         }
-
-        # TODO: pawn must promote to other things also, but for now...
-        self.White['p'].promotes = [self.White['Q']]
-        self.Black['p'].promotes = [self.Black['Q']]
     
+
     def __call__(self):
         white_army = [
             Piece(self.White['R'], (0, 0)),
@@ -327,7 +324,12 @@ class Chess(GameSet):
         ]
 
         for i in range(8):
-            white_army.append(Piece(self.White['p'], (i, 1)))
+            white_army.append(
+                Piece(
+                    self.White['p'], (i, 1), 
+                    promotes=[self.White['Q']] # TODO: must generalize promotion
+                )
+            )
         
         black_army = [
             Piece(self.Black['R'], (0, 7)),
@@ -340,7 +342,12 @@ class Chess(GameSet):
         ]
         
         for i in range(8):
-            black_army.append(Piece(self.Black['p'], (i, 6)))
+            black_army.append(
+                Piece(
+                    self.Black['p'], (i, 6), 
+                    promotes=[self.Black['Q']] # TODO: must generalize promotion
+                )
+            )
         
         white = Player(
             monarch = Piece(self.White['K'], (4, 0)),
@@ -501,9 +508,6 @@ class Shatranj(GameSet):
                 ]
             )
         }
-
-        self.White['p'].promotes = [self.White['F']]
-        self.Black['p'].promotes = [self.Black['F']]
     
     def __call__(self):
         white_army = [
@@ -517,7 +521,12 @@ class Shatranj(GameSet):
         ]
 
         for i in range(8):
-            white_army.append(Piece(self.White['p'], (i, 1)))
+            white_army.append(
+                Piece(
+                    self.White['p'], (i, 1), 
+                    promotes=[self.White['F']]
+                )
+            )
         
         black_army = [
             Piece(self.Black['R'], (0, 7)),
@@ -530,7 +539,12 @@ class Shatranj(GameSet):
         ]
         
         for i in range(8):
-            black_army.append(Piece(self.Black['p'], (i, 6)))
+            black_army.append(
+                Piece(
+                    self.Black['p'], (i, 6), 
+                    promotes=[self.Black['F']] # TODO: must generalize promotion
+                )
+            )
         
         white = Player(
             monarch = Piece(self.White['K'], (4, 0)),
@@ -545,4 +559,4 @@ class Shatranj(GameSet):
         )
 
         return Game([8, 8], [white, black])
-    
+

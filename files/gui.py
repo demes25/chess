@@ -254,7 +254,7 @@ class GUI:
                 developments = []
 
             if self.game.promoting is not None:
-                figs = self.game.promoting.figure.promotes
+                figs = self.game.promoting.promotes
                 if len(figs) == 1:
                     self.game.promote(figs[0])
                 else:
