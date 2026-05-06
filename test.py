@@ -1,9 +1,10 @@
-from files.sets import *
-
+from files.sets import Shatranj
+from files.graphics import Default
 from files.gui import *
 
 pg.init()
 
-bs = GUI(Standard.Set, (80, 80))
+standard_set = Shatranj(Default, (80, 80))
+bs = GUI(standard_set)
 bs.run()
 

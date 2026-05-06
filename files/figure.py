@@ -1,0 +1,101 @@
+# Demetre Seturidze
+# Chess
+# Figures
+
+from files.move import *
+from files.graphics import Color, load_sprite
+
+Player = Type['Player']
+
+
+class Figure:
+    def __init__(
+        self,
+        name : str,
+        value : int,   
+
+        color : Color,
+        width : int,
+        height : int,
+
+        moves : List[Move] = [], # list of valid moves
+    
+        first : List[Move] = [], # list of valid first moves
+        first_exclusive : bool = False, # True if can ONLY do the above first moves 
+
+        promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
+        promotion_axis : int = -1 # the promotion axis
+        ):
+
+        # ensure the piece has something that it can do
+        assert moves
+
+        dim = moves[0].rank
+
+        # makes sure all moves are of equal dimensionality
+        assert all(move.rank == dim for move in moves) 
+
+        self.moves = moves
+        self.first = first 
+        self.first_exclusive = first_exclusive
+
+        self.dim = dim 
+        
+        self.promotes = promotes
+        self.promotion_axis = promotion_axis
+
+        self.value = value  
+        self.name = name
+        self.sprite = load_sprite(f'files/sprites/{name}.png', color=color, width=width, height=height)
+
+class Piece:
+    def __init__(
+        self,
+        figure : Figure,
+        position : tuple
+    ):
+        self.player : Player | None = None 
+        self.figure = figure
+        self.position = position
+        self.history = [position]
+        self.vector = np.array(self.position)
+
+        self.dead = False
+        self.sprite = None
+
+        self.has_moved = False 
+        self.just_first = False 
+    
+    # returns the displacement vector between given square and current square
+    def displacement(self, target : tuple | Vector):
+        return np.array(target) - self.vector
+
+    # adds the current position to history
+    def update_history(self):
+        self.history.append(self.position)
+    
+    # kills this piece
+    def die(self):
+        assert len(self.player.monarchs) > 1 or self is not self.player.monarchs[0], 'General piece cannot be captured.'
+        
+        self.dead = True
+        self.player.material -= self.figure.value 
+        try:
+            self.player.army.remove(self)
+        except ValueError as e:
+            self.player.monarchs.remove(self)
+
+
+    # a dynamic function that iterates through all available moves for this piece
+    def available_squares(self, game):
+        if not self.has_moved:
+            for move in self.figure.first:
+                for square in move.available_squares(game, self.vector):
+                    yield square
+            
+            if self.figure.first_exclusive:
+                return
+        
+        for move in self.figure.moves:
+            for square in move.available_squares(game, self.vector):
+                yield square
