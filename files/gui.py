@@ -1,130 +1,172 @@
+# Demetre Seturidze
+# Chess
+# User Interface / Run Loop
+
 from files.game import *
 import pygame as pg
+from files.boards import Board
+from files.assets import load_sprite, new_surface, Surface, tint
+
+RAISE = False
 
 
-Color = Tuple[int, int, int]
-Sound = pg.mixer.Sound
-
-pg.init()
-pg.mixer.init()
-
-def _conditional_play(sound : Sound | None):
-    if sound is not None:
-        sound.play()
-
-def _load_image(filename : str, color : Color, width : int, height : int, opacity : int = 255):
-    # Make a copy so original stays unchanged
-    surface = pg.image.load(filename)
-    surface = pg.transform.scale(surface, (width, height))
-    
-    # Fill with tint color using multiply blend
-    surface.fill((*color, opacity), special_flags=pg.BLEND_RGBA_MULT)
-    
-    return surface
-
-
-# TODO: some takes don't register graphically
 class GUI:
     def __init__(
         self,
-        setup : Callable[[], Game],
-        dims : Tuple[int, int],
-        colors : Tuple[Color, Color] = ((250, 242, 210), (90, 50, 35)),
-        player_colors : List[Color] = [(220, 192, 180), (130, 80, 70)],
-
-        checkmate_color : Color = (214, 45, 25),
-        stalemate_color : Color = (125, 89, 50),
-
-        game_over_color : Color = (170, 120, 100),
-        text_color : Color = (220, 192, 180),
-
+        board : Board,
         caption : str = 'Chussy',
 
-        sprite_size : float = 0.95, # proportion of each tile that the sprite takes up.
-        title_font_size : float = 0.5,
-        caption_font_size : float = 0.3
+        title_font_size : float = 0.5, # proporitons of each tile that is the height of the text
+        caption_font_size : float = 0.3,
+        plaque_opacity : int = 230, # opacity for plaques
+        selection_opacity : int = 210 # alpha for selection tiles.
     ):
-        self.setup = setup 
-        self.game = setup()
-        self.game_over = False 
 
-        # TODO: generalize
-        assert self.game.rank == 2
-        assert len(self.game.players) == 2 
+        self.board = board 
 
-        self.center = (dims[0]//2, dims[1]//2)
-
-        self.screen = pg.display.set_mode(dims)
-
+        self.screen = pg.display.set_mode((self.board.width, self.board.height))
         pg.display.set_caption(caption)
 
-        self.COLS, self.ROWS = self.game.board.shape
+        colors = board.scheme
+        dims = board.tile_dims
 
-        self.width, self.height = dims 
+        # blocks with which we can construct plaques 
+        self.blocks = {
+            's' : load_sprite('tiles/Box.png', dims=dims), # single
 
-        self.tile_W = self.width // self.COLS
-        self.tile_H = self.height // self.ROWS
+            't' : load_sprite('tiles/Top.png', dims=dims), # top
+            'b' : load_sprite('tiles/Bottom.png', dims=dims), # bottom
+            'v' : load_sprite('tiles/Vertical.png', dims=dims), # vertical
 
-        self.colors = colors 
+            'l' : load_sprite('tiles/Left.png', dims=dims), # left
+            'r' : load_sprite('tiles/Right.png', dims=dims), # right
+            'h' : load_sprite('tiles/Horizontal.png', dims=dims), # horizontal
 
-        self.title_font = pg.font.Font('files/font.ttf', int(self.tile_H * title_font_size))
-        self.caption_font = pg.font.Font('files/font.ttf', int(self.tile_H * caption_font_size))
 
-        self.checkmate_text = self.title_font.render('Checkmate', True, checkmate_color)
-        self.stalemate_text = self.title_font.render('Stalemate', True, stalemate_color)
+            'le' : load_sprite('tiles/LeftEdge.png', dims=dims), # left edge
+            're' : load_sprite('tiles/RightEdge.png', dims=dims), # right edge
+            'te' : load_sprite('tiles/TopEdge.png', dims=dims), # top edge
+            'be' : load_sprite('tiles/BottomEdge.png', dims=dims), # bottom edge
 
-        self.plaque = _load_image('files/sprites/plaque.png', game_over_color, 5*self.tile_W, 3*self.tile_H, opacity=210)
-        self.reset_button = self.caption_font.render('Reset', True, text_color)
-        self.close_button = self.caption_font.render('Quit', True, text_color)
+            'tl' : load_sprite('tiles/TopLeft.png', dims=dims), # top left
+            'bl' : load_sprite('tiles/BottomLeft.png', dims=dims), # bottom left
+            'tr' : load_sprite('tiles/TopRight.png', dims=dims), # top right
+            'br' : load_sprite('tiles/BottomRight.png', dims=dims), # bottom right
+
+            'm' : load_sprite('tiles/Middle.png', dims=dims) # middle
+        }
+
+
+        self.title_font = pg.font.Font('files/font.ttf', int(self.board.tile_height * title_font_size))
+        self.caption_font = pg.font.Font('files/font.ttf', int(self.board.tile_height * caption_font_size))
+
+        self.checkmate_text = self.title_font.render('Checkmate', True, colors['checkmate'])
+        self.stalemate_text = self.title_font.render('Stalemate', True, colors['stalemate'])
+
+        self.plaque_opacity = plaque_opacity
+        self.selection_opacity = selection_opacity
+
+        
+        self.game_over_plaque : Surface | None = None # the game over plaque, we construct it upon the first game over
+        self.reset_button = self.caption_font.render('Reset', True, colors['text'])
+        self.close_button = self.caption_font.render('Quit', True, colors['text'])
 
         self.reset_center = None 
         self.close_center = None 
 
+        self.mouse_dragging = None 
+
         self.game_over_screen = None  
+        self.game_over_rect = None 
+    
+    # constructs a plaque using blocks sprites
+    # width and height are the dimensions of the plaque in terms of tiles, 
+    # i.e. 3x5 would return a 3 tile by 5 tile plaque
+    def new_plaque(self, width : int, height : int, color : Color, opacity : int = 255):
+        tile_w = self.board.tile_width
+        tile_h = self.board.tile_height
 
-        self.player_colors = player_colors if player_colors else colors
+        # special cases if any of the dimensions are one
+        if width == 1 and height == 1:
+            return tint(self.blocks['s'].copy(), color=color, opacity=opacity)
+        
+        if width == 1:
+            surface = new_surface((tile_w, height * tile_h))
 
-        self.sounds = {
-            'move' : Sound('files/sounds/move.mp3'), 
-            'take' : Sound('files/sounds/take.mp3'), 
-            'check' : Sound('files/sounds/check.mp3'), 
-            'start' : Sound('files/sounds/start.mp3'), 
-            'end' : Sound('files/sounds/end.mp3'),
-            'illegal' : Sound('files/sounds/illegal.mp3')
-        }
+            t = self.blocks['t']
+            b = self.blocks['b']
+            v = self.blocks['v']
 
-        self.sprites = [
-            _load_image(
-                f'files/sprites/{piece.figure.name}.png', 
-                color = self.player_colors[piece.player.index],
-                width = int(sprite_size*self.tile_W),
-                height = int(sprite_size*self.tile_H)
-            ) 
-            for piece in self.game.entities
-        ]
+            surface.blit(t, (0, 0))
+            surface.blit(b, (0, (height-1)*tile_h))
 
-        self.held_piece = None 
+            for i in range(1, height-1):
+                surface.blit(v, (0, i*tile_h))
+            
+            return tint(surface, color=color, opacity = opacity)
 
-    # translates a point on the screen to a square on the board
-    def board_pos(self, screen_pos : tuple):
-        i, j = screen_pos 
+        if height == 1:
+            surface = new_surface((width * tile_w, tile_h))
 
-        return i // self.tile_W, (self.height - j) // self.tile_H
+            l = self.blocks['l']
+            r = self.blocks['r']
+            h = self.blocks['h']
 
-    # translates a square on the board to its center point on the screen
-    def screen_pos(self, board_pos : tuple):
-        I, J = board_pos
+            surface.blit(l, (0, 0))
+            surface.blit(r, ((width-1)*tile_w, 0))
 
-        i = int(self.tile_W * (I + 0.5))
-        j = int(self.height - (J + 0.5)*self.tile_H)
+            for i in range(1, width-1):
+                surface.blit(h, (i*tile_w, 0))
+            
+            return tint(surface, color=color, opacity = opacity)
 
-        return i, j 
+        # otherwise: 
+        surface = new_surface((width * tile_w, height * tile_h))
+
+        tl = self.blocks['tl']
+        bl = self.blocks['bl']
+        tr = self.blocks['tr']
+        br = self.blocks['br']
+
+        BOTTOM = (height-1) * tile_h 
+        RIGHT = (width-1) * tile_w 
+
+        surface.blit(tl, (0, 0))
+        surface.blit(bl, (0, BOTTOM))
+        surface.blit(tr, (RIGHT, 0))
+        surface.blit(br, (RIGHT, BOTTOM))
+
+        te = self.blocks['te']
+        be = self.blocks['be']
+        le = self.blocks['le']
+        re = self.blocks['re']
+        
+        for i in range(1, width-1):
+            I = i * tile_w 
+            surface.blit(te, (I, 0))
+            surface.blit(be, (I, BOTTOM))
+        
+        for i in range(1, height-1):
+            I = i * tile_h 
+            surface.blit(le, (0, I))
+            surface.blit(re, (RIGHT, I))
+        
+        m = self.blocks['m']
+        for i in range(1, width-1):
+            for j in range(1, height-1):
+                surface.blit(m, (i * tile_w, j * tile_h))
+        
+        return tint(surface, color=color, opacity=opacity)
 
     # constructs the game over screen
-    def _construct_game_over_screen(self, text : pg.surface.Surface):
-        plaque = self.plaque.copy()
+    def construct_game_over_screen(self, text : pg.surface.Surface):
+        if self.game_over_plaque is None:
+            self.game_over_plaque = self.new_plaque(width=5, height=3, color=self.board.scheme['plaque'], opacity=self.plaque_opacity)
+
+        plaque = self.game_over_plaque.copy()
         plaque_rect = plaque.get_rect()
         x, y = plaque_rect.center
+        Xmid, Ymid = self.board.center
 
         dx_r = plaque_rect.width // 5
         dx_q = plaque_rect.width // 4
@@ -140,7 +182,7 @@ class GUI:
         new_button_rect.center = (x - dx_r, y + dy)
 
         if self.reset_center is None:
-            self.reset_center = (self.width // 2 - dx_r, self.height // 2 + dy)
+            self.reset_center = (Xmid - dx_r, Ymid + dy)
 
         plaque.blit(new_button, new_button_rect)
 
@@ -149,20 +191,16 @@ class GUI:
         quit_button_rect.center = (x + dx_q, y + dy)
 
         if self.close_center is None:
-            self.close_center = (self.width // 2 + dx_q, self.height // 2 + dy)
+            self.close_center = (Xmid + dx_q, Ymid + dy)
 
         plaque.blit(quit_button, quit_button_rect)
 
         self.game_over_screen = plaque 
-    
-    # resets the game
-    def _reset(self):
-        self.game = self.setup()
-        self.game_over = False 
-        self.game_over_screen = None 
+        plaque_rect.center = self.board.center
+        self.game_over_rect = plaque_rect
 
-    # returns true if the given position clicks the reset button
-    def _is_within(self, pos, size, center):
+    # returns true if the given position clicks the given square
+    def hits(self, pos, size, center):
         w = (size[0]+1)//2
         h = (size[1]+1)//2 
 
@@ -171,140 +209,119 @@ class GUI:
         X, Y = center 
 
         return (X - w <= x <= X + w) and (Y - h <= y <= Y + h)
-
-    # draws the board
-    def draw_board(self):
-        W = self.tile_W
-        H = self.tile_H
-
-        for i in range(self.ROWS):
-            for j in range(self.COLS):
-                # Alternate color based on position
-                color = self.colors[(i+j) % 2]
-
-                pg.draw.rect(
-                    self.screen,
-                    color,
-                    (j * W, i * H, W, H)
-                ) 
-
-    # draws the piece at the corresponding square
-    def draw_piece(self, piece : Piece, sprite : pg.surface.Surface):
-        rect = sprite.get_rect()
-        rect.center = pg.mouse.get_pos() if piece is self.held_piece else self.screen_pos(piece.position)
-        self.screen.blit(sprite, rect) 
     
-    def draw_name(self, piece : Piece, color : Color):
-        self.draw_piece(piece, self.font.render(piece.figure.name, True, color))
 
+    def ingame_event_loop(self, vars : dict) -> List[str]:
+        developments = []
 
-    # TODO: introduce sprites
-    def draw_names(self):
-        for i in range(len(self.game.players)):
-            player = self.game.players[i]
-            color = self.player_colors[i]
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                vars['running'] = False
+            
+            if event.type == pg.MOUSEBUTTONDOWN:
+                # selects the piece
+                self.board.select(event.pos)
+            
+            if event.type == pg.MOUSEBUTTONUP:
+                selected = self.board.selected_piece
+                if selected is not None:
+                    target = self.board.board_pos(event.pos)
 
-            self.draw_name(player.general, color)
-
-            for piece in player.army:
-                self.draw_name(piece, color)
-
-
-    def draw_pieces(self):
-        held_sprite = None 
-
-        for piece, sprite in zip(self.game.entities, self.sprites):
-            if piece is self.held_piece:
-                held_sprite = sprite 
-            elif not piece.dead:  
-                self.draw_piece(piece, sprite)
+                    if target != selected.position:
+                        try:
+                            developments = self.board.game.move(selected, target)
+                        except Exception as e:
+                            if not RAISE:
+                                self.board.sounds['illegal'].play()
+                                print(e)
+                            else:
+                                raise 
+                            
+                    
+                    self.board.deselect()
         
-        if held_sprite is not None:
-            self.draw_piece(self.held_piece, held_sprite)
-    
-    def draw(self):
-        self.draw_board()
-        self.draw_pieces()
+        return developments 
+            
+    def game_over_event_loop(self, vars : dict) -> List[str]:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                vars['running'] = False
+            
+            if event.type == pg.MOUSEBUTTONDOWN:
+                vars['click_pos'] = event.pos
+            
+            if event.type == pg.MOUSEBUTTONUP and vars['click_pos'] is not None:
+                # IF RESET
+                reset_size = self.reset_button.get_rect().size
+                reset_center = self.reset_center
 
-    def show(self):
+                quit_size = self.close_button.get_rect().size 
+                quit_center = self.close_center
+
+                if self.hits(vars['click_pos'], reset_size, reset_center) and self.hits(event.pos, reset_size, reset_center): 
+                    sound = self.board.begin()
+                    self.game_over_screen = None
+                    self.game_over_rect = None 
+                    sound.play()
+                elif self.hits(vars['click_pos'], quit_size, quit_center) and self.hits(event.pos, quit_size, quit_center):
+                    vars['running'] = False
+        
+        return []
+                
+
+    # flips a frame given the variables and developments
+    def frame(self, developments : List[str]):
+        image, sounds = self.board.update(developments, pg.mouse.get_pos())
+
+        self.screen.blit(image, (0,0))
+        for sound in sounds:
+            sound.play()
+
+        promoting = self.board.game.promoting
+        if promoting is not None:
+            figs = promoting.promotion_list
+            if len(figs) == 1:
+                    sound_keys = self.board.game.promote(figs[0])
+                    # if the player is out of legal moves, the game ends
+                    for sound_key in sound_keys:
+                        self.board.sounds[sound_key].play()
+            else:
+                # WRITE THIS!
+                return
+        
+        game_over = self.board.game.game_over
+
+        if game_over != 0:
+            if self.game_over_screen is None:
+                self.construct_game_over_screen(self.checkmate_text if game_over == 1 else self.stalemate_text)
+            
+            self.screen.blit(self.game_over_screen, self.game_over_rect)
+
         pg.display.flip()
-
-    def update(self, development):
-        self.draw()
-
-        if not self.game_over:
-            if development == 'stalemate':
-                self.sounds['end'].play()
-                self.game_over = True 
-                self._construct_game_over_screen(self.stalemate_text)
-            elif development == 'checkmate':
-                self.sounds['check'].play()
-                self.sounds['end'].play()
-                self.game_over = True 
-                self._construct_game_over_screen(self.checkmate_text)
-            elif development:
-                _conditional_play(self.sounds.get(development, None))
-
-        if self.game_over:
-            rect = self.game_over_screen.get_rect()
-            rect.center = self.center 
-            self.screen.blit(self.game_over_screen, rect)
-        
-        self.show()
+            
 
     def run(self):
-        running = True 
-        development = None
+        # keeps track of loop parameters to be able to modularize the event loop.
+        # this thing gets passed around and edited in-place as opposed to holding
+        # all variables locally inside the run function
+        vars = {
+            'running' : True,
+            'click_pos' : None
+        }
 
-        click_pos = None 
+        start_sound = self.board.begin()
+        start_sound.play()
 
-        while running:
-            if not self.game_over:
-                for event in pg.event.get():
-                    if event.type == pg.QUIT:
-                        running = False
-                    
-                    if event.type == pg.MOUSEBUTTONDOWN:
-                        self.held_piece = self.game.at(self.board_pos(event.pos))
-                    
-                    if event.type == pg.MOUSEBUTTONUP:
-                        if self.held_piece is not None:
-                            target = self.board_pos(event.pos)
-
-                            if target != self.held_piece.position:
-                                try:
-                                    development = self.game.move(self.held_piece, target)
-                                except Exception as e:
-                                    _conditional_play(self.sounds.get('illegal', None))
-                                    print(e)
-                                    
-                            
-                            self.held_piece = None
-
+        while vars['running']:
+            if not self.board.game.game_over:
+                developments = self.ingame_event_loop(vars)
             else:
-                for event in pg.event.get():
-                    if event.type == pg.QUIT:
-                        running = False
-                    
-                    if event.type == pg.MOUSEBUTTONDOWN:
-                        click_pos = event.pos
-                    
-                    if event.type == pg.MOUSEBUTTONDOWN:
-                        # IF RESET
-                        reset_size = self.reset_button.get_rect().size
-                        reset_center = self.reset_center
+                developments = self.game_over_event_loop(vars)
 
-                        quit_size = self.close_button.get_rect().size 
-                        quit_center = self.close_center
+            self.frame(developments)
 
-                        if self._is_within(click_pos, reset_size, reset_center) and self._is_within(event.pos, reset_size, reset_center):
-                            development = None 
-                            self._reset()
-                        elif self._is_within(click_pos, quit_size, quit_center) and self._is_within(event.pos, quit_size, quit_center):
-                            running = False
-                
-            self.update(development)
+            
 
-            if not self.game_over:
-                development = None
+
+
 
