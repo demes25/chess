@@ -1,26 +1,138 @@
+# Demetre Seturidze
+# Chess
+# Boards
+
 from files.game import *
 from abc import ABC, abstractmethod
-from files.graphics import Scheme
+from files.assets import Sound, Surface, Scheme, SFX, DefaultScheme, DefaultSFX
+from files.assets import load_sprite, tint
 
 xhat = np.array([1, 0])
 yhat = np.array([0, 1])
 
-class GameSet(ABC):
+class Board(ABC):
     def __init__(
         self, 
-        scheme : Scheme,
         tile_dims : Tuple[int, int],
+        dimensions : List[int] = [8, 8], 
+        num_players : int = 2,
 
+        scheme : Scheme = DefaultScheme, # the color scheme
+        sounds : SFX = DefaultSFX,
         sprite_size : float = 0.95 # proportion of each tile that the sprite takes up.
     ):
+        self.num_players = num_players
+
+        self.dimensions = dimensions
+        self.rank = len(dimensions)
+
+        # TODO: generalize tile dimensions and board rank. right now only supports rank-2 [n x m] boards
+        # and 2 players
+        assert len(dimensions) == 2
+        assert num_players == 2
+
         self.scheme = scheme
+        self.sounds = sounds
+
         self.tile_width, self.tile_height = self.tile_dims = tile_dims 
 
-        self.sprite_width = int(self.tile_width * sprite_size)
-        self.sprite_height = int(self.tile_height * sprite_size)
+        tile = load_sprite('tiles/Tile.png', dims=tile_dims)
 
+        white_tile = tint(tile.copy(), color=scheme['tile_white'])
+        black_tile = tint(tile.copy(), color=scheme['tile_black'])
+
+        self.tiles = (white_tile, black_tile) # the tiles - colored square surfaces
+
+        self.figure_width = int(self.tile_width * sprite_size) # figure sprite width
+        self.figure_height = int(self.tile_height * sprite_size) # figure sprite height
+        self.figure_dims = (self.figure_width, self.figure_height)
+
+        self.game = None
+        
+        self.COLS, self.ROWS = self.dimensions = dimensions
+        self.width = self.COLS * self.tile_width
+        self.height = self.ROWS * self.tile_height 
+
+        self.surface = Surface((self.width, self.height))
+        self.center = (self.width//2, self.height//2)
+        self.selected_piece = None 
+
+
+    # translates a point on the screen to a square on the board
+    def board_pos(self, coords : tuple):
+        i, j = coords 
+
+        return i // self.tile_width, (self.height - j) // self.tile_height
+
+    # translates a square on the board to its center point on the screen
+    def coords(self, board_pos : tuple):
+        I, J = board_pos
+
+        i = int(self.tile_width * (I + 0.5))
+        j = int(self.height - (J + 0.5)*self.tile_height)
+
+        return i, j 
+
+    # "selects" the piece 
+    def select(self, coords : tuple):
+        self.selected_piece = self.game.at(self.board_pos(coords))
     
-    #should returns a Game object with a chess game on this set
+    def deselect(self):
+        self.selected_piece = None 
+
+    # begins the game, returns the start sound effect
+    def begin(self) -> Sound:
+        self.game = self.__call__()
+        self.game.game_over = 0 
+        self.game_over_screen = None 
+        return self.sounds['start']
+
+    # draws the board
+    def draw_board(self):
+        W = self.tile_width
+        H = self.tile_height
+
+        for i in range(self.ROWS):
+            for j in range(self.COLS):
+                # Alternate color based on position
+                tile = self.tiles[(i+j) % 2]
+
+                self.surface.blit(tile, (j * W, i * H))
+    
+    # draws the piece at the corresponding square
+    def draw_piece(self, piece : Piece, coords : Tuple[int, int] | None = None):
+        sprite = piece.figure.sprite
+        rect = sprite.get_rect()
+        rect.center = coords if coords is not None else self.coords(piece.position)
+        self.surface.blit(sprite, rect) 
+    
+    # draws all pieces. held_coords is the coordinate of the center of the held piece.
+    # if it is None, we assume that the piece has not been "picked up" and we draw it on its square.
+    def draw_pieces(self, held_coords : Tuple[int, int] | None = None):
+        if not self.game:
+            return
+        
+        for piece in self.game.pieces.values():
+            if piece is not self.selected_piece:
+                self.draw_piece(piece)
+        
+        if self.selected_piece is not None:
+            self.draw_piece(self.selected_piece, held_coords)
+    
+    # draws the board to its surface
+    def draw(self, held_coords : Tuple[int, int] | None = None):
+        self.draw_board()
+        self.draw_pieces(held_coords=held_coords)
+
+    # returns the surface image and a list of sounds according to the list of developments
+    # also updates its internal state depending on developments
+    def update(self, developments : List[str], held_coords : Tuple[int, int] | None = None) -> Tuple[Surface, List[Sound]]:
+        self.draw(held_coords)
+        
+        sounds = [self.sounds[development] for development in developments]
+        return self.surface, sounds
+        
+    #should return a Game object with a chess game on this set
     @abstractmethod
     def __call__(self) -> Game:
         pass
@@ -153,23 +265,24 @@ class Moves:
 
 # here we store moves and figures for Standard Chess.
 # we also have a "constructor" (__call__) which gives us the full game
-class Chess(GameSet): 
+class Chess(Board): 
     def __init__(
         self, 
-        scheme : Scheme,
         tile_dims : Tuple[int, int],
+
+        scheme : Scheme = DefaultScheme,
+        sounds : SFX = DefaultSFX,
 
         sprite_size : float = 0.95
     ):
-        super().__init__(scheme, tile_dims, sprite_size=sprite_size)
+        super().__init__(tile_dims, dimensions=[8, 8], num_players=2, scheme=scheme, sounds=sounds, sprite_size=sprite_size)
 
         self.White : Dict[str, Figure] = {
             'K' : Figure(
                 name = 'King', 
                 value = 0, 
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.Perimeter()
                 ],
@@ -182,8 +295,7 @@ class Chess(GameSet):
                 name = 'Queen', 
                 value = 9, 
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan(), Moves.DiagonalSpan()
                 ]
@@ -193,8 +305,7 @@ class Chess(GameSet):
                 name = 'Rook',
                 value = 5,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan()
                 ]
@@ -204,8 +315,7 @@ class Chess(GameSet):
                 name = 'Bishop',
                 value = 3,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.DiagonalSpan()
                 ]
@@ -215,8 +325,7 @@ class Chess(GameSet):
                 name = 'Knight',
                 value = 3,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.KnightLeap()
                 ]
@@ -226,8 +335,7 @@ class Chess(GameSet):
                 name = 'Pawn',
                 value = 1,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.PawnPush(1), Moves.PawnTake(1), Moves.EnPassant(1)
                 ],
@@ -242,8 +350,7 @@ class Chess(GameSet):
                 name = 'King', 
                 value = 0, 
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.Perimeter()
                 ],
@@ -256,8 +363,7 @@ class Chess(GameSet):
                 name = 'Queen', 
                 value = 9, 
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan(), Moves.DiagonalSpan()
                 ]
@@ -267,8 +373,7 @@ class Chess(GameSet):
                 name = 'Rook',
                 value = 5,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan()
                 ]
@@ -278,8 +383,7 @@ class Chess(GameSet):
                 name = 'Bishop',
                 value = 3,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.DiagonalSpan()
                 ]
@@ -289,8 +393,7 @@ class Chess(GameSet):
                 name = 'Knight',
                 value = 3,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.KnightLeap()
                 ]
@@ -300,8 +403,7 @@ class Chess(GameSet):
                 name = 'Pawn',
                 value = 1,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                dims = self.figure_dims,
                 moves = [
                     Moves.PawnPush(-1), Moves.PawnTake(-1), Moves.EnPassant(-1)
                 ],
@@ -361,25 +463,27 @@ class Chess(GameSet):
             index = 1
         )
 
-        return Game([8, 8], [white, black])
+        return Game(self.dimensions, [white, black])
 
-class Shatranj(GameSet):
+class Shatranj(Board):
     def __init__(
         self, 
-        scheme : Scheme,
         tile_dims : Tuple[int, int],
+
+        scheme : Scheme = DefaultScheme,
+        sounds : SFX = DefaultSFX,
 
         sprite_size : float = 0.95
     ):
-        super().__init__(scheme, tile_dims, sprite_size=sprite_size)
+        super().__init__(tile_dims, dimensions=[8, 8], num_players=2, scheme=scheme, sounds=sounds, sprite_size=sprite_size)
 
         self.White : Dict[str, Figure] = {
             'K' : Figure(
                 name = 'King', 
                 value = 0, 
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.Perimeter()
                 ]
@@ -389,8 +493,8 @@ class Shatranj(GameSet):
                 name = 'Ferz', 
                 value = 2, 
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.DiagonalStep()
                 ]
@@ -400,8 +504,8 @@ class Shatranj(GameSet):
                 name = 'Rook',
                 value = 5,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan()
                 ]
@@ -411,8 +515,8 @@ class Shatranj(GameSet):
                 name = 'Alfil',
                 value = 2,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.AlfilLeap()
                 ]
@@ -422,8 +526,8 @@ class Shatranj(GameSet):
                 name = 'Knight',
                 value = 3,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.KnightLeap()
                 ]
@@ -433,8 +537,8 @@ class Shatranj(GameSet):
                 name = 'Pawn',
                 value = 1,
                 color = scheme['player_white'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.PawnPush(1), Moves.PawnTake(1)
                 ]
@@ -446,8 +550,8 @@ class Shatranj(GameSet):
                 name = 'King', 
                 value = 0, 
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.Perimeter()
                 ]
@@ -457,8 +561,8 @@ class Shatranj(GameSet):
                 name = 'Ferz', 
                 value = 9, 
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.DiagonalStep()
                 ]
@@ -468,8 +572,8 @@ class Shatranj(GameSet):
                 name = 'Rook',
                 value = 5,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.OrthogonalSpan()
                 ]
@@ -479,8 +583,8 @@ class Shatranj(GameSet):
                 name = 'Alfil',
                 value = 3,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.AlfilLeap()
                 ]
@@ -490,8 +594,8 @@ class Shatranj(GameSet):
                 name = 'Knight',
                 value = 3,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.KnightLeap()
                 ]
@@ -501,8 +605,8 @@ class Shatranj(GameSet):
                 name = 'Pawn',
                 value = 1,
                 color = scheme['player_black'], 
-                width = self.sprite_width,
-                height = self.sprite_height,
+                
+                dims = self.figure_dims,
                 moves = [
                     Moves.PawnPush(-1), Moves.PawnTake(-1)
                 ]

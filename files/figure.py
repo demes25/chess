@@ -2,8 +2,8 @@
 # Chess
 # Figures
 
-from files.move import *
-from files.graphics import Color, load_sprite
+from files.moves import *
+from files.assets import Color, load_sprite
 
 Player = Type['Player']
 
@@ -14,9 +14,8 @@ class Figure:
         name : str,
         value : int,   
 
-        color : Color,
-        width : int,
-        height : int,
+        color : Color, # color of the sprite 
+        dims : Tuple[int, int], # dimensions of the sprite
 
         moves : List[Move] = [], # list of valid moves
     
@@ -40,7 +39,7 @@ class Figure:
 
         self.value = value  
         self.name = name
-        self.sprite = load_sprite(f'files/sprites/{name}.png', color=color, width=width, height=height)
+        self.sprite = load_sprite(f'figures/{name}.png', dims=dims, color=color)
 
 class Piece:
     def __init__(
@@ -57,7 +56,7 @@ class Piece:
         self.history = [position]
         self.vector = np.array(self.position)
 
-        self.promotes = promotes
+        self.promotion_list = promotes
         self.promotion_axis = promotion_axis
 
         self.dead = False

@@ -24,6 +24,7 @@ class Game:
         self.turn = 0
         self.move_num = 0  # the amount of times that every player has made a move (after each player makes one move, we increment)
 
+        self.game_over = 0 # 0 if game on, 1 if checkmate, 2 if stalemate
         self.promoting = None # the piece which is currently promoting 
 
         assert all(player.rank == self.rank for player in players)
@@ -154,6 +155,9 @@ class Game:
         
         if piece.dead:
             raise Exception('The given piece is dead.')
+        
+        if not self.in_bounds(target):
+            raise Exception('Target square out of bounds.')
 
         player = piece.player 
 
@@ -196,15 +200,18 @@ class Game:
 
         # we check for the possibility of promotion. 
         index = piece.promotion_axis
-        if piece.promotes:
+        if piece.promotion_list:
             sign = 1 if piece.position[index] - piece.history[0][index] > 0 else -1
             # if we are at the edge of the board in the correct axis, we promote
             if not self.in_bounds(piece.vector + sign * self.basis[index]):
                 self.promoting = piece
-                result.append('promote')
 
-        if self.update_checks():
+        check = self.update_checks()
+        if check:
             result.append('check')
+
+            if 'move' in result:
+                result.remove('move')
 
         # update turns and moves
         self.turn = (self.turn + 1) % len(self.players)
@@ -214,13 +221,26 @@ class Game:
         # if the player is out of legal moves, the game ends
         if not self.has_legal_moves(self.players[self.turn]):
             result.append('end')
+            self.game_over = 1 if check else 2 
 
         return result 
     
-    def promote(self, figure : Figure):
+    def promote(self, figure : Figure) -> List[str]:
         if self.promoting is not None:
             self.promoting.figure = figure
             self.promoting = None 
+            
+            result = ['promote']
+
+            check = self.update_checks()
+            if check:
+                result.append('check')
+            if not self.has_legal_moves(self.players[self.turn]):
+                result.append('end')
+                self.game_over = 1 if check else 2 
+
+            return result
+        
         else:
             raise Exception('No pieces are currently promoting.')
 

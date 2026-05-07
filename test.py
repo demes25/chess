@@ -1,10 +1,10 @@
-from files.sets import Shatranj, Chess
-from files.graphics import Default
+from files.boards import Shatranj, Chess
+from files.assets import IndianScheme
 from files.gui import *
 
 pg.init()
 
-standard_set = Chess(Default, (80, 80))
+standard_set = Chess((80, 80))
 bs = GUI(standard_set)
 bs.run()
 
