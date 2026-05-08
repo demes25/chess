@@ -3,7 +3,7 @@
 # Game
 
 from files.player import * 
-
+from typing import Dict
 
 class Status:
     ONGOING = 0
@@ -11,7 +11,7 @@ class Status:
     STALEMATE = 2
     PROMOTING = 3
 
-#TODO: promotion
+#TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
 #TODO: add restartability, move history, takebacks, show previous positions, etc...
 class Game:
     def __init__(

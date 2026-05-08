@@ -2,7 +2,7 @@
 # Chess
 # Moves
 
-from typing import *
+from typing import Type, List, Callable
 from abc import ABC, abstractmethod    
 import numpy as np  
 

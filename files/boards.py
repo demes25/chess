@@ -2,6 +2,7 @@
 # Chess
 # Boards
 
+from typing import List, Tuple
 from files.game import *
 from abc import ABC, abstractmethod
 from files.assets import Sound, Surface, Scheme, SFX, DefaultScheme, DefaultSFX
@@ -151,8 +152,13 @@ class Moves:
         return Discrete([(1, 0), (0, 1), (-1, 0), (0, -1)])
     
     # we create a special move: castle   
+    # we may castle n steps;
+    # the "restrict" parameter allows us to restrict how many squares the king must be moved in order to execute castle.
+    # if restricted, it will only execute castle if the king is slid by n steps. otherwise, any k >= n steps. 
+    # the condition is that the rook must be at the end of the board
+    # also we need to know the board width
     @staticmethod
-    def Castle() -> Move:         
+    def Castle(n : int = 2, width : int = 8, restrict : bool = False) -> Move:         
         def castle_validity(game : Game, end : Vector) -> bool:
             return True 
         
@@ -169,8 +175,8 @@ class Moves:
             king = game.at(start)
             if king is None or king.has_moved or king.player.is_in_check:
                 return False
-            
-            rook_pos = np.array([7, start[1]]) if sign else np.array([0, start[1]])
+
+            rook_pos = np.array([width-1, start[1]]) if sign else np.array([0, start[1]])
             rook = game.at(rook_pos)
             if rook is None or rook.has_moved:
                 return False
@@ -197,18 +203,26 @@ class Moves:
                 
         def castle_exec(game : Game, piece : Piece, target : Vector) -> bool:
             sign = (target - piece.vector)[0] > 0
-            rook_pos = np.array([7, piece.vector[1]]) if sign else np.array([0, piece.vector[1]])
+            rook_pos = np.array([width-1, piece.vector[1]]) if sign else np.array([0, piece.vector[1]])
             dir = xhat if sign else -xhat
 
             init_pos = piece.vector
             rook = game.at(rook_pos)
 
-            Move.generalized_execute(game, piece, init_pos + 2*dir)
-            Move.generalized_execute(game, rook, init_pos + dir)
+            Move.generalized_execute(game, piece, init_pos + n*dir)
+            Move.generalized_execute(game, rook, init_pos + (n-1)*dir)
 
             return False
 
-        return Discrete([(-2, 0), (2, 0), (-3, 0), (3, 0), (-4, 0), (4, 0), (-5, 0), (5, 0)], captures = False, special_condition=castle_condition, special_exec=castle_exec, special_validity=castle_validity)
+        if restrict:
+            dirs = [(-n, 0), (n, 0)]
+        else:
+            dirs = []
+            for k in range(n, (width+1)//2 + 2):
+                dirs.append((-k, 0))
+                dirs.append((k, 0))
+
+        return Discrete(dirs=dirs, captures = False, special_condition=castle_condition, special_exec=castle_exec, special_validity=castle_validity)
         
     # we create a special move: en passant
     @staticmethod
@@ -247,6 +261,10 @@ class Moves:
     def KnightLeap() -> Move:
         return Discrete([(2, 1), (1, 2), (-1, 2), (-2, 1), (2, -1), (1, -2), (-2, -1), (-1, -2)])
 
+    @staticmethod
+    def CamelLeap() -> Move:
+        return Discrete([(3, 1), (1, 3), (-1, 3), (-3, 1), (3, -1), (1, -3), (-3, -1), (-1, -3)])
+    
     @staticmethod 
     def AlfilLeap() -> Move:
         return Discrete([(2, 2), (2, -2), (-2, 2), (-2, -2)])
@@ -266,6 +284,78 @@ class Moves:
 # here we store moves and figures for Standard Chess.
 # we also have a "constructor" (__call__) which gives us the full game
 class Chess(Board): 
+    
+    @staticmethod
+    # we create the standard set of pieces given a color forward direction 
+    def Figures(color : Color, dims : Tuple[int, int], forward : int) -> Dict[str, Figure]: 
+        return {
+            'K' : Figure(
+                name = 'King', 
+                value = 0, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.Perimeter()
+                ],
+                first = [
+                    Moves.Castle(n=2, width=8, restrict=False)
+                ]
+            ),
+
+            'Q' : Figure(
+                name = 'Queen', 
+                value = 9, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
+                ]
+            ),
+
+            'R' : Figure(
+                name = 'Rook',
+                value = 5,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.OrthogonalSpan()
+                ]
+            ),
+
+            'B' : Figure(
+                name = 'Bishop',
+                value = 3,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.DiagonalSpan()
+                ]
+            ),
+
+            'N' : Figure(
+                name = 'Knight',
+                value = 3,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.KnightLeap()
+                ]
+            ),
+
+            'p' : Figure(
+                name = 'Pawn',
+                value = 1,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.PawnPush(forward), Moves.PawnTake(forward), Moves.EnPassant(forward)
+                ],
+                first = [
+                    Moves.PawnJump(forward)
+                ]
+            )
+        }
+
     def __init__(
         self, 
         tile_dims : Tuple[int, int],
@@ -277,142 +367,8 @@ class Chess(Board):
     ):
         super().__init__(tile_dims, dimensions=[8, 8], num_players=2, scheme=scheme, sounds=sounds, sprite_size=sprite_size)
 
-        self.White : Dict[str, Figure] = {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.Perimeter()
-                ],
-                first = [
-                    Moves.Castle()
-                ]
-            ),
-
-            'Q' : Figure(
-                name = 'Queen', 
-                value = 9, 
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
-                ]
-            ),
-
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'B' : Figure(
-                name = 'Bishop',
-                value = 3,
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.DiagonalSpan()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                color = scheme['player_white'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.PawnPush(1), Moves.PawnTake(1), Moves.EnPassant(1)
-                ],
-                first = [
-                    Moves.PawnJump(1)
-                ]
-            )
-        }
-
-        self.Black : Dict[str, Figure] = {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.Perimeter()
-                ],
-                first = [
-                    Moves.Castle()
-                ]
-            ),
-
-            'Q' : Figure(
-                name = 'Queen', 
-                value = 9, 
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
-                ]
-            ),
-
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'B' : Figure(
-                name = 'Bishop',
-                value = 3,
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.DiagonalSpan()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                color = scheme['player_black'], 
-                dims = self.figure_dims,
-                moves = [
-                    Moves.PawnPush(-1), Moves.PawnTake(-1), Moves.EnPassant(-1)
-                ],
-                first = [
-                    Moves.PawnJump(-1)
-                ]
-            )
-        }
-    
+        self.White : Dict[str, Figure] = Chess.Figures(color=scheme['player_white'], dims=self.figure_dims, forward=1)
+        self.Black : Dict[str, Figure] = Chess.Figures(color=scheme['player_black'], dims=self.figure_dims, forward=-1)
 
     def __call__(self):
         white_army = [
@@ -467,7 +423,72 @@ class Chess(Board):
 
         return Game(self.dimensions, [white, black])
 
+
 class Shatranj(Board):
+    @staticmethod 
+    def Figures(color : Color, dims : Tuple[int, int], forward : int) -> Dict[str, Figure]:
+        return{
+            'K' : Figure(
+                name = 'King', 
+                value = 0, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.Perimeter()
+                ]
+            ),
+
+            'F' : Figure(
+                name = 'Ferz', 
+                value = 2, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.DiagonalStep()
+                ]
+            ),
+
+            'R' : Figure(
+                name = 'Rook',
+                value = 5,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.OrthogonalSpan()
+                ]
+            ),
+
+            'A' : Figure(
+                name = 'Alfil',
+                value = 2,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.AlfilLeap()
+                ]
+            ),
+
+            'N' : Figure(
+                name = 'Knight',
+                value = 3,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.KnightLeap()
+                ]
+            ),
+
+            'p' : Figure(
+                name = 'Pawn',
+                value = 1,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.PawnPush(forward), Moves.PawnTake(forward)
+                ]
+            )
+        }
+    
     def __init__(
         self, 
         tile_dims : Tuple[int, int],
@@ -479,142 +500,10 @@ class Shatranj(Board):
     ):
         super().__init__(tile_dims, dimensions=[8, 8], num_players=2, scheme=scheme, sounds=sounds, sprite_size=sprite_size)
 
-        self.White : Dict[str, Figure] = {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.Perimeter()
-                ]
-            ),
+        self.White : Dict[str, Figure] = Shatranj.Figures(color=scheme['player_white'], dims=self.figure_dims, forward=1)
+        self.Black : Dict[str, Figure] = Shatranj.Figures(color=scheme['player_black'], dims=self.figure_dims, forward=-1)
 
-            'F' : Figure(
-                name = 'Ferz', 
-                value = 2, 
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.DiagonalStep()
-                ]
-            ),
 
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'A' : Figure(
-                name = 'Alfil',
-                value = 2,
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.AlfilLeap()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                color = scheme['player_white'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.PawnPush(1), Moves.PawnTake(1)
-                ]
-            )
-        }
-
-        self.Black : Dict[str, Figure] = {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.Perimeter()
-                ]
-            ),
-
-            'F' : Figure(
-                name = 'Ferz', 
-                value = 9, 
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.DiagonalStep()
-                ]
-            ),
-
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'A' : Figure(
-                name = 'Alfil',
-                value = 3,
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.AlfilLeap()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                color = scheme['player_black'], 
-                
-                dims = self.figure_dims,
-                moves = [
-                    Moves.PawnPush(-1), Moves.PawnTake(-1)
-                ]
-            )
-        }
-    
     def __call__(self):
         white_army = [
             Piece(self.White['R'], (0, 0)),
@@ -664,5 +553,167 @@ class Shatranj(Board):
             index = 1
         )
 
-        return Game([8, 8], [white, black])
+        return Game(self.dimensions, [white, black])
 
+
+class Wildebeest(Board):
+    @staticmethod
+    # we create the standard set of pieces given a color forward direction 
+    def Figures(color : Color, dims : Tuple[int, int], forward : int) -> Dict[str, Figure]: 
+        return {
+            'K' : Figure(
+                name = 'King', 
+                value = 0, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.Perimeter()
+                ],
+                first = [
+                    Moves.Castle(n=2, width=11, restrict=True),
+                    Moves.Castle(n=3, width=11, restrict=True),
+                    Moves.Castle(n=4, width=11, restrict=True)
+                ]
+            ),
+
+            'Q' : Figure(
+                name = 'Queen', 
+                value = 9, 
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
+                ]
+            ),
+
+            'R' : Figure(
+                name = 'Rook',
+                value = 5,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.OrthogonalSpan()
+                ]
+            ),
+
+            'B' : Figure(
+                name = 'Bishop',
+                value = 3,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.DiagonalSpan()
+                ]
+            ),
+
+            'W' : Figure(
+                name = 'Wildebeest',
+                color=color,
+                value = 5,
+                dims=dims,
+                moves=[Moves.KnightLeap(), Moves.CamelLeap()]
+            ),
+
+            'C' : Figure(
+                name = 'Camel',
+                color=color,
+                value = 3,
+                dims=dims,
+                moves=[Moves.CamelLeap()]
+            ),
+
+            'N' : Figure(
+                name = 'Knight',
+                value = 3,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.KnightLeap()
+                ]
+            ),
+
+            'p' : Figure(
+                name = 'Pawn',
+                value = 1,
+                color = color, 
+                dims = dims,
+                moves = [
+                    Moves.PawnPush(forward), Moves.PawnTake(forward), Moves.EnPassant(forward)
+                ],
+                first = [
+                    Moves.PawnJump(forward)
+                ]
+            )
+        }
+    
+    def __init__(
+        self, 
+        tile_dims : Tuple[int, int],
+
+        scheme : Scheme = DefaultScheme,
+        sounds : SFX = DefaultSFX,
+
+        sprite_size : float = 0.95
+    ):
+        super().__init__(tile_dims, dimensions=[11, 10], num_players=2, scheme=scheme, sounds=sounds, sprite_size=sprite_size)
+
+        self.White : Dict[str, Figure] = Wildebeest.Figures(color=scheme['player_white'], dims=self.figure_dims, forward=1)
+        self.Black : Dict[str, Figure] = Wildebeest.Figures(color=scheme['player_black'], dims=self.figure_dims, forward=-1)
+
+
+    def __call__(self):
+        white_army = [
+            Piece(self.White['R'], (0, 0)),
+            Piece(self.White['N'], (1, 0)),
+            Piece(self.White['C'], (2, 0)),
+            Piece(self.White['C'], (3, 0)),
+            Piece(self.White['W'], (4, 0)),
+            Piece(self.White['Q'], (6, 0)),
+            Piece(self.White['B'], (7, 0)),
+            Piece(self.White['B'], (8, 0)),
+            Piece(self.White['N'], (9, 0)),
+            Piece(self.White['R'], (10, 0))
+        ]
+
+        for i in range(11):
+            white_army.append(
+                Piece(
+                    self.White['p'], (i, 1), 
+                    promotes=[self.White['Q'], self.White['W']]
+                )
+            )
+        
+        black_army = [
+            Piece(self.Black['R'], (0, 9)),
+            Piece(self.Black['N'], (1, 9)),
+            Piece(self.Black['C'], (2, 9)),
+            Piece(self.Black['C'], (3, 9)),
+            Piece(self.Black['W'], (4, 9)),
+            Piece(self.Black['Q'], (6, 9)),
+            Piece(self.Black['B'], (7, 9)),
+            Piece(self.Black['B'], (8, 9)),
+            Piece(self.Black['N'], (9, 9)),
+            Piece(self.Black['R'], (10, 9))
+        ]
+
+        for i in range(11):
+            black_army.append(
+                Piece(
+                    self.Black['p'], (i, 8), 
+                    promotes=[self.Black['Q'], self.Black['W']]
+                )
+            )
+        
+        white = Player(
+            monarch = Piece(self.White['K'], (5, 0)),
+            army = white_army,
+            index = 0
+        )
+
+        black = Player(
+            monarch = Piece(self.Black['K'], (5, 9)),
+            army = black_army,
+            index = 1
+        )
+
+        return Game(self.dimensions, [white, black])

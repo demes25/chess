@@ -2,6 +2,7 @@
 # Chess
 # Figures
 
+from typing import Tuple
 from files.moves import *
 from files.assets import Color, load_sprite
 
