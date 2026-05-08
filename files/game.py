@@ -4,6 +4,13 @@
 
 from files.player import * 
 
+
+class Status:
+    ONGOING = 0
+    CHECKMATE = 1
+    STALEMATE = 2
+    PROMOTING = 3
+
 #TODO: promotion
 #TODO: add restartability, move history, takebacks, show previous positions, etc...
 class Game:
@@ -24,7 +31,9 @@ class Game:
         self.turn = 0
         self.move_num = 0  # the amount of times that every player has made a move (after each player makes one move, we increment)
 
-        self.game_over = 0 # 0 if game on, 1 if checkmate, 2 if stalemate
+        
+        self.status : int = Status.ONGOING
+        
         self.promoting = None # the piece which is currently promoting 
 
         assert all(player.rank == self.rank for player in players)
@@ -170,15 +179,6 @@ class Game:
             raise Exception('Player will be in check.')
 
         move = self.sees(piece, target)
-
-        target_piece = self.at(target)
-
-        if target_piece is not None: 
-            if move is None:
-                raise Exception('Illegal capture.')
-            # if the target square is occupied, check that we can capture the piece
-            elif target_piece.player is player:
-                raise Exception('Cannot capture own piece.')
         
         # check otherwise legality
         if move is None:
@@ -189,6 +189,13 @@ class Game:
         castle_like = piece is player.monarchs[0] and move.special_exec is not None
         result = ['castle'] if castle_like else ['move']
 
+        target_piece = self.at(target)
+
+        if target_piece is not None: 
+            # if the target square is occupied, check that we can capture the piece
+            if move.captures and target_piece.player is player:
+                raise Exception('Illegal capture.')
+            
         if move.execute(self, piece, target):
             result = ['take']
         
@@ -204,7 +211,16 @@ class Game:
             sign = 1 if piece.position[index] - piece.history[0][index] > 0 else -1
             # if we are at the edge of the board in the correct axis, we promote
             if not self.in_bounds(piece.vector + sign * self.basis[index]):
-                self.promoting = piece
+                if len(piece.promotion_list) == 1:
+                    piece.figure = piece.promotion_list[0]
+                    result.append('promote')
+
+                    # a piece may only promote once
+                    piece.promotion_list = [] 
+                else:
+                    self.promoting = piece
+                    self.status = Status.PROMOTING
+                    
 
         check = self.update_checks()
         if check:
@@ -221,13 +237,15 @@ class Game:
         # if the player is out of legal moves, the game ends
         if not self.has_legal_moves(self.players[self.turn]):
             result.append('end')
-            self.game_over = 1 if check else 2 
+            self.status = Status.CHECKMATE if check else Status.STALEMATE
 
         return result 
     
     def promote(self, figure : Figure) -> List[str]:
         if self.promoting is not None:
             self.promoting.figure = figure
+            # we may only promote once
+            self.promoting.promotion_list = [] 
             self.promoting = None 
             
             result = ['promote']
@@ -235,9 +253,13 @@ class Game:
             check = self.update_checks()
             if check:
                 result.append('check')
+            else:
+                result.append('move')
             if not self.has_legal_moves(self.players[self.turn]):
                 result.append('end')
-                self.game_over = 1 if check else 2 
+                self.status = Status.CHECKMATE if check else Status.STALEMATE 
+            else:
+                self.status = Status.ONGOING
 
             return result
         

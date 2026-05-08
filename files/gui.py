@@ -9,14 +9,13 @@ from files.assets import load_sprite, new_surface, Surface, tint
 
 RAISE = False
 
-
 class GUI:
     def __init__(
         self,
         board : Board,
         caption : str = 'Chussy',
 
-        title_font_size : float = 0.5, # proporitons of each tile that is the height of the text
+        title_font_size : float = 0.5, 
         caption_font_size : float = 0.3,
         plaque_opacity : int = 230, # opacity for plaques
         selection_opacity : int = 210 # alpha for selection tiles.
@@ -24,195 +23,253 @@ class GUI:
 
         self.board = board 
 
-        self.screen = pg.display.set_mode((self.board.width, self.board.height))
+        self.screen = pg.display.set_mode((board.width, board.height))
         pg.display.set_caption(caption)
 
-        colors = board.scheme
-        dims = board.tile_dims
+        self.title_font = pg.font.Font('files/font.ttf', int(board.tile_height * title_font_size))
+        self.caption_font = pg.font.Font('files/font.ttf', int(board.tile_height * caption_font_size))
 
-        # blocks with which we can construct plaques 
-        self.blocks = {
-            's' : load_sprite('tiles/Box.png', dims=dims), # single
-
-            't' : load_sprite('tiles/Top.png', dims=dims), # top
-            'b' : load_sprite('tiles/Bottom.png', dims=dims), # bottom
-            'v' : load_sprite('tiles/Vertical.png', dims=dims), # vertical
-
-            'l' : load_sprite('tiles/Left.png', dims=dims), # left
-            'r' : load_sprite('tiles/Right.png', dims=dims), # right
-            'h' : load_sprite('tiles/Horizontal.png', dims=dims), # horizontal
-
-
-            'le' : load_sprite('tiles/LeftEdge.png', dims=dims), # left edge
-            're' : load_sprite('tiles/RightEdge.png', dims=dims), # right edge
-            'te' : load_sprite('tiles/TopEdge.png', dims=dims), # top edge
-            'be' : load_sprite('tiles/BottomEdge.png', dims=dims), # bottom edge
-
-            'tl' : load_sprite('tiles/TopLeft.png', dims=dims), # top left
-            'bl' : load_sprite('tiles/BottomLeft.png', dims=dims), # bottom left
-            'tr' : load_sprite('tiles/TopRight.png', dims=dims), # top right
-            'br' : load_sprite('tiles/BottomRight.png', dims=dims), # bottom right
-
-            'm' : load_sprite('tiles/Middle.png', dims=dims) # middle
-        }
-
-
-        self.title_font = pg.font.Font('files/font.ttf', int(self.board.tile_height * title_font_size))
-        self.caption_font = pg.font.Font('files/font.ttf', int(self.board.tile_height * caption_font_size))
-
-        self.checkmate_text = self.title_font.render('Checkmate', True, colors['checkmate'])
-        self.stalemate_text = self.title_font.render('Stalemate', True, colors['stalemate'])
-
-        self.plaque_opacity = plaque_opacity
         self.selection_opacity = selection_opacity
-
         
-        self.game_over_plaque : Surface | None = None # the game over plaque, we construct it upon the first game over
-        self.reset_button = self.caption_font.render('Reset', True, colors['text'])
-        self.close_button = self.caption_font.render('Quit', True, colors['text'])
+        self.mouse_dragging = False 
 
-        self.reset_center = None 
-        self.close_center = None 
-
-        self.mouse_dragging = None 
-
-        self.game_over_screen = None  
-        self.game_over_rect = None 
-    
-    # constructs a plaque using blocks sprites
-    # width and height are the dimensions of the plaque in terms of tiles, 
-    # i.e. 3x5 would return a 3 tile by 5 tile plaque
-    def new_plaque(self, width : int, height : int, color : Color, opacity : int = 255):
-        tile_w = self.board.tile_width
-        tile_h = self.board.tile_height
-
-        # special cases if any of the dimensions are one
-        if width == 1 and height == 1:
-            return tint(self.blocks['s'].copy(), color=color, opacity=opacity)
-        
-        if width == 1:
-            surface = new_surface((tile_w, height * tile_h))
-
-            t = self.blocks['t']
-            b = self.blocks['b']
-            v = self.blocks['v']
-
-            surface.blit(t, (0, 0))
-            surface.blit(b, (0, (height-1)*tile_h))
-
-            for i in range(1, height-1):
-                surface.blit(v, (0, i*tile_h))
+        # wraps a surface to be able to blit/move easier.
+        # also makes registering hits easier
+        class Object:
+            def __init__(obj, surface : Surface):
+                obj.surface = surface 
+                obj.rect = surface.get_rect()
             
-            return tint(surface, color=color, opacity = opacity)
+            # blits this object to the screen
+            def blit(obj):
+                self.screen.blit(obj.surface, obj.rect)
 
-        if height == 1:
-            surface = new_surface((width * tile_w, tile_h))
+            # returns true if both (or the one given) sets of coordinates collide with this object
+            def hits(obj, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None):
+                if prev_coords is None:
+                    return obj.rect.collidepoint(coords)
+                else:
+                    return obj.rect.collidepoint(coords) and obj.rect.collidepoint(prev_coords)
+        
+        # creates a plaque
+        class Plaque(Object):
+            # blocks with which we can construct plaques 
+            blocks = {
+                's' : load_sprite('tiles/Box.png', dims=board.tile_dims), # single
 
-            l = self.blocks['l']
-            r = self.blocks['r']
-            h = self.blocks['h']
+                't' : load_sprite('tiles/Top.png', dims=board.tile_dims), # top
+                'b' : load_sprite('tiles/Bottom.png', dims=board.tile_dims), # bottom
+                'v' : load_sprite('tiles/Vertical.png', dims=board.tile_dims), # vertical
 
-            surface.blit(l, (0, 0))
-            surface.blit(r, ((width-1)*tile_w, 0))
+                'l' : load_sprite('tiles/Left.png', dims=board.tile_dims), # left
+                'r' : load_sprite('tiles/Right.png', dims=board.tile_dims), # right
+                'h' : load_sprite('tiles/Horizontal.png', dims=board.tile_dims), # horizontal
 
-            for i in range(1, width-1):
-                surface.blit(h, (i*tile_w, 0))
+
+                'le' : load_sprite('tiles/LeftEdge.png', dims=board.tile_dims), # left edge
+                're' : load_sprite('tiles/RightEdge.png', dims=board.tile_dims), # right edge
+                'te' : load_sprite('tiles/TopEdge.png', dims=board.tile_dims), # top edge
+                'be' : load_sprite('tiles/BottomEdge.png', dims=board.tile_dims), # bottom edge
+
+                'tl' : load_sprite('tiles/TopLeft.png', dims=board.tile_dims), # top left
+                'bl' : load_sprite('tiles/BottomLeft.png', dims=board.tile_dims), # bottom left
+                'tr' : load_sprite('tiles/TopRight.png', dims=board.tile_dims), # top right
+                'br' : load_sprite('tiles/BottomRight.png', dims=board.tile_dims), # bottom right
+
+                'm' : load_sprite('tiles/Middle.png', dims=board.tile_dims) # middle
+            }
+
+            # constructs a plaque using blocks sprites
+            # width and height are the dimensions of the plaque in terms of tiles, 
+            # i.e. 3x5 would return a 3 tile by 5 tile plaque
+            def __init__(plq, dims : Tuple[int, int]):
+                tile_w = board.tile_width
+                tile_h = board.tile_height
+                color = board.scheme['plaque']
+                opacity = plaque_opacity
+                width, height = dims 
+
+                # special cases if any of the dimensions are one
+                if width == 1 and height == 1:
+                    plq.surface = tint(Plaque.blocks['s'].copy(), color=color, opacity=opacity)
+                
+                elif width == 1:
+                    surface = new_surface((tile_w, height * tile_h))
+
+                    t = Plaque.blocks['t']
+                    b = Plaque.blocks['b']
+                    v = Plaque.blocks['v']
+
+                    surface.blit(t, (0, 0))
+                    surface.blit(b, (0, (height-1)*tile_h))
+
+                    for i in range(1, height-1):
+                        surface.blit(v, (0, i*tile_h))
+                    
+                    plq.surface = tint(surface, color=color, opacity = opacity)
+
+                elif height == 1:
+                    surface = new_surface((width * tile_w, tile_h))
+
+                    l = Plaque.blocks['l']
+                    r = Plaque.blocks['r']
+                    h = Plaque.blocks['h']
+
+                    surface.blit(l, (0, 0))
+                    surface.blit(r, ((width-1)*tile_w, 0))
+
+                    for i in range(1, width-1):
+                        surface.blit(h, (i*tile_w, 0))
+                    
+                    plq.surface = tint(surface, color=color, opacity = opacity)
+
+                else:
+                    surface = new_surface((width * tile_w, height * tile_h))
+
+                    tl = Plaque.blocks['tl']
+                    bl = Plaque.blocks['bl']
+                    tr = Plaque.blocks['tr']
+                    br = Plaque.blocks['br']
+
+                    BOTTOM = (height-1) * tile_h 
+                    RIGHT = (width-1) * tile_w 
+
+                    surface.blit(tl, (0, 0))
+                    surface.blit(bl, (0, BOTTOM))
+                    surface.blit(tr, (RIGHT, 0))
+                    surface.blit(br, (RIGHT, BOTTOM))
+
+                    te = Plaque.blocks['te']
+                    be = Plaque.blocks['be']
+                    le = Plaque.blocks['le']
+                    re = Plaque.blocks['re']
+                    
+                    for i in range(1, width-1):
+                        I = i * tile_w 
+                        surface.blit(te, (I, 0))
+                        surface.blit(be, (I, BOTTOM))
+                    
+                    for i in range(1, height-1):
+                        I = i * tile_h 
+                        surface.blit(le, (0, I))
+                        surface.blit(re, (RIGHT, I))
+                    
+                    m = Plaque.blocks['m']
+                    for i in range(1, width-1):
+                        for j in range(1, height-1):
+                            surface.blit(m, (i * tile_w, j * tile_h))
+                    
+                    plq.surface = tint(surface, color=color, opacity=opacity)
+
+                plq.rect = plq.surface.get_rect()
             
-            return tint(surface, color=color, opacity = opacity)
+            def blit(plq):
+                self.screen.blit(plq.surface, plq.rect)
 
-        # otherwise: 
-        surface = new_surface((width * tile_w, height * tile_h))
 
-        tl = self.blocks['tl']
-        bl = self.blocks['bl']
-        tr = self.blocks['tr']
-        br = self.blocks['br']
+        # a promotion plaque, depending on the choice of 
+        # figures, and the position on the screen 
+        class PromotionPlaque(Plaque):
+            def __init__(plq, figures : List[Figure], board_pos : Tuple[int, int]):
+                plq.figures = figures
+                plq.objects = [Object(figure.sprite) for figure in figures]
 
-        BOTTOM = (height-1) * tile_h 
-        RIGHT = (width-1) * tile_w 
+                # rudimentary: for now, the default is that the promotion plaque 
+                # extends rightwards from the promotion square, unless that clashes with 
+                # board dimensions, in which case we go leftwards.
+                # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
+                if (board.dimensions[0]-board_pos[0]) < len(figures):
+                    disp = -board.tile_width
+                else:
+                    disp = board.tile_width
+                
+                x, y = board.coords(board_pos)
+                fx = x
+                for obj in plq.objects:
+                    obj.rect.center = (fx, y)
+                    fx += disp
 
-        surface.blit(tl, (0, 0))
-        surface.blit(bl, (0, BOTTOM))
-        surface.blit(tr, (RIGHT, 0))
-        surface.blit(br, (RIGHT, BOTTOM))
+                plq.width = width = len(figures)
+                super().__init__((width, 1))
 
-        te = self.blocks['te']
-        be = self.blocks['be']
-        le = self.blocks['le']
-        re = self.blocks['re']
+                # set the center of the plaque
+                plq.rect.center = (x + int(disp*(width -1)/2.0), y)
+            
+            def blit(plq):
+                super().blit()
+                for obj in plq.objects:
+                    obj.blit()
+
+            # returns the figure which the given coordinates collide with
+            def which_hits(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> Figure:
+                for i in range(plq.width):
+                    if plq.objects[i].hits(coords, prev_coords):
+                        return plq.figures[i]
+                
+                return None 
+
+
+        self.Object = Object
+        self.Plaque = Plaque 
+        self.PromotionPlaque = PromotionPlaque
+
+        self._construct_game_over_plaque()
+        self.promotion : PromotionPlaque | None = None
+
+
+
+    # constructs the game over plaque and necessary objects
+    def _construct_game_over_plaque(self):
+        plaque = self.Plaque((5, 3))
+        x, y = plaque.rect.center = self.board.center 
+        rect = plaque.rect
+
+        checkmate = self.Object(self.title_font.render('Checkmate', True, self.board.scheme['checkmate']))
+
+        stalemate = self.Object(self.title_font.render('Stalemate', True, self.board.scheme['stalemate']))
+
+        dx_r = rect.width // 5
+        dx_q = rect.width // 4
+        dy = rect.height // 7
+
+        checkmate.rect.center = stalemate.rect.center = (x, y - dy)
+
+        reset_button = self.Object(self.caption_font.render('Reset', True, self.board.scheme['text']))
+        reset_button.rect.center = (x - dx_r, y + dy)
+
+
+        close_button = self.Object(self.caption_font.render('Quit', True, self.board.scheme['text']))
+        close_button.rect.center = (x + dx_q, y + dy)
+
         
-        for i in range(1, width-1):
-            I = i * tile_w 
-            surface.blit(te, (I, 0))
-            surface.blit(be, (I, BOTTOM))
-        
-        for i in range(1, height-1):
-            I = i * tile_h 
-            surface.blit(le, (0, I))
-            surface.blit(re, (RIGHT, I))
-        
-        m = self.blocks['m']
-        for i in range(1, width-1):
-            for j in range(1, height-1):
-                surface.blit(m, (i * tile_w, j * tile_h))
-        
-        return tint(surface, color=color, opacity=opacity)
+        self.game_over_plaque = plaque
+        self.checkmate_text = checkmate
+        self.stalemate_text = stalemate
+        self.reset_button = reset_button
+        self.close_button = close_button
 
-    # constructs the game over screen
-    def construct_game_over_screen(self, text : pg.surface.Surface):
-        if self.game_over_plaque is None:
-            self.game_over_plaque = self.new_plaque(width=5, height=3, color=self.board.scheme['plaque'], opacity=self.plaque_opacity)
+    # blits the game over screen (if game over)
+    def status_screen(self, status : int):
+        if status == Status.ONGOING:
+            return 
+        elif status == Status.PROMOTING:
+            if self.promotion is None:
+                piece = self.board.game.promoting
+                self.promotion = self.PromotionPlaque(piece.promotion_list, piece.position)
+            self.promotion.blit()
+        else:
+            self.game_over_plaque.blit()
+            if status == Status.CHECKMATE:
+                self.checkmate_text.blit()
+            else:
+                self.stalemate_text.blit()
 
-        plaque = self.game_over_plaque.copy()
-        plaque_rect = plaque.get_rect()
-        x, y = plaque_rect.center
-        Xmid, Ymid = self.board.center
-
-        dx_r = plaque_rect.width // 5
-        dx_q = plaque_rect.width // 4
-        dy = plaque_rect.height // 7
-
-        title_rect = text.get_rect()
-        title_rect.center = (x, y - dy)
-
-        plaque.blit(text, title_rect)
-
-        new_button = self.reset_button
-        new_button_rect = new_button.get_rect()
-        new_button_rect.center = (x - dx_r, y + dy)
-
-        if self.reset_center is None:
-            self.reset_center = (Xmid - dx_r, Ymid + dy)
-
-        plaque.blit(new_button, new_button_rect)
-
-        quit_button = self.close_button
-        quit_button_rect = quit_button.get_rect()
-        quit_button_rect.center = (x + dx_q, y + dy)
-
-        if self.close_center is None:
-            self.close_center = (Xmid + dx_q, Ymid + dy)
-
-        plaque.blit(quit_button, quit_button_rect)
-
-        self.game_over_screen = plaque 
-        plaque_rect.center = self.board.center
-        self.game_over_rect = plaque_rect
-
-    # returns true if the given position clicks the given square
-    def hits(self, pos, size, center):
-        w = (size[0]+1)//2
-        h = (size[1]+1)//2 
-
-        x, y = pos 
-
-        X, Y = center 
-
-        return (X - w <= x <= X + w) and (Y - h <= y <= Y + h)
+            self.reset_button.blit()
+            self.close_button.blit()
     
 
-    def ingame_event_loop(self, vars : dict) -> List[str]:
-        developments = []
+    def _ingame_event_loop(self, vars : dict) -> List[str]:
+        events = []
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -229,7 +286,7 @@ class GUI:
 
                     if target != selected.position:
                         try:
-                            developments = self.board.game.move(selected, target)
+                            events = self.board.game.move(selected, target)
                         except Exception as e:
                             if not RAISE:
                                 self.board.sounds['illegal'].play()
@@ -240,9 +297,9 @@ class GUI:
                     
                     self.board.deselect()
         
-        return developments 
+        return events 
             
-    def game_over_event_loop(self, vars : dict) -> List[str]:
+    def _game_over_event_loop(self, vars : dict) -> List[str]:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 vars['running'] = False
@@ -251,52 +308,54 @@ class GUI:
                 vars['click_pos'] = event.pos
             
             if event.type == pg.MOUSEBUTTONUP and vars['click_pos'] is not None:
-                # IF RESET
-                reset_size = self.reset_button.get_rect().size
-                reset_center = self.reset_center
-
-                quit_size = self.close_button.get_rect().size 
-                quit_center = self.close_center
-
-                if self.hits(vars['click_pos'], reset_size, reset_center) and self.hits(event.pos, reset_size, reset_center): 
+                if self.reset_button.hits(event.pos, vars['click_pos']): 
                     sound = self.board.begin()
-                    self.game_over_screen = None
-                    self.game_over_rect = None 
                     sound.play()
-                elif self.hits(vars['click_pos'], quit_size, quit_center) and self.hits(event.pos, quit_size, quit_center):
+                elif self.close_button.hits(event.pos, vars['click_pos']):
                     vars['running'] = False
         
         return []
-                
+    
+    def _promotion_event_loop(self, vars : dict) -> List[str]:
+        events = []
 
-    # flips a frame given the variables and developments
-    def frame(self, developments : List[str]):
-        image, sounds = self.board.update(developments, pg.mouse.get_pos())
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                vars['running'] = False
+            
+            if event.type == pg.MOUSEBUTTONDOWN:
+                vars['click_pos'] = event.pos
+            
+            if event.type == pg.MOUSEBUTTONUP and vars['click_pos'] is not None:
+                figure = self.promotion.which_hits(event.pos, vars['click_pos'])
+                if figure is not None:
+                    events = self.board.game.promote(figure)
+                    self.promotion = None
+                    # if the player is out of legal moves, the game ends
+        
+        return events
+
+    def fetch_events(self, vars : dict) -> List[str]:
+        status = self.board.game.status 
+        if status == Status.ONGOING:
+            events = self._ingame_event_loop(vars)
+        elif status == Status.PROMOTING:
+            events = self._promotion_event_loop(vars)
+        else:
+            events = self._game_over_event_loop(vars)
+
+        return events 
+
+    # flips a frame given the variables and events
+    def frame(self, events : List[str]):
+        image, sounds = self.board.update(events, pg.mouse.get_pos())
 
         self.screen.blit(image, (0,0))
         for sound in sounds:
             sound.play()
-
-        promoting = self.board.game.promoting
-        if promoting is not None:
-            figs = promoting.promotion_list
-            if len(figs) == 1:
-                    sound_keys = self.board.game.promote(figs[0])
-                    # if the player is out of legal moves, the game ends
-                    for sound_key in sound_keys:
-                        self.board.sounds[sound_key].play()
-            else:
-                # WRITE THIS!
-                return
         
-        game_over = self.board.game.game_over
-
-        if game_over != 0:
-            if self.game_over_screen is None:
-                self.construct_game_over_screen(self.checkmate_text if game_over == 1 else self.stalemate_text)
-            
-            self.screen.blit(self.game_over_screen, self.game_over_rect)
-
+        # blits a game over screen if the game over value is 1 or 2 (checkmate or stalemate)
+        self.status_screen(self.board.game.status)
         pg.display.flip()
             
 
@@ -313,12 +372,8 @@ class GUI:
         start_sound.play()
 
         while vars['running']:
-            if not self.board.game.game_over:
-                developments = self.ingame_event_loop(vars)
-            else:
-                developments = self.game_over_event_loop(vars)
-
-            self.frame(developments)
+            events = self.fetch_events(vars=vars)
+            self.frame(events=events)
 
             
 

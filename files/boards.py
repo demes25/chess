@@ -425,11 +425,12 @@ class Chess(Board):
             Piece(self.White['R'], (7, 0))
         ]
 
+        promotes = promotes=[self.White['Q'], self.White['R'], self.White['N'], self.White['B']]
         for i in range(8):
             white_army.append(
                 Piece(
                     self.White['p'], (i, 1), 
-                    promotes=[self.White['Q']] # TODO: must generalize promotion
+                    promotes=promotes
                 )
             )
         
@@ -443,11 +444,12 @@ class Chess(Board):
             Piece(self.Black['R'], (7, 7))
         ]
         
+        promotes = [self.Black['Q'], self.Black['R'], self.Black['N'], self.Black['B']]
         for i in range(8):
             black_army.append(
                 Piece(
                     self.Black['p'], (i, 6), 
-                    promotes=[self.Black['Q']] # TODO: must generalize promotion
+                    promotes=promotes
                 )
             )
         
