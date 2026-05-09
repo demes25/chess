@@ -82,7 +82,7 @@ class Piece:
         self.player.material -= self.figure.value 
         try:
             self.player.army.remove(self)
-        except ValueError as e:
+        except ValueError:
             self.player.monarchs.remove(self)
 
 

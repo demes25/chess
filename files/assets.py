@@ -45,7 +45,7 @@ DefaultScheme : Scheme = {
     'tile_black' : (90, 60, 50),
 
     'player_white' : (220, 192, 180),
-    'player_black' : (100, 80, 70),
+    'player_black' : (130, 100, 90),
 
     'checkmate' : (255, 25, 15),
     'stalemate' : (200, 180, 150),

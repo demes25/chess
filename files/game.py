@@ -4,6 +4,7 @@
 
 from files.player import * 
 from typing import Dict
+from itertools import product
 
 class Status:
     ONGOING = 0
@@ -12,7 +13,9 @@ class Status:
     PROMOTING = 3
 
 #TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
-#TODO: add restartability, move history, takebacks, show previous positions, etc...
+#TODO: add takebacks, show previous positions, etc...
+#TODO: make game a separate thing on top of the board. the board should be able to be set up however it be so desired,
+# with whichever pieces.
 class Game:
     def __init__(
         self,
@@ -30,7 +33,6 @@ class Game:
         # the player whose turn it is
         self.turn = 0
         self.move_num = 0  # the amount of times that every player has made a move (after each player makes one move, we increment)
-
         
         self.status : int = Status.ONGOING
         
@@ -52,9 +54,6 @@ class Game:
                 self.board[piece.position] = i
                 i += 1
         
-
-
-
     # returns the entity at the given position
     def at(self, pos : tuple | Vector) -> Piece | None:
         if isinstance(pos, np.ndarray):
@@ -156,9 +155,13 @@ class Game:
         return result
 
     # executes a move, returns the nature of the move (move, take, check, etc...)
+    # allows us to enforce move rules and game rules at will.
     def move(self, piece : Piece, target : tuple | Vector) -> List[str]:
         assert len(target) == self.rank
 
+        player = piece.player
+
+        
         if self.promoting is not None:
             raise Exception('Promoting piece has not yet been promoted.')
         
@@ -166,9 +169,7 @@ class Game:
             raise Exception('The given piece is dead.')
         
         if not self.in_bounds(target):
-            raise Exception('Target square out of bounds.')
-
-        player = piece.player 
+            raise Exception('Target square out of bounds.') 
 
         # if it is not the player's turn, return false
         if player is not self.players[self.turn]:

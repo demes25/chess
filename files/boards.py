@@ -259,19 +259,19 @@ class Moves:
         
     @staticmethod
     def KnightLeap() -> Move:
-        return Discrete([(2, 1), (1, 2), (-1, 2), (-2, 1), (2, -1), (1, -2), (-2, -1), (-1, -2)])
+        return Leap((1, 2))
 
     @staticmethod
     def CamelLeap() -> Move:
-        return Discrete([(3, 1), (1, 3), (-1, 3), (-3, 1), (3, -1), (1, -3), (-3, -1), (-1, -3)])
+        return Leap((1, 3))
     
     @staticmethod 
     def AlfilLeap() -> Move:
-        return Discrete([(2, 2), (2, -2), (-2, 2), (-2, -2)])
+        return Leap((2, 2))
     
     @staticmethod
     def DabaabaLeap() -> Move:
-        return Discrete([(2, 0), (0, 2), (-2, 0), (0, -2)])
+        return Leap((0, 2))
 
     @staticmethod
     def OrthogonalSpan() -> Move:

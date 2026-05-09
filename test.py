@@ -1,6 +1,5 @@
-from files.boards import Wildebeest, Chess
+from files.boards import Wildebeest, Chess, Shatranj
 from files.gui import *
-from files.assets import LiamcitoScheme, IndianScheme, RaymacitaScheme
 
 pg.init()
 

@@ -5,6 +5,7 @@
 from typing import Type, List, Callable
 from abc import ABC, abstractmethod    
 import numpy as np  
+from itertools import product, permutations
 
 Vector = np.typing.NDArray[np.int_] # for typehinting - vector is a 1-d integer array
 Game = Type['Game'] # just for typehinting, refers to the 'Game' and 'Piece' objects defined in the game and piece modules.
@@ -12,11 +13,19 @@ Piece = Type['Piece']
 
 # returns the scaling of dir that yields disp. 0 if inconsistent
 def scaling(dir : Vector, disp : Vector):
-    if dir[0] == 0:
-        return disp[1] // dir[1] if disp[0] == 0 else 0
+    k = 0
+    for i in range(len(dir)):
+        if dir[i] == 0:
+            if disp[i] != 0:
+                return 0
+        else:
+            j = disp[i]//dir[i]
+            if k == 0:
+                k = j
+            elif k != j:
+                return 0
     
-    k = disp[0] // dir[0]
-    return k if k * dir[1] == disp[1] else 0
+    return k
     
 # an abstract class that encompasses all moves
 class Move(ABC):
@@ -118,7 +127,7 @@ class Move(ABC):
     def available_squares(self, game : Game, start : Vector):
         pass
 
-# discrete moves: leaps and steps, like knight and pawn in conventional chess, OR special moves like en passant or castle
+# discrete moves: steps, like pawn in conventional chess, OR special moves like en passant or castle
 class Discrete(Move):
     def __init__(
         self, 
@@ -140,7 +149,7 @@ class Discrete(Move):
         b = False 
 
         for dir in self.directions:
-            if all(disp == dir):
+            if np.array_equal(disp, dir):
                 b = True
                 break 
         
@@ -156,7 +165,37 @@ class Discrete(Move):
             if game.in_bounds(vec) and self.accesses(game, start, vec):
                 yield vec
                 
+# leaps, omnidimensional, like the knight in chess, (or even the king)
+class Leap(Discrete):
+    def __init__(
+        self, 
+
+        displacement : tuple | Vector,
+
+        captures : bool = True,
+        moves : bool = True,
+    ):  
+        if isinstance(displacement, np.ndarray):
+            self.displacement = displacement
+            displacement = displacement.tolist()
+        else:
+            self.displacement = np.array(displacement)
+
+        # generate all signed permutations of the displacement
+        dirs = []
+        for p in permutations(displacement):
+            for signs in product([1, -1], repeat=len(displacement)):
+                dirs.append(tuple(a * s for a, s in zip(p, signs)))
+
+        super().__init__(dirs=dirs, captures=captures, moves=moves)
+
+    def sees(self, game : Game, start : Vector, end : Vector):
+        disp = end - start  
+
+        return np.array_equal(np.sort(np.abs(disp)), self.displacement)
         
+    
+
 # spanning moves: ones that follow a specific direction 
 # for an unspecified amount of squares. (bishop, rook, queen in conventional chess)
 class Spanning(Move):
