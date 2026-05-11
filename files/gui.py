@@ -5,7 +5,7 @@
 from files.game import *
 import pygame as pg
 from files.boards import Board
-from files.assets import load_sprite, new_surface, Surface, tint
+from files.resources import load_sprite, new_surface, Surface, tint, FONT_FILE
 
 RAISE = False
 
@@ -26,8 +26,8 @@ class GUI:
         self.screen = pg.display.set_mode((board.width, board.height))
         pg.display.set_caption(caption)
 
-        self.title_font = pg.font.Font('files/font.ttf', int(board.tile_height * title_font_size))
-        self.caption_font = pg.font.Font('files/font.ttf', int(board.tile_height * caption_font_size))
+        self.title_font = pg.font.Font(FONT_FILE, int(board.tile_height * title_font_size))
+        self.caption_font = pg.font.Font(FONT_FILE, int(board.tile_height * caption_font_size))
 
         self.selection_opacity = selection_opacity
         
@@ -55,28 +55,28 @@ class GUI:
         class Plaque(Object):
             # blocks with which we can construct plaques 
             blocks = {
-                's' : load_sprite('tiles/Box.png', dims=board.tile_dims), # single
+                's' : load_sprite('tiles/Box', dims=board.tile_dims), # single
 
-                't' : load_sprite('tiles/Top.png', dims=board.tile_dims), # top
-                'b' : load_sprite('tiles/Bottom.png', dims=board.tile_dims), # bottom
-                'v' : load_sprite('tiles/Vertical.png', dims=board.tile_dims), # vertical
+                't' : load_sprite('tiles/Top', dims=board.tile_dims), # top
+                'b' : load_sprite('tiles/Bottom', dims=board.tile_dims), # bottom
+                'v' : load_sprite('tiles/Vertical', dims=board.tile_dims), # vertical
 
-                'l' : load_sprite('tiles/Left.png', dims=board.tile_dims), # left
-                'r' : load_sprite('tiles/Right.png', dims=board.tile_dims), # right
-                'h' : load_sprite('tiles/Horizontal.png', dims=board.tile_dims), # horizontal
+                'l' : load_sprite('tiles/Left', dims=board.tile_dims), # left
+                'r' : load_sprite('tiles/Right', dims=board.tile_dims), # right
+                'h' : load_sprite('tiles/Horizontal', dims=board.tile_dims), # horizontal
 
 
-                'le' : load_sprite('tiles/LeftEdge.png', dims=board.tile_dims), # left edge
-                're' : load_sprite('tiles/RightEdge.png', dims=board.tile_dims), # right edge
-                'te' : load_sprite('tiles/TopEdge.png', dims=board.tile_dims), # top edge
-                'be' : load_sprite('tiles/BottomEdge.png', dims=board.tile_dims), # bottom edge
+                'le' : load_sprite('tiles/LeftEdge', dims=board.tile_dims), # left edge
+                're' : load_sprite('tiles/RightEdge', dims=board.tile_dims), # right edge
+                'te' : load_sprite('tiles/TopEdge', dims=board.tile_dims), # top edge
+                'be' : load_sprite('tiles/BottomEdge', dims=board.tile_dims), # bottom edge
 
-                'tl' : load_sprite('tiles/TopLeft.png', dims=board.tile_dims), # top left
-                'bl' : load_sprite('tiles/BottomLeft.png', dims=board.tile_dims), # bottom left
-                'tr' : load_sprite('tiles/TopRight.png', dims=board.tile_dims), # top right
-                'br' : load_sprite('tiles/BottomRight.png', dims=board.tile_dims), # bottom right
+                'tl' : load_sprite('tiles/TopLeft', dims=board.tile_dims), # top left
+                'bl' : load_sprite('tiles/BottomLeft', dims=board.tile_dims), # bottom left
+                'tr' : load_sprite('tiles/TopRight', dims=board.tile_dims), # top right
+                'br' : load_sprite('tiles/BottomRight', dims=board.tile_dims), # bottom right
 
-                'm' : load_sprite('tiles/Middle.png', dims=board.tile_dims) # middle
+                'm' : load_sprite('tiles/Middle', dims=board.tile_dims) # middle
             }
 
             # constructs a plaque using blocks sprites

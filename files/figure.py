@@ -4,7 +4,7 @@
 
 from typing import Tuple
 from files.moves import *
-from files.assets import Color, load_sprite
+from files.resources import Color, load_sprite
 
 Player = Type['Player']
 
@@ -40,7 +40,7 @@ class Figure:
 
         self.value = value  
         self.name = name
-        self.sprite = load_sprite(f'figures/{name}.png', dims=dims, color=color)
+        self.sprite = load_sprite(f'figures/{name}', dims=dims, color=color)
 
 class Piece:
     def __init__(

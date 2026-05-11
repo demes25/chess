@@ -5,8 +5,8 @@
 from typing import List, Tuple
 from files.game import *
 from abc import ABC, abstractmethod
-from files.assets import Sound, Surface, Scheme, SFX, DefaultScheme, DefaultSFX
-from files.assets import load_sprite, tint
+from files.resources import Sound, Surface, Scheme, SFX, DefaultScheme, DefaultSFX
+from files.resources import load_sprite, tint
 
 xhat = np.array([1, 0])
 yhat = np.array([0, 1])
@@ -37,7 +37,7 @@ class Board(ABC):
 
         self.tile_width, self.tile_height = self.tile_dims = tile_dims 
 
-        tile = load_sprite('tiles/Tile.png', dims=tile_dims)
+        tile = load_sprite('tiles/Tile', dims=tile_dims)
 
         white_tile = tint(tile.copy(), color=scheme['tile_white'])
         black_tile = tint(tile.copy(), color=scheme['tile_black'])

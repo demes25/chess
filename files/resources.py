@@ -4,6 +4,7 @@
 
 from typing import Tuple, Dict
 import pygame as pg
+import os 
 
 Color = Tuple[int, int, int]
 Scheme = Dict[str, Color]
@@ -16,6 +17,18 @@ Surface = pg.surface.Surface
 pg.init()
 pg.mixer.init()
 
+FILES_PATH = os.path.join(os.getcwd(), 'files')
+ASSET_PATH = os.path.join(FILES_PATH, 'assets')
+
+SPRITE_PATH = os.path.join(ASSET_PATH, 'sprites')
+SOUND_PATH = os.path.join(ASSET_PATH, 'sounds')
+
+FONT_FILE = os.path.join(ASSET_PATH, 'font.ttf')
+
+SOUND_EXT = 'mp3'
+SPRITE_EXT = 'png'
+
+
 
 def new_surface(dims : Tuple[int, int]):
     return Surface(dims, pg.SRCALPHA)
@@ -25,9 +38,9 @@ def tint(surface : Surface, color : Color, opacity : int = 255) -> Surface:
     surface.fill((*color, opacity), special_flags=pg.BLEND_RGBA_MULT)
     return surface
 
-def load_sprite(filename : str, dims : Tuple[int, int] | None = None, color : Color | None = None, opacity : int = 255) -> Surface:
+def load_sprite(name : str, dims : Tuple[int, int] | None = None, color : Color | None = None, opacity : int = 255) -> Surface:
     # filename is path from the sprites file.
-    surface = pg.image.load(f'files/sprites/{filename}')
+    surface = pg.image.load(os.path.join(SPRITE_PATH, f'{name}.{SPRITE_EXT}'))
 
     if dims is not None:
         surface = pg.transform.scale(surface, dims)
@@ -150,12 +163,12 @@ LiamcitoScheme : Scheme = {
 # Sound Effects
 
 DefaultSFX : SFX = {
-    'move' : Sound('files/sounds/move.mp3'), 
-    'take' : Sound('files/sounds/take.mp3'), 
-    'check' : Sound('files/sounds/check.mp3'), 
-    'start' : Sound('files/sounds/start.mp3'), 
-    'end' : Sound('files/sounds/end.mp3'),
-    'illegal' : Sound('files/sounds/illegal.mp3'),
-    'castle' : Sound('files/sounds/castle.mp3'),
-    'promote' : Sound('files/sounds/promote.mp3')
+    'move' : Sound(os.path.join(SOUND_PATH, f'move.{SOUND_EXT}')), 
+    'take' : Sound(os.path.join(SOUND_PATH, f'take.{SOUND_EXT}')), 
+    'check' : Sound(os.path.join(SOUND_PATH, f'check.{SOUND_EXT}')), 
+    'start' : Sound(os.path.join(SOUND_PATH, f'start.{SOUND_EXT}')), 
+    'end' : Sound(os.path.join(SOUND_PATH, f'end.{SOUND_EXT}')),
+    'illegal' : Sound(os.path.join(SOUND_PATH, f'illegal.{SOUND_EXT}')),
+    'castle' : Sound(os.path.join(SOUND_PATH, f'castle.{SOUND_EXT}')),
+    'promote' : Sound(os.path.join(SOUND_PATH, f'promote.{SOUND_EXT}'))
 }
