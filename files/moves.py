@@ -55,6 +55,8 @@ def scaling_range(board_shape : Vector, pos : Vector, dir : Vector, large_value 
 
     return (np.min(negative_limits), np.min(positive_limits))
 
+# TODO: make interacting moves like castle separate, and special moves like en passant separate.
+# they need alternate treatment for access maps. 
 
 # an abstract class that encompasses all moves
 class Move(ABC):
