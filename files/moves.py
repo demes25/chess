@@ -1,13 +1,16 @@
 # Demetre Seturidze
 # Chess
-# Moves
+# Moves and Figures
 
-from typing import Type, List, Callable
-from abc import ABC, abstractmethod    
+from typing import Type, List, Callable, Tuple
+from abc import ABC, abstractmethod
 import numpy as np  
 from itertools import product, permutations
 
 Vector = np.typing.NDArray[np.int_] # for typehinting - vector is a 1-d integer array
+Matrix = np.typing.NDArray[np.int_] # matrix is a 2-d integer array
+BooleanMap = np.typing.NDArray[np.bool_]
+
 Game = Type['Game'] # just for typehinting, refers to the 'Game' and 'Piece' objects defined in the game and piece modules.
 Piece = Type['Piece']
 
@@ -26,7 +29,33 @@ def scaling(dir : Vector, disp : Vector):
                 return 0
     
     return k
+
+# returns the range of scalings of the given direction vector, starting at pos bounded by the board shape
+# returns: (max subtractable, max addable)
+def scaling_range(board_shape : Vector, pos : Vector, dir : Vector, large_value : int = 100) -> Tuple[int, int]:
+    positive_limits = np.where(
+        dir > 0,
+        (board_shape - 1 - pos) // dir,
+        np.where(
+            dir < 0,
+            pos // (-dir),
+            large_value
+        )
+    )
     
+    negative_limits = np.where(
+        dir < 0,
+        (board_shape - 1 - pos) // (-dir),
+        np.where(
+            dir > 0,
+            pos // (dir),
+            large_value
+        )
+    )
+
+    return (np.min(negative_limits), np.min(positive_limits))
+
+
 # an abstract class that encompasses all moves
 class Move(ABC):
     def __init__(
@@ -76,6 +105,8 @@ class Move(ABC):
         ) or (
             piece is not None and self.captures
         )
+    
+
         
     # returns true if the move complex 'sees' the end square given the start square
     # must be given the game object in order to evaluate this.
@@ -100,7 +131,7 @@ class Move(ABC):
 
         if isinstance(end_pos, np.ndarray):
             piece.vector = end_pos
-            end_pos = tuple(end_pos.tolist())
+            end_pos = tuple(end_pos)
         else:
             piece.vector = np.array(end_pos)
 
@@ -122,10 +153,19 @@ class Move(ABC):
     def accesses(self, game : Game, start : Vector, end : Vector):
         return self.valid_square(game, end) and self.sees(game, start, end)
 
+    # returns a access map:
+    # a map populated with True everywhere that this move can access, zeros elsewhere
+    # TODO: GAME_BOARD has 1 everywhere an opposing player is standing, -1 everywhere the attacking player is standing, and 0 else
+    @abstractmethod 
+    def access_map(self, game_board : Matrix, pos : tuple | Vector) -> BooleanMap:
+        pass
+
     # dynamically iterates through all available squares
     @abstractmethod
     def available_squares(self, game : Game, start : Vector):
         pass
+
+
 
 # discrete moves: steps, like pawn in conventional chess, OR special moves like en passant or castle
 class Discrete(Move):
@@ -164,6 +204,20 @@ class Discrete(Move):
             vec = start + dir 
             if game.in_bounds(vec) and self.accesses(game, start, vec):
                 yield vec
+    
+    def access_map(self, occupation_map : Matrix, pos : tuple | Vector) -> BooleanMap:
+        result = np.zeros_like(occupation_map, dtype=np.bool)
+
+        for dir in self.directions:
+            target = dir + pos
+            index = tuple(target)
+            if (occupation_map[index] == 0 and self.moves) or (occupation_map[index] == 1 and self.captures):
+                result[index] = True
+        
+        return result 
+        
+        
+        
                 
 # leaps, omnidimensional, like the knight in chess, (or even the king)
 class Leap(Discrete):
@@ -265,6 +319,59 @@ class Spanning(Move):
             
         return False  
 
+    def access_map(self, occupation_map : Matrix, pos : tuple | Vector) -> BooleanMap:
+        result = np.zeros_like(occupation_map, dtype=np.bool)
+
+        map_shape = np.array(occupation_map.shape, dtype=np.int16)
+
+        for dir in self.directions:
+            neg_limit, pos_limit = scaling_range(map_shape, pos, dir)
+
+            if self.max_num is not None:
+                pos_limit = np.min(pos_limit, self.max_num)
+                neg_limit = np.min(neg_limit, self.max_num) 
+            
+            # we start by adding.
+            num_obstacles = 0
+            square = pos
+            for _ in range(0, pos_limit):
+                square = square + dir
+
+                index = tuple(square)
+                occupation = occupation_map[index]
+                if occupation != 0:
+                    if num_obstacles >= self.min_obstacles and occupation == 1 and self.captures:
+                        result[index] = True
+                    
+                    num_obstacles += 1
+
+                    if num_obstacles > self.max_obstacles:
+                        break
+                elif self.moves:
+                    result[index] = True
+
+            # then we subtract
+            num_obstacles = 0
+            square = pos
+            for _ in range(0, neg_limit):
+                square = square - dir
+
+                index = tuple(square)
+                occupation = occupation_map[index]
+                if occupation != 0:
+                    if num_obstacles >= self.min_obstacles and occupation == 1 and self.captures:
+                        result[index] = True
+                    
+                    num_obstacles += 1
+
+                    if num_obstacles > self.max_obstacles:
+                        break
+                elif self.moves:
+                    result[index] = True
+
+        return result 
+        
+
     def available_squares(self, game : Game, start : Vector):
         if self.max_num is None:
             def _in_bounds(i):
@@ -302,6 +409,7 @@ class Spanning(Move):
 # compound moves go discrete -> spanning.
 # the initial discrete moves do NOT capture.
 # similar to the giraffe in Tamerlane chess
+#TODO: write access map function
 class Compound(Spanning):
     def __init__(
         self,
@@ -338,6 +446,64 @@ class Compound(Spanning):
             offset = start + disc
             for square in super().available_squares(game, offset):
                 yield square
+
+
+
+# -- FIGURES -- #
+
+# a figure is a set of moves, basically, along with a name and a value
+
+from files.resources import Color, load_sprite
+
+class Figure:
+    def __init__(
+        self,
+        name : str,
+        value : int,   
+
+        color : Color, # color of the sprite 
+        dims : Tuple[int, int], # dimensions of the sprite
+
+        moves : List[Move] = [], # list of valid moves
+    
+        first : List[Move] = [], # list of valid first moves
+        first_exclusive : bool = False, # True if can ONLY do the above first moves 
+        ):
+
+        # ensure the piece has something that it can do
+        assert moves
+
+        dim = moves[0].rank
+
+        # makes sure all moves are of equal dimensionality
+        assert all(move.rank == dim for move in moves) 
+
+        self.moves = moves
+        self.first = first 
+        self.first_exclusive = first_exclusive
+
+        self.dim = dim 
+
+        self.value = value  
+        self.name = name
+        self.sprite = load_sprite(f'figures/{name}', dims=dims, color=color)
+
+    
+    def access_map(self, occupation_map : Matrix, pos : tuple | Vector, first_move : bool = False) -> BooleanMap:
+        result = np.zeros_like(occupation_map, dtype=np.bool)
+
+        if first_move:
+            for f in self.first:
+                result = result | f.access_map(occupation_map, pos)
+        
+            if self.first_exclusive:
+                return result
+        
+        for f in self.moves:
+            result = result | f.access_map(occupation_map, pos)
+        
+        return result 
+       
 
 
 

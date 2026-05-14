@@ -2,9 +2,99 @@
 # Chess
 # Game
 
-from files.player import * 
+from files.moves import *
 from typing import Dict
 from itertools import product
+
+# -- THE PLAYER and THE PIECES -- #
+
+class Player:
+    def __init__(
+        self,
+        monarch : Piece, # king piece
+        army : List[Piece], 
+        index : int,
+    ):
+
+        self.index = index
+
+        self.monarchs = [monarch]
+        monarch.player = self 
+
+        self.army = army
+        for piece in army:
+            piece.player = self
+
+        self.rank = monarch.figure.dim 
+
+        assert all(piece.figure.dim == self.rank for piece in self.army)
+
+        self.material = sum(piece.figure.value for piece in self.army) # counts raw value for material
+
+        self.is_in_check : bool = False # keeps track if the player is in check
+
+class Piece:
+    def __init__(
+        self,
+        figure : Figure,
+        position : tuple,
+
+        promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
+        promotion_axis : int = -1 # the promotion axis
+    ):
+        self.player : Player | None = None 
+        self.figure = figure
+        self.position = position
+        self.history = [position]
+        self.vector = np.array(self.position)
+
+        self.promotion_list = promotes
+        self.promotion_axis = promotion_axis
+
+        self.dead = False
+        self.sprite = None
+
+        self.has_moved = False 
+        self.just_first = False 
+    
+    # returns the displacement vector between given square and current square
+    def displacement(self, target : tuple | Vector):
+        return np.array(target) - self.vector
+
+    # adds the current position to history
+    def update_history(self):
+        self.history.append(self.position)
+    
+    # kills this piece
+    def die(self):
+        assert len(self.player.monarchs) > 1 or self is not self.player.monarchs[0], 'General piece cannot be captured.'
+        
+        self.dead = True
+        self.player.material -= self.figure.value 
+        try:
+            self.player.army.remove(self)
+        except ValueError:
+            self.player.monarchs.remove(self)
+
+
+    # a dynamic function that iterates through all available moves for this piece
+    def available_squares(self, game):
+        if not self.has_moved:
+            for move in self.figure.first:
+                for square in move.available_squares(game, self.vector):
+                    yield square
+            
+            if self.figure.first_exclusive:
+                return
+        
+        for move in self.figure.moves:
+            for square in move.available_squares(game, self.vector):
+                yield square
+
+
+
+# -- THE GAME and THE GAME STATUS -- #
+# the actual rules and state of the game.
 
 class Status:
     ONGOING = 0
@@ -56,10 +146,7 @@ class Game:
         
     # returns the entity at the given position
     def at(self, pos : tuple | Vector) -> Piece | None:
-        if isinstance(pos, np.ndarray):
-            pos = tuple(pos.tolist())
-
-        i = self.board[pos]
+        i = self.board[tuple(pos)]
         return None if i == -1 else self.pieces[i]
     
 
@@ -70,7 +157,7 @@ class Game:
 
         if isinstance(pos, np.ndarray):
             vec = pos 
-            pos = tuple(pos.tolist())
+            pos = tuple(pos)
         else:
             pos = pos 
             vec = np.array(pos)
