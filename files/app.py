@@ -8,7 +8,7 @@ from files.logic.sets import Set
 from files.media.assets import AudioVisuals, Assets
 from files.media.schemes import Scheme, DefaultScheme
 
-RAISE = True
+RAISE = False
 
 class App:
     def __init__(

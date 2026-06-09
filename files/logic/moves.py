@@ -275,7 +275,7 @@ class Spanning(Move):
                     return False
                 
                 pos = tuple(vec.tolist())
-                if np.any(game.board[pos] < 0):
+                if not np.any(game.board[pos] < 0):
                     obstacles += 1
                 
                 # if we find more than the admitted amount of obstacles, return false

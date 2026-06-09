@@ -88,11 +88,11 @@ class Assets:
 
             sprite_size : float = 0.95,
             
-            plaque_opacity : float = 0.5,
-            selection_opacity : float = 0.3,
+            plaque_opacity : float = 0.8,
+            selection_opacity : float = 0.5,
 
-            big_font_size : float = 1.0,
-            small_font_size : float = 0.5
+            big_font_size : float = 0.5,
+            small_font_size : float = 0.3
         ):
 
         self.tile_dims = tile_dims
@@ -140,10 +140,9 @@ class Assets:
         # width and height are the dimensions of the plaque in terms of tiles, 
         # i.e. 3x5 would return a 3 tile by 5 tile plaque    
         class Plaque(Object):
-            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] = (0, 0), opacity : int = plaque_opacity):
+            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] = (0, 0), opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
                 color = self.scheme['plaque']
-                opacity = opacity
 
                 plq.width, plq.height = width, height = dims 
 
@@ -193,9 +192,17 @@ class Assets:
                     RIGHT = (width-1) * tile_w 
 
                     surface.blit(tl, (0, 0))
+                    pg.image.save(surface, 'current.png')
+
                     surface.blit(bl, (0, BOTTOM))
+                    pg.image.save(surface, 'current.png')
+                    
                     surface.blit(tr, (RIGHT, 0))
+                    pg.image.save(surface, 'current.png')
+                    
                     surface.blit(br, (RIGHT, BOTTOM))
+                    pg.image.save(surface, 'current.png')
+                    
 
                     te = self.tiles['TopEdge']
                     be = self.tiles['BottomEdge']
@@ -205,21 +212,32 @@ class Assets:
                     for i in range(1, width-1):
                         I = i * tile_w 
                         surface.blit(te, (I, 0))
+                        pg.image.save(surface, 'current.png')
+                    
                         surface.blit(be, (I, BOTTOM))
+                        pg.image.save(surface, 'current.png')
+                    
                     
                     for i in range(1, height-1):
                         I = i * tile_h 
                         surface.blit(le, (0, I))
+                        pg.image.save(surface, 'current.png')
+                    
                         surface.blit(re, (RIGHT, I))
+                        pg.image.save(surface, 'current.png')
+                    
                     
                     m = self.tiles['Middle']
                     for i in range(1, width-1):
                         for j in range(1, height-1):
                             surface.blit(m, (i * tile_w, j * tile_h))
+                            pg.image.save(surface, 'current.png')
+                    
                     
                     surface = tint(surface, color=color, opacity=opacity)
 
                 super().__init__(surface, center=center)
+
 
         class ObjectPlaque(Plaque):
             # a plaque that "contains" other objects -- for example, a promotion plaque
@@ -228,7 +246,7 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object], center : Tuple[int, int] = (0, 0), opacity : int = plaque_opacity):
+            def __init__(plq, dims : Tuple[int, int], objects : List[Object], center : Tuple[int, int] = (0, 0), opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, opacity = opacity)
                 plq.objects = objects 
 
@@ -250,6 +268,12 @@ class Assets:
                     x, y = object.rect.center 
                     object.rect.center = (x+dx, y+dy)
 
+            def blit_onto(self, surface : Surface):
+                super().blit_onto(surface)
+
+                for obj in self.objects:
+                    obj.blit_onto(surface)
+                
         self.Plaque = Plaque
         self.ObjectPlaque = ObjectPlaque
 
@@ -260,13 +284,11 @@ class Assets:
         if color_name is None:
             color_name = label.lower()
 
-        label_object = Object(self.big_font.render(label, True, self.scheme[color_name]))
-
         dx_r = plaque.rect.width // 5
         dx_q = plaque.rect.width // 4
         dy = plaque.rect.height // 7
 
-        label_object.rect.center = (0, - dy)
+        label_object = Object(self.big_font.render(label, True, self.scheme[color_name]), center=(0, - dy))
 
         reset_button = Object(self.small_font.render('Reset', True, self.scheme['text']))
         reset_button.rect.center = (dx_r, dy)
@@ -398,7 +420,10 @@ class AudioVisuals:
                 sprite = sprite_dict[piece.figure.name]
                 if piece is not self.selected_piece:
                     Object(sprite, self.coords(piece.position)).blit_onto(surface)
-                else:
-                    Object(sprite, held_coords).blit_onto(surface)
+
+        if self.selected_piece is not None:
+            piece = self.selected_piece
+            sprite = self.figure_sprites[piece.player.index][piece.figure.name]
+            Object(sprite, held_coords).blit_onto(surface)
         
         return surface
