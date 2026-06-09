@@ -1,6 +1,6 @@
 # Demetre Seturidze
 # Chess
-# UI -- Graphics and Sounds
+# Assets -- Graphics and Sounds
 
 # we create a graphics class - which will hold the necessary graphics throughout an instance of the game.
 from typing import Tuple, List, Dict, Callable, Any 
@@ -129,6 +129,8 @@ class Assets:
             name : tint(sprite.copy(), scheme['player_black']) for name, sprite in self.figures.items()
         }
 
+        self.selected_tile = tint(self.tiles['Tile'].copy(), scheme['select'], opacity=int(selection_opacity * 255))
+
         font_path = Path(self.asset_dir, f'font.{font_ext}')
 
         self.big_font = pg.font.Font(font_path, int(big_font_size * h))
@@ -192,16 +194,9 @@ class Assets:
                     RIGHT = (width-1) * tile_w 
 
                     surface.blit(tl, (0, 0))
-                    pg.image.save(surface, 'current.png')
-
                     surface.blit(bl, (0, BOTTOM))
-                    pg.image.save(surface, 'current.png')
-                    
                     surface.blit(tr, (RIGHT, 0))
-                    pg.image.save(surface, 'current.png')
-                    
                     surface.blit(br, (RIGHT, BOTTOM))
-                    pg.image.save(surface, 'current.png')
                     
 
                     te = self.tiles['TopEdge']
@@ -212,26 +207,19 @@ class Assets:
                     for i in range(1, width-1):
                         I = i * tile_w 
                         surface.blit(te, (I, 0))
-                        pg.image.save(surface, 'current.png')
-                    
                         surface.blit(be, (I, BOTTOM))
-                        pg.image.save(surface, 'current.png')
                     
                     
                     for i in range(1, height-1):
                         I = i * tile_h 
                         surface.blit(le, (0, I))
-                        pg.image.save(surface, 'current.png')
-                    
                         surface.blit(re, (RIGHT, I))
-                        pg.image.save(surface, 'current.png')
                     
                     
                     m = self.tiles['Middle']
                     for i in range(1, width-1):
                         for j in range(1, height-1):
                             surface.blit(m, (i * tile_w, j * tile_h))
-                            pg.image.save(surface, 'current.png')
                     
                     
                     surface = tint(surface, color=color, opacity=opacity)
@@ -256,6 +244,15 @@ class Assets:
                         return obj 
                     
                 return None 
+            
+            # returns the index in plq.objects of the object that has been hit
+            def hit_index(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> int:
+                for i in range(len(plq.objects)):
+                    if plq.objects[i].hits(coords, prev_coords):
+                        return i
+                    
+                return -1
+            
 
             def center_at(plq, coords : Tuple[int, int]):
                 x_curr, y_curr = plq.rect.center
@@ -293,10 +290,10 @@ class Assets:
         reset_button = Object(self.small_font.render('Reset', True, self.scheme['text']))
         reset_button.rect.center = (dx_r, dy)
 
-        close_button = Object(self.small_font.render('Quit', True, self.scheme['text']))
-        close_button.rect.center = (-dx_q, dy)
+        quit_button = Object(self.small_font.render('Quit', True, self.scheme['text']))
+        quit_button.rect.center = (-dx_q, dy)
 
-        plaque.objects = [reset_button, close_button, label_object]
+        plaque.objects = [reset_button, quit_button, label_object]
 
         plaque.center_at(center)
 
@@ -309,10 +306,14 @@ class AudioVisuals:
     def __init__(self, 
         assets : Assets,
         dimensions : List[int] = [8, 8],
-        num_players : int = 2
+        num_players : int = 2,
+
+        player_index : int = 0 # gives the player index whose perspective we are looking from (0 if white, 1 if black)
     ):
         self.rank = len(dimensions)
         self.num_players = num_players
+
+        self.perspective = player_index
 
         self.assets = assets
         # TODO: generalize tile dimensions and board rank. right now only supports rank-2 [n x m] boards
@@ -341,7 +342,10 @@ class AudioVisuals:
 
         self.board = Object(board_surface)
         self.board.rect.topleft = (0, 0)
+
         self.selected_piece : Piece | None = None 
+        self.hold_selected : bool = False 
+        self.selected_squares : List[Object] = [] 
 
         self.checkmate_plaque = assets.make_end_plaque('Checkmate', center=self.board.rect.center)
         self.stalemate_plaque = assets.make_end_plaque('Stalemate', center=self.board.rect.center)
@@ -377,7 +381,7 @@ class AudioVisuals:
 
                 plq.width = width = len(figures)
                 super().__init__(
-                    dimensions=(width, 1), 
+                    dims=(width, 1), 
                     objects=objects,
                     center = (x + int(disp*(width -1)/2.0), y)
                 )
@@ -393,19 +397,21 @@ class AudioVisuals:
         self.make_promotion_plaque = PromotionPlaque
 
     # translates a point on the screen to a square on the board
-    def board_pos(self, coords : tuple, forward : int = 1) -> tuple:
+    def board_pos(self, coords : tuple) -> tuple:
         i, j = coords 
 
-        if forward == -1:
-            j = self.dimensions[1] - j - 1
+        I, J = i // self.assets.tile_width, (self.height - j) // self.assets.tile_height
 
-        return i // self.assets.tile_width, (self.height - j) // self.assets.tile_height
+        if self.perspective == 1:
+            J = self.dimensions[1] - J - 1
+
+        return I, J
 
     # translates a square on the board to its center point on the screen
-    def coords(self, board_pos : tuple, forward : int = 1) -> tuple:
+    def coords(self, board_pos : tuple) -> tuple:
         I, J = board_pos
 
-        if forward == -1:
+        if self.perspective == 1:
             J = self.dimensions[1] - J - 1
 
         i = int(self.assets.tile_width * (I + 0.5))
@@ -414,20 +420,51 @@ class AudioVisuals:
         return i, j 
     
 
+    def select_piece(self, piece : Piece):
+        self.selected_piece = piece
+        self.hold_selected = True
+        if piece is None:
+            self.deselect_squares()
+        else:
+            self.select_square(piece.position)
+    
+    def select_square(self, position : tuple):
+        j, i = position
+        w, h = self.assets.tile_dims
+
+        obj = Object(self.assets.selected_tile) 
+
+        if self.perspective == 0:
+            i = self.dimensions[1] - i - 1 
+        
+        obj.rect.topleft = (j * w, i * h)
+        self.selected_squares.append(obj) 
+
+    def deselect_piece(self):
+        self.selected_piece = None
+        self.hold_selected = False 
+
+    def deselect_squares(self):
+        self.selected_squares = []
+
+
     def play(self, sound_name : str):
         self.assets.sounds[sound_name].play()
 
     # draws the given game to a surface
-    def draw(self, surface : Surface, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None, forward : int = 1) -> Surface:
+    def draw(self, surface : Surface, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None) -> Surface:
         self.board.blit_onto(surface)
 
+        for square in self.selected_squares:
+            square.blit_onto(surface)
+           
         for piece_dict, sprite_dict in zip(pieces, self.figure_sprites):
             for piece in piece_dict.values():
                 sprite = sprite_dict[piece.figure.name]
-                if piece is not self.selected_piece:
-                    Object(sprite, self.coords(piece.position, forward=forward)).blit_onto(surface)
+                if not (piece is self.selected_piece and self.hold_selected):
+                    Object(sprite, self.coords(piece.position)).blit_onto(surface)
 
-        if self.selected_piece is not None:
+        if self.selected_piece is not None and self.hold_selected:
             piece = self.selected_piece
             sprite = self.figure_sprites[piece.player.index][piece.figure.name]
             Object(sprite, held_coords).blit_onto(surface)

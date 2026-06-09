@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 xhat = np.array([1, 0])
 yhat = np.array([0, 1])
 
+# TODO: Make sets instantiable instead of fixed classes
 
 class Moves:
     @staticmethod 
@@ -103,7 +104,8 @@ class Moves:
         forward_direction = np.array([0, forward])
         
         def passant_validity(game : Game, end : Vector) -> bool:
-            piece = game.at(end - forward_direction) 
+            target_pos = end - forward_direction
+            piece = game.at(target_pos) if game.in_bounds(target_pos) else None 
             # make sure the pawn did a leap
             if piece is not None and abs(piece.history[0][1] - piece.history[-1][1]) == 2:
                 return piece.figure.name == 'Pawn' and piece.just_first
@@ -532,3 +534,10 @@ class Wildebeest(Set):
         )
 
         return Game(cls.dimensions, [white, black])
+    
+
+sets : Dict[str, Type[Set]] = {
+    'chess' : Chess,
+    'shatranj' : Shatranj,
+    'wildebeest' : Wildebeest
+}

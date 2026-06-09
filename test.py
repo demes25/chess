@@ -1,8 +1,6 @@
 from files.logic.sets import Wildebeest, Chess, Shatranj
-from files.app import *
+from files.system.instance import GameInstance
+from files.media.assets import Assets
 
-pg.init()
-
-bs = App(Chess, assets=Assets((76, 76)))
-bs.run()
+GameInstance(Chess, Assets((76, 76))).run_solo()
 

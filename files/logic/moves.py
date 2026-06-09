@@ -16,14 +16,14 @@ Piece = Type['Piece']
 
 # returns the scaling of dir that yields disp. 0 if inconsistent
 def scaling(dir : Vector, disp : Vector):
-    k = 0
+    k = -1
     for i in range(len(dir)):
         if dir[i] == 0:
             if disp[i] != 0:
                 return 0
         else:
             j = disp[i]//dir[i]
-            if k == 0:
+            if k == -1:
                 k = j
             elif k != j:
                 return 0

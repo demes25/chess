@@ -102,6 +102,33 @@ class Status:
     STALEMATE = 2
     PROMOTING = 3
 
+
+from dataclasses import dataclass, field
+
+@dataclass
+class Event:
+    # label is move if this is just a move,
+    # reset if reset,
+    # quit if quit,
+    # promote if promote.
+    label : str = 'none'
+    displacement : Tuple[Tuple[int, int], Tuple[int, int]] | None = None
+    sounds : List[str] = field(default_factory=list)
+    promote_to : int = -1 
+
+    def to_dict(self):
+        return {
+            'label' : self.label,
+            'displacement' : [list(self.displacement[0]), list(self.displacement[1])],
+            'sounds' : self.sounds,
+            'promote_to' : self.promote_to
+        }
+    
+    @staticmethod 
+    def from_dict(event : dict):
+        return Event(label=event['label'], displacement=tuple(tuple(j) for j in event['displacement']), sounds=event['sounds'], promote_to=event['promote_to'])
+
+
 #TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
 #TODO: add takebacks, show previous positions, etc...
 #TODO: make game a separate thing on top of the board. the board should be able to be set up however it be so desired,
@@ -296,14 +323,18 @@ class Game:
         else:
             return self.generalized_execute(piece, target, target)
 
+    def _next_turn(self):
+        self.turn = (self.turn + 1) % len(self.players)
+        if self.turn == 0:
+            self.move_num += 1
+
     # executes a move, returns the nature of the move (move, take, check, etc...)
     # allows us to enforce move rules and game rules at will.
-    def move(self, piece : Piece, target : tuple | Vector) -> List[str]:
+    def move(self, piece : Piece, target : tuple | Vector) -> Event:
         assert len(target) == self.rank
 
         player = piece.player
 
-        
         if self.promoting is not None:
             raise Exception('Promoting piece has not yet been promoted.')
         
@@ -330,7 +361,7 @@ class Game:
         player.is_in_check = False
 
         castle_like = piece is player.monarchs[0] and move.special_exec is not None
-        result = ['castle'] if castle_like else ['move']
+        sounds = ['castle'] if castle_like else ['move']
 
         target_piece = self.at(target)
 
@@ -340,7 +371,7 @@ class Game:
                 raise Exception('Illegal capture.')
             
         if self._execute(move, piece, target):
-            result = ['take']
+            sounds = ['take']
         
         for player_army in self.pieces:
             for s in player_army.values():
@@ -357,59 +388,59 @@ class Game:
             if not self.in_bounds(piece.vector + sign * self.basis[index]):
                 if len(piece.promotion_list) == 1:
                     piece.figure = piece.promotion_list[0]
-                    result.append('promote')
+                    sounds.append('promote')
 
                     # a piece may only promote once
                     piece.promotion_list = [] 
                 else:
                     self.promoting = piece
                     self.status = Status.PROMOTING
-                    
-
-        check = self.update_checks()
-        if check:
-            result.append('check')
-
-            if 'move' in result:
-                result.remove('move')
 
         # update turns and moves
-        self.turn = (self.turn + 1) % len(self.players)
-        if self.turn == 0:
-            self.move_num += 1
-            
-        # if the player is out of legal moves, the game ends
-        if not self.has_legal_moves(self.players[self.turn]):
-            result.append('end')
-            self.status = Status.CHECKMATE if check else Status.STALEMATE
+        if not self.status == Status.PROMOTING:
+            self._next_turn()
 
-        return result 
+            check = self.update_checks()
+            if check:
+                sounds.append('check')
+
+                if 'move' in sounds:
+                    sounds.remove('move')
+            
+            # if the player is out of legal moves, the game ends
+            if not self.has_legal_moves(self.players[self.turn]):
+                sounds.append('end')
+                self.status = Status.CHECKMATE if check else Status.STALEMATE
+
+
+        return Event(label='move', displacement=(piece.position, tuple(target)), sounds=sounds)
     
-    def promote(self, figure : Figure) -> List[str]:
+    def promote(self, promotion_index : int) -> Event:
         if self.promoting is not None:
-            self.promoting.figure = figure
+            self.promoting.figure = self.promoting.promotion_list[promotion_index]
             # we may only promote once
             self.promoting.promotion_list = [] 
             self.promoting = None 
             
-            result = ['promote']
-
+            sounds = ['promote']    
+            self._next_turn()
+            
             check = self.update_checks()
             if check:
-                result.append('check')
+                sounds.append('check')
             else:
-                result.append('move')
+                sounds.append('move')
             if not self.has_legal_moves(self.players[self.turn]):
-                result.append('end')
+                sounds.append('end')
                 self.status = Status.CHECKMATE if check else Status.STALEMATE 
             else:
                 self.status = Status.ONGOING
 
-            return result
-        
+            return Event(label='promote', sounds=sounds, promote_to=promotion_index)
+                
         else:
             raise Exception('No pieces are currently promoting.')
-
+    
     def in_bounds(self, pos : tuple | Vector):
         pos = np.array(pos)
         return all(pos >= 0) and all(pos < self.board.shape[:self.rank])
