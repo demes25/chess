@@ -115,41 +115,6 @@ class Move(ABC):
     @abstractmethod
     def sees(self, game : Game, start : Vector, end : Vector):
         pass 
-    
-    # allows us to take a piece that is not at the end position of the move.
-    # also allows us to explicitly not capture anything (should be used back-end strictly, in order to avoid inconsistency)
-    @staticmethod
-    def generalized_execute(game : Game, piece : Piece, end_pos : tuple | Vector, kill_target : Vector | None = None) -> bool:
-        if kill_target is not None:
-            target_piece = game.at(kill_target)
-            result = target_piece is not None
-            if result:
-                i = game.board[target_piece.position]
-                game.board[target_piece.position] = -1
-                target_piece.die()
-                game.pieces.pop(i)
-        else:
-            result = False
-
-        if isinstance(end_pos, np.ndarray):
-            piece.vector = end_pos
-            end_pos = tuple(end_pos)
-        else:
-            piece.vector = np.array(end_pos)
-
-        game.board[end_pos] = game.board[piece.position]
-        game.board[piece.position] = -1 
-
-        piece.position = end_pos 
-        
-        return result
-
-    # executes this move
-    def execute(self, game : Game, piece : Piece, target : Vector):
-        if self.special_exec:
-            return self.special_exec(game, piece, target)
-        else:
-            return Move.generalized_execute(game, piece, target, target)
 
     # returns true if both: the end square is a valid square, and the move complex 'sees' the end square given the start square
     def accesses(self, game : Game, start : Vector, end : Vector):
@@ -310,7 +275,7 @@ class Spanning(Move):
                     return False
                 
                 pos = tuple(vec.tolist())
-                if game.board[pos] != -1:
+                if np.any(game.board[pos] < 0):
                     obstacles += 1
                 
                 # if we find more than the admitted amount of obstacles, return false
@@ -398,7 +363,7 @@ class Spanning(Move):
                     yield vec
 
                 pos = tuple(vec.tolist())
-                if game.board[pos] != -1:
+                if np.any(game.board[pos] < 0):
                     obstacles += 1
 
                 if obstacles > self.max_obstacles:
@@ -455,16 +420,11 @@ class Compound(Spanning):
 
 # a figure is a set of moves, basically, along with a name and a value
 
-from files.resources import Color, load_sprite
-
 class Figure:
     def __init__(
         self,
         name : str,
         value : int,   
-
-        color : Color, # color of the sprite 
-        dims : Tuple[int, int], # dimensions of the sprite
 
         moves : List[Move] = [], # list of valid moves
     
@@ -488,8 +448,6 @@ class Figure:
 
         self.value = value  
         self.name = name
-        self.sprite = load_sprite(f'figures/{name}', dims=dims, color=color)
-
     
     def access_map(self, occupation_map : Matrix, pos : tuple | Vector, first_move : bool = False) -> BooleanMap:
         result = np.zeros_like(occupation_map, dtype=np.bool)

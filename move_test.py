@@ -1,8 +1,10 @@
-from files.boards import *
-import time 
+from files.media.assets import *
 
-queen = Figure('Queen', 9, (100, 100, 100), (50, 50), [Moves.DiagonalSpan(), Moves.OrthogonalSpan()])
+gui = GUI(Assets((76, 76)))
 
-board = np.zeros([8, 8])
+pg.display.init()
+screen = pg.display.set_mode((gui.width, gui.height))
 
-print(np.asarray(queen.access_map(board, (4, 3)), dtype=np.int16))
+gui.board.blit_onto(screen)
+pg.display.update()
+input()

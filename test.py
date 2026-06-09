@@ -1,9 +1,8 @@
-from files.boards import Wildebeest, Chess, Shatranj
-from files.gui import *
+from files.logic.sets import Wildebeest, Chess, Shatranj
+from files.app import *
 
 pg.init()
 
-standard_set = Wildebeest((76, 76))
-bs = GUI(standard_set)
+bs = App(Wildebeest, assets=Assets((76, 76)))
 bs.run()
 

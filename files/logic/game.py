@@ -2,17 +2,17 @@
 # Chess
 # Game
 
-from files.moves import *
+from files.logic.moves import *
 from typing import Dict
-from itertools import product
+from files.logic.moves import Move
 
 # -- THE PLAYER and THE PIECES -- #
 
 class Player:
     def __init__(
         self,
-        monarch : Piece, # king piece
-        army : List[Piece], 
+        monarch : 'Piece', # king piece
+        army : List['Piece'], 
         index : int,
     ):
 
@@ -114,7 +114,7 @@ class Game:
         ):
 
         self.rank = len(dimensions)
-        self.board = np.full(dimensions, -1)
+        self.board = np.full((*dimensions, 2), -1)
         self.dimensions = dimensions
         self.players = players
 
@@ -130,24 +130,40 @@ class Game:
 
         assert all(player.rank == self.rank for player in players)
         
-        self.pieces : Dict[int, Piece] = {}
+        self.pieces : List[Dict[int, 'Piece']] = [{} for _ in players] # indexed according to the index of the corresponding player
 
         i = 0
-        for player in players:
+        for j in range(len(players)):
+            player = players[j]
+            pieces = self.pieces[j]
+
             for monarch in player.monarchs:
-                self.pieces[i] = (monarch)
-                self.board[monarch.position] = i
+                pieces[i] = monarch
+                square = self.board[monarch.position]
+
+                square[0] = j 
+                square[1] = i 
                 i += 1
 
             for piece in player.army:
-                self.pieces[i] = piece
-                self.board[piece.position] = i
+                pieces[i] = piece
+                square = self.board[piece.position]
+
+                square[0] = j 
+                square[1] = i 
                 i += 1
+            
+            i=0
         
     # returns the entity at the given position
     def at(self, pos : tuple | Vector) -> Piece | None:
-        i = self.board[tuple(pos)]
-        return None if i == -1 else self.pieces[i]
+        i, j = tuple(self.board[tuple(pos)])
+        return None if i == -1 else self.pieces[i][j]
+
+    def set_to(self, pos : tuple | Vector, player_index : int, piece_index : int):
+        square = self.board[tuple(pos)]
+        square[0] = player_index
+        square[1] = piece_index
     
 
     # temporarily moves the given piece to the given position and runs the given function with the given arguments
@@ -165,23 +181,27 @@ class Game:
         piece.position = pos
         piece.vector = vec
 
-        _cpiece = self.board[_cpos]
-        self.board[_cpos] = -1
+        _cplayer, _cpiece = tuple(self.board[_cpos]) # current piece
+        self.set_to(_cpos, -1, -1) # removes the current piece from the current position
 
-        _opiece = self.board[pos]
+        _oplayer, _opiece = self.board[pos] # original piece 
+
         if _opiece != -1:
-            self.pieces[_opiece].dead = True 
-        self.board[pos] = _cpiece
+            self.pieces[_oplayer][_opiece].dead = True 
+
+        self.set_to(pos, _cplayer, _cpiece)
 
         result = func(*args)
 
         piece.position = _cpos 
         piece.vector = _cvec 
 
-        self.board[pos] = _opiece
+        self.set_to(pos, _oplayer, _opiece)
+ 
         if _opiece != -1:
-            self.pieces[_opiece].dead = False 
-        self.board[_cpos] = _cpiece
+            self.pieces[_oplayer][_opiece].dead = False 
+ 
+        self.set_to(_cpos, _cplayer, _cpiece)
 
         return result
 
@@ -241,6 +261,41 @@ class Game:
         
         return result
 
+
+    # allows us to take a piece that is not at the end position of the move.
+    # also allows us to explicitly not capture anything (should be used back-end strictly, in order to avoid inconsistency)
+    def generalized_execute(self, piece : Piece, end_pos : tuple | Vector, kill_target : Vector | None = None) -> bool:
+        if kill_target is not None:
+            target_piece = self.at(kill_target)
+            result = target_piece is not None
+            if result:
+                i, j = tuple(self.board[target_piece.position])
+                self.set_to(target_piece.position, -1, -1)
+                target_piece.die()
+                self.pieces[i].pop(j)
+        else:
+            result = False
+
+        if isinstance(end_pos, np.ndarray):
+            piece.vector = end_pos
+            end_pos = tuple(end_pos)
+        else:
+            piece.vector = np.array(end_pos)
+
+        self.set_to(end_pos, *tuple(self.board[piece.position]))
+        self.set_to(piece.position, -1, -1)
+
+        piece.position = end_pos 
+        
+        return result
+
+    # executes this move
+    def _execute(self, move : Move, piece : Piece, target : Vector):
+        if move.special_exec:
+            return move.special_exec(self, piece, target)
+        else:
+            return self.generalized_execute(piece, target, target)
+
     # executes a move, returns the nature of the move (move, take, check, etc...)
     # allows us to enforce move rules and game rules at will.
     def move(self, piece : Piece, target : tuple | Vector) -> List[str]:
@@ -284,12 +339,13 @@ class Game:
             if move.captures and target_piece.player is player:
                 raise Exception('Illegal capture.')
             
-        if move.execute(self, piece, target):
+        if self._execute(move, piece, target):
             result = ['take']
         
-        for s in self.pieces.values():
-            s.just_first = not s.has_moved 
-            s.update_history()
+        for player_army in self.pieces:
+            for s in player_army.values():
+                s.just_first = not s.has_moved 
+                s.update_history()
 
         piece.has_moved = True 
 
@@ -356,7 +412,7 @@ class Game:
 
     def in_bounds(self, pos : tuple | Vector):
         pos = np.array(pos)
-        return all(pos >= 0) and all(pos < self.board.shape)
+        return all(pos >= 0) and all(pos < self.board.shape[:self.rank])
     
     # returns None if the given move is legal, otherwise returns an error message
     def _is_illegal(self, piece : Piece, target : Vector) -> str | None:
