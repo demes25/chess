@@ -81,8 +81,8 @@ class Moves:
             init_pos = piece.vector
             rook = game.at(rook_pos)
 
-            Move.generalized_execute(game, piece, init_pos + n*dir)
-            Move.generalized_execute(game, rook, init_pos + (n-1)*dir)
+            game.generalized_execute(piece, init_pos + n*dir)
+            game.generalized_execute(rook, init_pos + (n-1)*dir)
 
             return False
 
@@ -113,7 +113,7 @@ class Moves:
             return passant_validity(game, end)
         
         def passant_exec(game : Game, piece : Piece, target : Vector) -> bool:
-            return Move.generalized_execute(game, piece, end_pos = target, kill_target = target-forward_direction)
+            return game.generalized_execute(piece, end_pos = target, kill_target = target-forward_direction)
 
         return Discrete([(-1, forward), (1, forward)], moves = False, special_condition=passant_condition, special_exec=passant_exec, special_validity=passant_validity)
     

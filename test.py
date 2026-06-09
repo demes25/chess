@@ -3,6 +3,6 @@ from files.app import *
 
 pg.init()
 
-bs = App(Wildebeest, assets=Assets((76, 76)))
+bs = App(Chess, assets=Assets((76, 76)))
 bs.run()
 

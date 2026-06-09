@@ -91,8 +91,8 @@ class Assets:
             plaque_opacity : float = 0.8,
             selection_opacity : float = 0.5,
 
-            big_font_size : float = 0.5,
-            small_font_size : float = 0.3
+            big_font_size : float = 0.55,
+            small_font_size : float = 0.35
         ):
 
         self.tile_dims = tile_dims
@@ -393,14 +393,20 @@ class AudioVisuals:
         self.make_promotion_plaque = PromotionPlaque
 
     # translates a point on the screen to a square on the board
-    def board_pos(self, coords : tuple) -> tuple:
+    def board_pos(self, coords : tuple, forward : int = 1) -> tuple:
         i, j = coords 
+
+        if forward == -1:
+            j = self.dimensions[1] - j - 1
 
         return i // self.assets.tile_width, (self.height - j) // self.assets.tile_height
 
     # translates a square on the board to its center point on the screen
-    def coords(self, board_pos : tuple) -> tuple:
+    def coords(self, board_pos : tuple, forward : int = 1) -> tuple:
         I, J = board_pos
+
+        if forward == -1:
+            J = self.dimensions[1] - J - 1
 
         i = int(self.assets.tile_width * (I + 0.5))
         j = int(self.height - (J + 0.5)*self.assets.tile_height)
@@ -412,14 +418,14 @@ class AudioVisuals:
         self.assets.sounds[sound_name].play()
 
     # draws the given game to a surface
-    def draw(self, surface : Surface, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None) -> Surface:
+    def draw(self, surface : Surface, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None, forward : int = 1) -> Surface:
         self.board.blit_onto(surface)
 
         for piece_dict, sprite_dict in zip(pieces, self.figure_sprites):
             for piece in piece_dict.values():
                 sprite = sprite_dict[piece.figure.name]
                 if piece is not self.selected_piece:
-                    Object(sprite, self.coords(piece.position)).blit_onto(surface)
+                    Object(sprite, self.coords(piece.position, forward=forward)).blit_onto(surface)
 
         if self.selected_piece is not None:
             piece = self.selected_piece
