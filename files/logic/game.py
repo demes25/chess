@@ -2,7 +2,7 @@
 # Chess
 # Game
 
-from files.logic.moves import Move, Castle, Figure, Vector
+from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional
 import numpy as np 
 
@@ -50,10 +50,10 @@ class Player(Serializable):
 class Piece(Serializable):
     def __init__(
         self,
-        figure : Figure,
+        name : str,
         position : tuple,
 
-        promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
+        promotes : List[str] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
         promotion_axis : int = -1, # the promotion axis
 
         history : List[tuple] = [], # the history of positions this has had
@@ -63,12 +63,14 @@ class Piece(Serializable):
         just_first : bool = False
     ):
         self.player : Player | None = None 
-        self.figure = figure
+        self.figure = Figures[name]
+
         self.position = tuple(position)
         self.history = history + [position]
         self.vector = np.array(self.position)
 
-        self.promotion_list = promotes
+        self.promotes = promotes 
+        self.promotion_list = [Figures[name] for name in promotes]
         self.promotion_axis = promotion_axis
 
         self.dead = dead
@@ -79,10 +81,10 @@ class Piece(Serializable):
     # serialization
     def to_dict(self) -> dict:
         return {
-            'figure' : self.figure,
+            'name' : self.figure.name,
             'position' : self.position,
             
-            'promotes' : self.promotion_list,
+            'promotes' : self.promotes,
             'promotion_axis' : self.promotion_axis,
 
             'history' : self.history[:-1],

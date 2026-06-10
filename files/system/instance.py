@@ -1,6 +1,6 @@
 # Demetre Seturidze
 # Chess
-# Client
+# Instance
 
 from files.logic.game import Game, Status, Event
 from files.logic.serialization import serialize, deserialize
@@ -18,6 +18,7 @@ class VarSettings:
     running = True 
     click_pos = None 
 
+
 class GameInstance:
     def __init__(
         self,
@@ -27,7 +28,6 @@ class GameInstance:
 
         player_index : int =0
     ):
-        self.set = set
         self.game : Game | None = None 
         self.assets = assets
         self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=player_index)
@@ -155,7 +155,7 @@ class GameInstance:
 
     def begin(self):
         self.clear()
-        self.game = self.set.new_game()
+        self.game = self.set()
         self.av.play('start')
 
     def fetch_event(self) -> Event:
@@ -219,8 +219,6 @@ class GameInstance:
         
         with open('game.txt', 'w') as f:
             f.write(serialize(self.game, indent = 2))
+        
 
-
-
-
-
+        

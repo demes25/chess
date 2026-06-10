@@ -2,235 +2,138 @@
 # Chess
 # Server
 
-import asyncio, json
-from typing import Set, Callable, Any, Optional, Awaitable
-from files.system.utils import LogUtils as lu, logging
-
-MessageType = str | Callable[[], str] | dict | Callable[[], dict]
-
-# if input is not function, returns.
-# if input is argless function, calls it and returns result.
-def collapse(foo : Any | Callable[[], Any]) -> Any:
-    return foo() if callable(foo) else foo
+import asyncio, websockets, uuid
+from typing import List, Dict
+from files.logic.serialization import serialize, deserialize
+from files.logic.sets import Set
+from files.media.assets import Assets
+import random
 
 
-class Client:
-    def __init__(self, 
-        reader : asyncio.StreamReader,
-        writer : asyncio.StreamWriter,
-        system : 'Server',
-        handle : Callable[[str], Awaitable[Optional[MessageType]]] | None = None 
-    ):
+RAISE = False 
+
+
+# hosts a game        
+class GameServer:
+    def __init__(self, set : Set, num_players = 2):
+        self.players : List[websockets.ClientConnection | None] = [None] * num_players
+        self.player_dict : Dict[str, int] = {}
+
+        self.set = set
+        self.game = None 
+
+        self.num_joined = 0
+        self.num_players = num_players
+
+        self.available_spots = [i for i in range(num_players)]
+
+
+    def assign(self, ws, id : str) -> int:
+        if self.num_joined == self.num_players:
+            raise Exception('All players already assigned')
         
-        self.reader = reader
-        self.writer = writer
+        elif self.player_dict:
+            index = self.player_dict.get(id, -1)
+            if index != -1 and self.players[index] == None:
+                self.players[index] = ws 
+                self.available_spots.remove(index)
 
-        if handle is None:
-            async def _handle(line) -> Optional[MessageType]:
-                return json.loads(line)
-            handle = _handle 
-
-        self.handle = handle
-
-        self.__system__ = system 
-
-        self.lock = asyncio.Lock()
-        self.delimit = system.delimit
-
-    async def display(self, msg : MessageType):
-        self.writer.write(self.__system__.render(msg))
-        await self.writer.drain()
-
-    async def listen(self):
-        while True:
-            try:
-                line = await self.reader.readuntil(self.delimit.encode())
-            except asyncio.IncompleteReadError as e:
-                # Stream closed before we got the delimiter
-                if e.partial:
-                    line = e.partial
-                else:
-                    break
-            except EOFError:
-                break
-            except Exception as e:
-                await self.display(lu.handle_dict(e))
-
-            if not line:
-                break
-
-            try:
-                line = line.decode().strip().strip(self.delimit).strip()
-                msg = await self.handle(line)
-                
-                if msg is None:
-                    break 
-                else:
-                    await self.display(msg)
-                
-            except Exception as e:
-                await self.display(lu.handle_dict(e))
+                self.num_joined += 1
+                return index
             
-class Server:
-    # THE FORMAT is:
-    # {
-    #   'type' : ['status', 'signal', etc...],
-    #   'msg' : [MessageType] 
-    # }
+        random.shuffle(self.available_spots)
+        index = self.available_spots.pop()
 
-    def __init__(self, 
-                    open_msg : MessageType = {
-                        'type' : 'status',
-                        'msg' : 'connected'
-                    }, 
-                    close_msg : MessageType = {
-                        'type' : 'status',
-                        'msg' : 'disconnected'
-                    },
+        self.players[index] = ws
+        self.player_dict[id] = index 
 
-                    delimit : str = ';',  # the line delimiter
-                    indent : int = 2 # indent for json formatting
-                ):
+        self.num_joined += 1
+        return index
         
-        self.delimit = delimit
-        self.indent = indent
+    async def new_game(self):
+        assert self.num_joined == self.num_players
+
+        self.game = self.set()
+        sergame = serialize(self.game)
+
+        for i in range(self.num_players):
+            await self.players[i].send(sergame)
         
-        self.lock = asyncio.Lock()
-        self.clients : Set[Client] = set()
-        
-        # keeps track of the serve task
-        self.serve_task = None 
 
-        self.open_msg = open_msg
-        self.close_msg = close_msg
-        
-        self.server = None 
-
-   
-    def to_str(self, msg : MessageType) -> str:
-        called = collapse(msg)
-        if isinstance(called, str):
-            return called
-        elif isinstance(called, dict):
-            return json.dumps(called, indent=self.indent)
-        else:
-            raise TypeError(f'expected message of type {str} or {dict}, not {type(called)}')
-    
-    
-    # checks connections continuously if limit is set
-    # for now this is only for KILL-SWITCH purposes, for security
-    # TODO: enforce security better
-    async def limit_strict(self, limit=1, period=1):
-        while True:
-            await asyncio.sleep(period)
-            
-            async with self.lock:
-                # kill-switch
-                kill = len(self.clients) > limit
-            
-            if kill:
-                print({'type' : 'panic', 'msg' : 'connection limit surpassed, shutting down'})
-                await self.close_host()
-                break
-
-        self.serve_task.cancel()
-
-
-    def render(self, msg : MessageType, delimit : bool=True) -> bytes:
-        str_msg = self.to_str(msg)
-        if delimit:
-            str_msg = str_msg + self.delimit
-        return (str_msg + '\n').encode()
-    
-
-    async def handle_client(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter):
-        addr = writer.get_extra_info('peername')
-        logging.info(f'[Server] Client connected: {addr}' )
-
-        async with self.lock:
-            client = Client(reader, writer, self)
-            self.clients.add(client)
-            await client.display(self.open_msg)
-            
+    async def handler(self, ws : websockets.ClientConnection):
         try:
-            await client.listen()
-                
-        finally:  
-            await client.display(self.close_msg)
-            
-            async with self.lock:
-                self.clients.discard(client)
-            client.writer.close()
-            await client.writer.wait_closed()
+            id = await ws.recv()
+            index = self.assign(ws, id)
 
-            logging.info(f'[Server] Client disconnected: {addr}')
+            # send the player index 
+            await ws.send(str(index))
+            # send the relevant set 
+            await ws.send(serialize(self.set))
 
+            if self.num_joined == self.num_players:
+                self.game = self.set()
+
+            async for message in ws:
+                while self.num_joined < self.num_players:
+                    asyncio.sleep(1)
+
+                if 'reset' in message:
+                    self.game = self.set()
+
+                # Relay message to other players
+                for i in range(self.num_players):
+                    if i != index:
+                        await self.players[i].send(message)
+
+        finally:
+            self.players[index] = None 
+            self.num_joined -= 1
+            self.available_spots.append(index)
+
+    async def run(self, host : str = 'localhost', port : int = 8888):
+        async with websockets.serve(self.handler, host, port):
+            await asyncio.Future() 
+
+
+
+from files.system.instance import GameInstance
+
+class GameClient:
+    def __init__(self, assets : Assets):
+        self.lock = asyncio.Lock()
+        self.id = str(uuid.uuid1())
+        self.assets = assets 
+
+    async def sender(self, ws : websockets.ClientConnection):
+        pass
     
-    async def broadcast(self, msg : MessageType):
-        rendered_msg = self.render(msg)
+    async def listener(self, ws : websockets.ClientConnection):
+        pass 
 
-        async with self.lock: 
-            to_remove = [client for client in self.clients if client.is_closing()]
-            for client in to_remove:
-                self.clients.discard(client)
-            client_list = self.clients.copy()
 
-        for client in client_list:
-            try:
-                client.writer.write(rendered_msg)
-                await client.writer.drain()
-            except Exception as e:
-                lu.handle(e, "Discarding failed client.")
-                async with self.lock:
-                    self.clients.discard(client)
-    
-
-    async def close_host(self):
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-            logging.info("[Server] Server closed")
-
-        if self.clients:
-            for client in list(self.clients):
-                try:
-                    await client.display(self.close_msg)
-                except:
-                    pass
-                finally:
-                    client.writer.close()
-                    await client.writer.wait_closed()
-
-            self.clients.clear()
-            logging.info("[Server] Clients disconnected")
+    async def establish(self, ws : websockets.ClientConnection):
+        # send client information
+        await ws.send(self.id)
         
-    async def open_host(self, host = 'localhost', port = 8888):
-        await self.close_host()
+        # receive the player index 
+        self.index = int(await ws.recv())
 
-        self.server = await asyncio.start_server(
-            self.handle_client,
-            host=host,
-            port=port
-        )
+        # receive the set
+        set_obj = deserialize(await(ws.recv()))
 
-        logging.info("[Server] Server opened")
+        # receive the serialized game object
+        game_obj = deserialize(await(ws.recv()))
+
+        # construct the instance
+        self.instance = GameInstance(set_obj, assets=self.assets, player_index=self.index)
+        self.instance.game = game_obj
+
+    # listens for events from the server, handles accordingly
+    async def run(self, host : str = 'localhost', port : int = 8888):
+        async with websockets.connect(f"ws://{host}:{port}") as ws:
+            await self.establish(ws)
 
 
-    async def serve(self, limit: int = 0): # 0 is no limit...
-        
-        task = asyncio.create_task(self.server.serve_forever())
-        self.serve_task = task 
-
-        if limit > 0:
-            task = asyncio.gather(task, self.limit_strict(limit=limit))
             
-        try:
-            await task
-        except asyncio.CancelledError as e:
-            pass
-            
-    async def open_serve(self, host='localhost', port=8888, limit=0):
-        await self.open_host(host=host, port=port)
-        await self.serve(limit=limit)
         
 

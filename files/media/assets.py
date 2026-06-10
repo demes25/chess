@@ -352,7 +352,7 @@ class AudioVisuals:
 
         class PromotionPlaque(assets.ObjectPlaque):
 
-            from files.logic.game import Figure 
+            from files.logic.figures import Figure 
             def __init__(plq, figures : List[Figure], player_index : int, board_pos : Tuple[int, int]):
                 plq.figures = figures
             

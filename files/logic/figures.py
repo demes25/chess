@@ -568,6 +568,56 @@ class EnPassant(Discrete):
         return False 
 
 
+class StandardMoves:
+    @staticmethod 
+    def Perimeter() -> Move:
+        return Discrete([(1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)])
+
+    @staticmethod
+    def DiagonalStep() -> Move:
+        return Discrete([(1, 1), (1, -1), (-1, 1), (-1, -1)])
+    
+    @staticmethod
+    def OrthogonalStep() -> Move:
+        return Discrete([(1, 0), (0, 1), (-1, 0), (0, -1)])
+    
+    @staticmethod
+    def PawnPush(forward : int) -> Move:
+        return Discrete([(0, forward)], captures=False)
+    
+    @staticmethod
+    def PawnJump(forward : int) -> Move:
+        return Discrete([(0, 2*forward)], captures=False)
+    
+    @staticmethod
+    def PawnTake(forward : int) -> Move:
+        return Discrete([(-1, forward), (1, forward)], moves=False)
+        
+    @staticmethod
+    def KnightLeap() -> Move:
+        return Leap((1, 2))
+
+    @staticmethod
+    def CamelLeap() -> Move:
+        return Leap((1, 3))
+    
+    @staticmethod 
+    def AlfilLeap() -> Move:
+        return Leap((2, 2))
+    
+    @staticmethod
+    def DabaabaLeap() -> Move:
+        return Leap((0, 2))
+
+    @staticmethod
+    def OrthogonalSpan() -> Move:
+        return Spanning([(0, 1), (1, 0)])
+    
+    @staticmethod
+    def DiagonalSpan() -> Move:
+        return Spanning([(1, 1), (1, -1)])
+
+
 # -- FIGURES -- #
 
 # a figure is a set of moves, basically, along with a name and a value
@@ -628,6 +678,138 @@ class Figure(Serializable):
         
         return result 
        
+Figures = {
+    'King' : Figure(
+        name = 'King', 
+        value = 0, 
+        moves = [
+            StandardMoves.Perimeter()
+        ],
+        first = [
+            Castle(n=2, width=8, restrict=False)
+        ]
+    ),
+
+    'Queen' : Figure(
+        name = 'Queen', 
+        value = 9, 
+        moves = [
+            StandardMoves.OrthogonalSpan(), StandardMoves.DiagonalSpan()
+        ]
+    ),
+
+    'Rook' : Figure(
+        name = 'Rook',
+        value = 5,
+        moves = [
+            StandardMoves.OrthogonalSpan()
+        ]
+    ),
+
+    'Bishop' : Figure(
+        name = 'Bishop',
+        value = 3,
+        moves = [
+            StandardMoves.DiagonalSpan()
+        ]
+    ),
+
+    'Knight' : Figure(
+        name = 'Knight',
+        value = 3,
+        moves = [
+            StandardMoves.KnightLeap()
+        ]
+    ),
+
+    
+
+    'ShatranjKing' : Figure(
+        name = 'King',
+        value = 0,
+        moves = [StandardMoves.Perimeter()]
+    ),
+
+    'Ferz' : Figure(
+        name = 'Ferz', 
+        value = 2, 
+        moves = [
+            StandardMoves.DiagonalStep()
+        ]
+    ),
+
+    'Alfil' : Figure(
+        name = 'Alfil',
+        value = 2,
+        moves = [
+            StandardMoves.AlfilLeap()
+        ]
+    ),
 
 
 
+    'WildebeestKing' : Figure(
+        name = 'King',
+        value = 0,
+        moves = [
+            StandardMoves.Perimeter()
+        ],
+        first = [
+            Castle(n=2, width=11, restrict=True),
+            Castle(n=3, width=11, restrict=True),
+            Castle(n=4, width=11, restrict=True)
+        ]
+    ),
+    
+    'Wildebeest' : Figure(
+        name = 'Wildebeest',
+        value = 5,
+        moves=[StandardMoves.KnightLeap(), StandardMoves.CamelLeap()]
+    ),
+
+    'Camel' : Figure(
+        name = 'Camel',
+        value = 3,
+        moves=[StandardMoves.CamelLeap()]
+    ),
+
+
+
+    'ShatranjWhitePawn' : Figure(
+        name = 'Pawn',
+        value = 1,
+        moves = [
+            StandardMoves.PawnPush(1), StandardMoves.PawnTake(-1)
+        ]
+    ),
+
+    'ShatranjBlackPawn' : Figure(
+        name = 'Pawn',
+        value = 1,
+        moves = [
+            StandardMoves.PawnPush(-1), StandardMoves.PawnTake(-1)
+        ]
+    ),
+
+    'WhitePawn' : Figure(
+        name = 'Pawn',
+        value = 1,
+        moves = [
+            StandardMoves.PawnPush(1), StandardMoves.PawnTake(1), EnPassant(1)
+        ],
+        first = [
+            StandardMoves.PawnJump(1)
+        ]
+    ),
+
+    'BlackPawn' : Figure(
+        name = 'Pawn',
+        value = 1,
+        moves = [
+            StandardMoves.PawnPush(-1), StandardMoves.PawnTake(-1), EnPassant(-1)
+        ],
+        first = [
+            StandardMoves.PawnJump(-1)
+        ]
+    )
+}

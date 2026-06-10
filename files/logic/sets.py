@@ -2,9 +2,9 @@
 # Chess
 # Boards
 
-from typing import Type, Dict
-from files.logic.moves import Vector, Move, Discrete, Spanning, Leap, Figure
-import files.logic.moves as _moves
+from typing import Type, Dict, Tuple, List
+from files.logic.figures import Figures
+from files.logic.serialization import Serializable
 from files.logic.game import Game, Piece, Player
 
 import numpy as np
@@ -12,441 +12,142 @@ from abc import ABC, abstractmethod
 
 # TODO: Make sets instantiable instead of fixed classes
 
-class Moves:
-    @staticmethod 
-    def Perimeter() -> Move:
-        return Discrete([(1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)])
-
-    @staticmethod
-    def DiagonalStep() -> Move:
-        return Discrete([(1, 1), (1, -1), (-1, 1), (-1, -1)])
+# we define a *set*. i.e. a set of dimensions and starting armies for each player.
+class Set(Serializable):
     
-    @staticmethod
-    def OrthogonalStep() -> Move:
-        return Discrete([(1, 0), (0, 1), (-1, 0), (0, -1)])
-    
-    Castle = _moves.Castle
-    EnPassant = _moves.EnPassant
-
-    @staticmethod
-    def PawnPush(forward : int) -> Move:
-        return Discrete([(0, forward)], captures=False)
-    
-    @staticmethod
-    def PawnJump(forward : int) -> Move:
-        return Discrete([(0, 2*forward)], captures=False)
-    
-    @staticmethod
-    def PawnTake(forward : int) -> Move:
-        return Discrete([(-1, forward), (1, forward)], moves=False)
+    def __init__(
+        self, 
         
-    @staticmethod
-    def KnightLeap() -> Move:
-        return Leap((1, 2))
+        dimensions : List[int],
 
-    @staticmethod
-    def CamelLeap() -> Move:
-        return Leap((1, 3))
-    
-    @staticmethod 
-    def AlfilLeap() -> Move:
-        return Leap((2, 2))
-    
-    @staticmethod
-    def DabaabaLeap() -> Move:
-        return Leap((0, 2))
+        # each of these is a list of (figure_name, position)
+        white_monarchs : List[Tuple[str, tuple]], 
+        white_pieces : List[Tuple[str, tuple]],
+        # each of these is (figure_name, position, promotion_list)
+        white_pawns : List[Tuple[str, tuple, List[str]]],
 
-    @staticmethod
-    def OrthogonalSpan() -> Move:
-        return Spanning([(0, 1), (1, 0)])
-    
-    @staticmethod
-    def DiagonalSpan() -> Move:
-        return Spanning([(1, 1), (1, -1)])
+        black_monarchs : List[Tuple[str, tuple]],
+        black_pieces : List[Tuple[str, tuple]],
+        black_pawns : List[Tuple[str, tuple, List[str]]]
+    ):
+        self.dimensions = dimensions
 
-class Set(ABC):
-    @staticmethod
-    @abstractmethod
-    # we create the standard set of pieces given a color forward direction 
-    def Figures(forward : int) -> Dict[str, Figure]: 
-        pass
+        self.white_monarchs = white_monarchs
+        self.white_pieces = white_pieces
+        self.white_pawns = white_pawns
 
-    @classmethod 
-    @abstractmethod
-    def new_game(cls) -> Game:
-        pass
+        self.black_monarchs = black_monarchs
+        self.black_pieces = black_pieces 
+        self.black_pawns = black_pawns 
 
-
-# here we store moves and figures for Standard Chess.
-# we also have a "constructor" (new_game) which gives us the full game
-class Chess(Set): 
-    dimensions = [8, 8]
-
-    @staticmethod
-    # we create the standard set of pieces given a color forward direction 
-    def Figures(forward : int) -> Dict[str, Figure]: 
+    # serialization
+    def to_dict(self):
         return {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                moves = [
-                    Moves.Perimeter()
-                ],
-                first = [
-                    Moves.Castle(n=2, width=8, restrict=False)
-                ]
-            ),
+            'dimensions' : self.dimensions,
+            
+            'white_monarchs' : self.white_monarchs,
+            'white_pieces' : self.white_pieces,
+            'white_pawns' : self.white_pawns,
 
-            'Q' : Figure(
-                name = 'Queen', 
-                value = 9, 
-                moves = [
-                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
-                ]
-            ),
-
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'B' : Figure(
-                name = 'Bishop',
-                value = 3,
-                moves = [
-                    Moves.DiagonalSpan()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                moves = [
-                    Moves.PawnPush(forward), Moves.PawnTake(forward), Moves.EnPassant(forward)
-                ],
-                first = [
-                    Moves.PawnJump(forward)
-                ]
-            )
+            'black_monarchs' : self.black_monarchs,
+            'black_pieces' : self.black_pieces,
+            'black_pawns' : self.black_pawns
         }
 
-    @classmethod
-    def new_game(cls) -> Game:
-        white_figures = cls.Figures(1)
-        white_army = [
-            Piece(white_figures['R'], (0, 0)),
-            Piece(white_figures['N'], (1, 0)),
-            Piece(white_figures['B'], (2, 0)),
-            Piece(white_figures['Q'], (3, 0)),
-            Piece(white_figures['B'], (5, 0)),
-            Piece(white_figures['N'], (6, 0)),
-            Piece(white_figures['R'], (7, 0))
+    def __call__(self) -> Game:
+        white_monarchs = [
+            Piece(*args) for args in self.white_monarchs
+        ]
+        white_pieces = [
+            Piece(*args) for args in self.white_pieces
+        ]
+        white_pawns = [
+            Piece(*args) for args in self.white_pawns
         ]
 
-        promotes = promotes=[white_figures['Q'], white_figures['R'], white_figures['N'], white_figures['B']]
-        for i in range(8):
-            white_army.append(
-                Piece(
-                    white_figures['p'], (i, 1), 
-                    promotes=promotes
-                )
-            )
-        
-        black_figures = cls.Figures(-1)
-        black_army = [
-            Piece(black_figures['R'], (0, 7)),
-            Piece(black_figures['N'], (1, 7)),
-            Piece(black_figures['B'], (2, 7)),
-            Piece(black_figures['Q'], (3, 7)),
-            Piece(black_figures['B'], (5, 7)),
-            Piece(black_figures['N'], (6, 7)),
-            Piece(black_figures['R'], (7, 7))
+
+        black_monarchs = [
+            Piece(*args) for args in self.black_monarchs
         ]
-        
-        promotes = [black_figures['Q'], black_figures['R'], black_figures['N'], black_figures['B']]
-        for i in range(8):
-            black_army.append(
-                Piece(
-                    black_figures['p'], (i, 6), 
-                    promotes=promotes
-                )
-            )
-        
-        white = Player(
-            monarchs = Piece(white_figures['K'], (4, 0)),
-            army = white_army,
-            index = 0
-        )
+        black_pieces = [
+            Piece(*args) for args in self.black_pieces
+        ]
+        black_pawns = [
+            Piece(*args) for args in self.black_pawns
+        ]
 
-        black = Player(
-            monarchs = Piece(black_figures['K'], (4, 7)),
-            army = black_army,
-            index = 1
-        )
+        white = Player(monarchs=white_monarchs, army=white_pieces + white_pawns, index=0)
+        black = Player(monarchs=black_monarchs, army=black_pieces + black_pawns, index=1)
 
-        return Game(cls.dimensions, [white, black])
+        return Game(self.dimensions, [white, black], history=[[]])
+
+# a chess set
+chess_pieces = ['Rook', 'Knight', 'Bishop', 'Queen']
+chess_promotion = ['Queen', 'Rook', 'Bishop', 'Knight']
+Chess = Set(
+    dimensions=[8, 8],
+
+    white_monarchs=[('King', (4, 0))],
+    white_pieces=[
+        (chess_pieces[i], (i, 0)) if i < 4 else (chess_pieces[6-i], (i+1, 0)) for i in range(7)
+    ],
+    white_pawns=[
+        ('WhitePawn', (i, 1), chess_promotion) for i in range(8)
+    ],
+
+    black_monarchs=[('King', (4, 7))],
+    black_pieces=[
+        (chess_pieces[i], (i, 7)) if i < 4 else (chess_pieces[6-i], (i+1, 7)) for i in range(7)
+    ],
+    black_pawns=[
+        ('BlackPawn', (i, 6), chess_promotion) for i in range(8)
+    ]
+)
 
 
-class Shatranj(Set):
-    dimensions = [8, 8]
+# a shatranj set
+shatranj_pieces = ['Rook', 'Knight', 'Alfil', 'Ferz']
+shatranj_promotion = ['Ferz']
+Shatranj = Set(
+    dimensions=[8, 8],
 
-    @staticmethod 
-    def Figures(forward : int) -> Dict[str, Figure]:
-        return{
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                moves = [
-                    Moves.Perimeter()
-                ]
-            ),
+    white_monarchs=[('ShatranjKing', (4, 0))],
+    white_pieces=[
+        (shatranj_pieces[i], (i, 0)) if i < 4 else (shatranj_pieces[6-i], (i+1, 0))  for i in range(7) 
+    ],
+    white_pawns=[
+        ('ShatranjWhitePawn', (i, 1), shatranj_promotion) for i in range(8)
+    ],
 
-            'F' : Figure(
-                name = 'Ferz', 
-                value = 2, 
-                moves = [
-                    Moves.DiagonalStep()
-                ]
-            ),
+    black_monarchs=[('ShatranjKing', (4, 7))],
+    black_pieces=[
+        (shatranj_pieces[i], (i, 7)) if i < 4 else (shatranj_pieces[7-i], (i+1, 7)) for i in range(7)
+    ],
+    black_pawns=[
+        ('ShatranjBlackPawn', (i, 6), shatranj_promotion) for i in range(8)
+    ]
+)
 
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
 
-            'A' : Figure(
-                name = 'Alfil',
-                value = 2,
-                moves = [
-                    Moves.AlfilLeap()
-                ]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                moves = [
-                    Moves.PawnPush(forward), Moves.PawnTake(forward)
-                ]
-            )
-        }
+# a wildebeest set
+wildebeest_pieces = ['Rook', 'Knight', 'Camel', 'Camel', 'Wildebeest', 'Queen', 'Bishop', 'Bishop', 'Knight', 'Rook']
+wildebeest_promotion = ['Queen', 'Wildebeest']
+Wildebeest = Set(
+    dimensions = [11, 10],
     
-    @classmethod
-    def new_game(cls) -> Game:
-        white_figures = cls.Figures(1)
-        white_army = [
-            Piece(white_figures['R'], (0, 0)),
-            Piece(white_figures['N'], (1, 0)),
-            Piece(white_figures['A'], (2, 0)),
-            Piece(white_figures['F'], (3, 0)),
-            Piece(white_figures['A'], (5, 0)),
-            Piece(white_figures['N'], (6, 0)),
-            Piece(white_figures['R'], (7, 0))
-        ]
+    white_monarchs=[('WildebeestKing', (5, 0))],
+    white_pieces=[
+        (wildebeest_pieces[i], (i, 0) if i < 5 else (i+1, 0)) for i in range(10) 
+    ],
+    white_pawns=[
+        ('WhitePawn', (i, 1), wildebeest_promotion) for i in range(11)
+    ],
 
-        for i in range(8):
-            white_army.append(
-                Piece(
-                    white_figures['p'], (i, 1), 
-                    promotes=[white_figures['F']]
-                )
-            )
-        
-        black_figures = cls.Figures(-1)
-        black_army = [
-            Piece(black_figures['R'], (0, 7)),
-            Piece(black_figures['N'], (1, 7)),
-            Piece(black_figures['A'], (2, 7)),
-            Piece(black_figures['F'], (3, 7)),
-            Piece(black_figures['A'], (5, 7)),
-            Piece(black_figures['N'], (6, 7)),
-            Piece(black_figures['R'], (7, 7))
-        ]
-        
-        for i in range(8):
-            black_army.append(
-                Piece(
-                    black_figures['p'], (i, 6), 
-                    promotes=[black_figures['F']] # TODO: must generalize promotion
-                )
-            )
-        
-        white = Player(
-            monarchs = Piece(white_figures['K'], (4, 0)),
-            army = white_army,
-            index = 0
-        )
-
-        black = Player(
-            monarchs = Piece(black_figures['K'], (4, 7)),
-            army = black_army,
-            index = 1
-        )
-
-        return Game(cls.dimensions, [white, black])
-
-
-class Wildebeest(Set):
-    dimensions = [11, 10]
-
-    @staticmethod
-    # we create the standard set of pieces given a color forward direction 
-    def Figures(forward : int) -> Dict[str, Figure]: 
-        return {
-            'K' : Figure(
-                name = 'King', 
-                value = 0, 
-                moves = [
-                    Moves.Perimeter()
-                ],
-                first = [
-                    Moves.Castle(n=2, width=11, restrict=True),
-                    Moves.Castle(n=3, width=11, restrict=True),
-                    Moves.Castle(n=4, width=11, restrict=True)
-                ]
-            ),
-
-            'Q' : Figure(
-                name = 'Queen', 
-                value = 9, 
-                moves = [
-                    Moves.OrthogonalSpan(), Moves.DiagonalSpan()
-                ]
-            ),
-
-            'R' : Figure(
-                name = 'Rook',
-                value = 5,
-                moves = [
-                    Moves.OrthogonalSpan()
-                ]
-            ),
-
-            'B' : Figure(
-                name = 'Bishop',
-                value = 3,
-                moves = [
-                    Moves.DiagonalSpan()
-                ]
-            ),
-
-            'W' : Figure(
-                name = 'Wildebeest',
-                value = 5,
-                moves=[Moves.KnightLeap(), Moves.CamelLeap()]
-            ),
-
-            'C' : Figure(
-                name = 'Camel',
-                value = 3,
-                moves=[Moves.CamelLeap()]
-            ),
-
-            'N' : Figure(
-                name = 'Knight',
-                value = 3,
-                moves = [
-                    Moves.KnightLeap()
-                ]
-            ),
-
-            'p' : Figure(
-                name = 'Pawn',
-                value = 1,
-                moves = [
-                    Moves.PawnPush(forward), Moves.PawnTake(forward), #Moves.EnPassant(forward)
-                ],
-                first = [
-                    Moves.PawnJump(forward)
-                ]
-            )
-        }
-
-    @classmethod
-    def new_game(cls):
-        white_figures = cls.Figures(1)
-        white_army = [
-            Piece(white_figures['R'], (0, 0)),
-            Piece(white_figures['N'], (1, 0)),
-            Piece(white_figures['C'], (2, 0)),
-            Piece(white_figures['C'], (3, 0)),
-            Piece(white_figures['W'], (4, 0)),
-            Piece(white_figures['Q'], (6, 0)),
-            Piece(white_figures['B'], (7, 0)),
-            Piece(white_figures['B'], (8, 0)),
-            Piece(white_figures['N'], (9, 0)),
-            Piece(white_figures['R'], (10, 0))
-        ]
-
-        for i in range(11):
-            white_army.append(
-                Piece(
-                    white_figures['p'], (i, 1), 
-                    promotes=[white_figures['Q'], white_figures['W']]
-                )
-            )
-        
-        black_figures = cls.Figures(-1)
-        black_army = [
-            Piece(black_figures['R'], (0, 9)),
-            Piece(black_figures['N'], (1, 9)),
-            Piece(black_figures['C'], (2, 9)),
-            Piece(black_figures['C'], (3, 9)),
-            Piece(black_figures['W'], (4, 9)),
-            Piece(black_figures['Q'], (6, 9)),
-            Piece(black_figures['B'], (7, 9)),
-            Piece(black_figures['B'], (8, 9)),
-            Piece(black_figures['N'], (9, 9)),
-            Piece(black_figures['R'], (10, 9))
-        ]
-
-        for i in range(11):
-            black_army.append(
-                Piece(
-                    black_figures['p'], (i, 8), 
-                    promotes=[black_figures['Q'], black_figures['W']]
-                )
-            )
-        
-        white = Player(
-            monarchs = Piece(white_figures['K'], (5, 0)),
-            army = white_army,
-            index = 0
-        )
-
-        black = Player(
-            monarchs = Piece(black_figures['K'], (5, 9)),
-            army = black_army,
-            index = 1
-        )
-
-        return Game(cls.dimensions, [white, black])
-    
-
-sets : Dict[str, Type[Set]] = {
-    'chess' : Chess,
-    'shatranj' : Shatranj,
-    'wildebeest' : Wildebeest
-}
+    black_monarchs=[('WildebeestKing', (5, 9))],
+    black_pieces=[
+        (wildebeest_pieces[i], (i, 9) if i < 5 else (i+1, 9)) for i in range(10) 
+    ],
+    black_pawns=[
+        ('BlackPawn', (i, 8), wildebeest_promotion) for i in range(11)
+    ]
+)
