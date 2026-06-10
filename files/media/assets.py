@@ -336,7 +336,7 @@ class AudioVisuals:
         for i in range(self.ROWS):
             for j in range(self.COLS):
                 # Alternate color based on position
-                tile = tiles[(i+j) % 2]
+                tile = tiles[(i+j + player_index) % 2]
 
                 board_surface.blit(tile, (j * W, i * H))
 

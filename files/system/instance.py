@@ -29,8 +29,10 @@ class GameInstance:
         player_index : int =0
     ):
         self.game : Game | None = None 
+        self.set = set 
         self.assets = assets
         self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=player_index)
+        self.player_index = player_index
 
         self.var_settings = VarSettings()
 
@@ -54,7 +56,7 @@ class GameInstance:
             self.game_over_plaque.blit_onto(self.surface)
     
     # for all of these: vars contains
-    def _ingame_event_loop(self) -> Event:
+    def _ingame_event_loop(self, enforce_player : bool = False) -> Event:
         result = Event()
 
         for event in pg.event.get():
@@ -67,17 +69,20 @@ class GameInstance:
                 target = self.game.at(pos)
                 selected = self.av.selected_piece
 
-                if selected is None or (target is not None and target.player == selected.player):
-                    self.av.deselect_squares()
-                    self.av.select_piece(target)
-                elif target != selected:
-                    try:
-                        result = self.game.move(selected, pos)
-                        self.av.select_square(pos)
-                    except Exception as e:
+                overall_condition = target is None or not enforce_player or (target.player.index == self.player_index)
+
+                if overall_condition:
+                    if selected is None or (target is not None and target.player == selected.player):
                         self.av.deselect_squares()
-                        
-                    self.av.deselect_piece()
+                        self.av.select_piece(target)
+                    elif target != selected:
+                        try:
+                            result = self.game.move(selected, pos)
+                            self.av.select_square(pos)
+                        except Exception as e:
+                            self.av.deselect_squares()
+                            
+                        self.av.deselect_piece()
             
             if event.type == pg.MOUSEBUTTONUP:
                 selected = self.av.selected_piece
@@ -126,7 +131,7 @@ class GameInstance:
         
         return result
     
-    def _promotion_event_loop(self) -> List[str]:
+    def _promotion_event_loop(self, enforce_player : bool = False) -> List[str]:
         result = Event()
 
         for event in pg.event.get():
@@ -139,9 +144,9 @@ class GameInstance:
             if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
                 promotion_index = self.promotion_plaque.hit_index(event.pos, self.var_settings.click_pos)
                 if promotion_index >= 0:
-                    result = self.game.promote(promotion_index=promotion_index)
-                    self.promotion_plaque = None
-                    # if the player is out of legal moves, the game ends
+                    if not enforce_player or self.game.promoting.player.index == self.player_index:
+                        result = self.game.promote(promotion_index=promotion_index)
+                        self.promotion_plaque = None
         
         return result
 
@@ -153,17 +158,17 @@ class GameInstance:
         self.var_settings = VarSettings()
         self.av.deselect_squares()
 
-    def begin(self):
+    def begin(self, game = None):
         self.clear()
-        self.game = self.set()
+        self.game = game if game is not None else self.set()
         self.av.play('start')
 
-    def fetch_event(self) -> Event:
+    def fetch_event(self, enforce_player : bool = False) -> Event:
         status = self.game.status 
         if status == Status.ONGOING:
-            event = self._ingame_event_loop()
+            event = self._ingame_event_loop(enforce_player=enforce_player)
         elif status == Status.PROMOTING:
-            event = self._promotion_event_loop()
+            event = self._promotion_event_loop(enforce_player=enforce_player)
         else:
             event = self._game_over_event_loop()
 
@@ -186,11 +191,7 @@ class GameInstance:
         elif event.label == 'quit':
             self.var_settings.running = False 
         elif event.label == 'action':
-            s, e = event.action.displacement
-            self.game.move(self.game.at(s), e)
-
-            if event.action.promote_to > 0:
-                self.game.promote(event.action.promote_to)
+            self.game.register_action(event.action)
         
         return event
         

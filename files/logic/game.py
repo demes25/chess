@@ -64,6 +64,7 @@ class Piece(Serializable):
     ):
         self.player : Player | None = None 
         self.figure = Figures[name]
+        self.name = name
 
         self.position = tuple(position)
         self.history = history + [position]
@@ -81,7 +82,7 @@ class Piece(Serializable):
     # serialization
     def to_dict(self) -> dict:
         return {
-            'name' : self.figure.name,
+            'name' : self.name,
             'position' : self.position,
             
             'promotes' : self.promotes,
@@ -476,6 +477,13 @@ class Game(Serializable):
             self.delayed_event = event
             return Event()
     
+    def register_action(self, action : Action):
+        s, e = action.displacement
+        self.move(self.at(s), e)
+
+        if action.promote_to > 0:
+            self.promote(action.promote_to)
+        
     # update process after a move has been completed.
     # checks for checks, registers the necessary sounds, updates history
     def _post_move_update(self, event : Event):

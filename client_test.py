@@ -1,10 +1,12 @@
 from files.logic.sets import Wildebeest, Chess, Shatranj
-from files.system.instance import GameInstance
+from files.system.server import GameServer, GameClient
 from files.media.assets import Assets
 from files.logic.serialization import deserialize
-
-instance = GameInstance(Chess, Assets((76, 76)))
-instance.run_solo()
+import asyncio
 
 
+assets = Assets((76, 76))
 
+client = GameClient(assets)
+
+asyncio.run(client.run())
