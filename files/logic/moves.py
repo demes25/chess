@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 import numpy as np  
 from itertools import product, permutations
 
+from files.logic.serialization import Serializable
+
 Vector = np.typing.NDArray[np.int_] # for typehinting - vector is a 1-d integer array
 Matrix = np.typing.NDArray[np.int_] # matrix is a 2-d integer array
 BooleanMap = np.typing.NDArray[np.bool_]
@@ -16,15 +18,20 @@ Piece = Type['Piece']
 
 # returns the scaling of dir that yields disp. 0 if inconsistent
 def scaling(dir : Vector, disp : Vector):
-    k = -1
+    k = 0
+    first = True 
     for i in range(len(dir)):
         if dir[i] == 0:
             if disp[i] != 0:
                 return 0
+        elif disp[i] == 0:
+            if dir[i] != 0:
+                return 0 
         else:
             j = disp[i]//dir[i]
-            if k == -1:
+            if first:
                 k = j
+                first = False 
             elif k != j:
                 return 0
     
@@ -59,6 +66,7 @@ def scaling_range(board_shape : Vector, pos : Vector, dir : Vector, large_value 
 # they need alternate treatment for access maps. 
 
 # an abstract class that encompasses all moves
+# TODO: serialize!
 class Move(ABC):
     def __init__(
         self,
@@ -196,11 +204,13 @@ class Leap(Discrete):
         captures : bool = True,
         moves : bool = True,
     ):  
+        # we keep a numpy array to compare against,
+        # but generate permutations with a python list.
         if isinstance(displacement, np.ndarray):
-            self.displacement = displacement
+            self.displacement = np.sort(np.abs(displacement))
             displacement = displacement.tolist()
         else:
-            self.displacement = np.array(displacement)
+            self.displacement = np.sort(np.abs(np.array(displacement)))
 
         # generate all signed permutations of the displacement
         dirs = []
@@ -210,6 +220,8 @@ class Leap(Discrete):
 
         super().__init__(dirs=dirs, captures=captures, moves=moves)
 
+
+    # returns true if end-start is a valid permutation of the leap displacement
     def sees(self, game : Game, start : Vector, end : Vector):
         disp = end - start  
 

@@ -2,7 +2,8 @@
 # Chess
 # Client
 
-from files.logic.game import *
+from files.logic.game import Game, Status, Event
+from typing import Type, List 
 import pygame as pg
 from files.logic.sets import Set
 from files.media.assets import AudioVisuals, Assets, new_surface
@@ -21,12 +22,14 @@ class GameInstance:
         self,
         
         set : Type[Set],
-        assets : Assets
+        assets : Assets,
+
+        player_index : int =0
     ):
         self.set = set
         self.game : Game | None = None 
         self.assets = assets
-        self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=1)
+        self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=player_index)
 
         self.var_settings = VarSettings()
 
@@ -177,24 +180,18 @@ class GameInstance:
 
     # registers received events (as opposed to producing events)
     def register(self, event : Event) -> Event:
-        if event.label == 'none':
-            return event 
-        elif event.label == 'reset':
+        if event.label == 'reset':
             self.begin()
-            return event
         elif event.label == 'quit':
             self.var_settings.running = False 
-            return event
-        elif event.label == 'move':
-            s, e = event.displacement
-            re_event = self.game.move(self.game.at(s), e)
+        elif event.label == 'action':
+            s, e = event.action.displacement
+            self.game.move(self.game.at(s), e)
 
-            if event.promote_to > 0:
-                event.sounds.append('promote')
-                self.game.promote(event.promote_to)
-            return re_event 
-        elif event.label == 'promote':
-            return self.game.promote(event.promote_to)
+            if event.action.promote_to > 0:
+                self.game.promote(event.action.promote_to)
+        
+        return event
         
 
     def run_solo(self):

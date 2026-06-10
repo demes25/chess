@@ -2,9 +2,11 @@
 # Chess
 # Game
 
-from files.logic.moves import *
-from typing import Dict
-from files.logic.moves import Move
+from files.logic.moves import Move, Figure, Vector
+from typing import Dict, Tuple, List, Callable, Optional
+import numpy as np 
+
+from files.logic.serialization import Serializable
 
 # -- THE PLAYER and THE PIECES -- #
 
@@ -105,39 +107,64 @@ class Status:
 
 from dataclasses import dataclass, field
 
+ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+# an action in a game. includes a displacement (start, end), and a promotion index (if we promote)
+@dataclass 
+class Action(Serializable):
+    displacement : Tuple[Tuple[int, int], Tuple[int, int]] | None = None
+    promote_to : int = -1 
+
+    def to_dict(self) -> dict:
+        return {
+            'displacement' : [list(self.displacement[0]), list(self.displacement[1])],
+            'promote_to' : self.promote_to
+        }
+    
+    @classmethod 
+    def from_dict(cls, action : dict | None) -> Optional['Action']:
+        if action is None: return None 
+        return Action(displacement=tuple(tuple(j) for j in action['displacement']), promote_to=action['promote_to'])
+    
+    def __str__(self) -> str:
+        moves = [f'{ALPHABET[d[0]]}{d[1]+1}' for d in self.displacement]
+        string = '-'.join(moves)
+        return string if self.promote_to == -1 else f'{string}P{self.promote_to}'
+
+
 @dataclass
-class Event:
+class Event(Serializable):
     # label is move if this is just a move,
     # reset if reset,
     # quit if quit,
     # promote if promote.
     label : str = 'none'
-    displacement : Tuple[Tuple[int, int], Tuple[int, int]] | None = None
     sounds : List[str] = field(default_factory=list)
-    promote_to : int = -1 
+    action : Action | None = None 
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             'label' : self.label,
-            'displacement' : [list(self.displacement[0]), list(self.displacement[1])],
             'sounds' : self.sounds,
-            'promote_to' : self.promote_to
+            'action' : self.action 
         }
     
-    @staticmethod 
-    def from_dict(event : dict):
-        return Event(label=event['label'], displacement=tuple(tuple(j) for j in event['displacement']), sounds=event['sounds'], promote_to=event['promote_to'])
+    @classmethod  
+    def from_dict(cls, event : dict) -> 'Event':
+        return Event(label=event['label'], sounds=event['sounds'], action=event['action'])
 
 
 #TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
 #TODO: add takebacks, show previous positions, etc...
 #TODO: make game a separate thing on top of the board. the board should be able to be set up however it be so desired,
 # with whichever pieces.
-class Game:
+Round = List[Action]
+class Game(Serializable):
     def __init__(
         self,
         dimensions : List[int],
-        players : List[Player]
+        players : List[Player],
+
+        history : List[Round] = [[]] # for serialization purposes
         ):
 
         self.rank = len(dimensions)
@@ -147,13 +174,16 @@ class Game:
 
         self.basis = np.eye(self.rank)
 
-        # the player whose turn it is
-        self.turn = 0
-        self.move_num = 0  # the amount of times that every player has made a move (after each player makes one move, we increment)
+        self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
+        self.turn = len(history[-1]) # the player whose turn it is
+        self.history : List[Round] = [[]] # registers the history
+
+        # TODO: REGISTER HISTORY
         
         self.status : int = Status.ONGOING
         
         self.promoting = None # the piece which is currently promoting 
+        self.delayed_event = None # the event which is delayed by promotion
 
         assert all(player.rank == self.rank for player in players)
         
@@ -369,7 +399,10 @@ class Game:
             # if the target square is occupied, check that we can capture the piece
             if move.captures and target_piece.player is player:
                 raise Exception('Illegal capture.')
-            
+        
+        # keeps track of start and end positions
+        action = Action(displacement=(piece.position, tuple(target)))
+
         if self._execute(move, piece, target):
             sounds = ['take']
         
@@ -396,24 +429,40 @@ class Game:
                     self.promoting = piece
                     self.status = Status.PROMOTING
 
+        event = Event(label='action', action=action, sounds=sounds)
+
         # update turns and moves
-        if not self.status == Status.PROMOTING:
-            self._next_turn()
+        if self.status != Status.PROMOTING:
+            return self._post_move_update(event)
+        else:
+            self.delayed_event = event
+            return Event()
+    
+    # update process after a move has been completed.
+    # checks for checks, registers the necessary sounds, updates history
+    def _post_move_update(self, event : Event):
+        self._next_turn()
 
-            check = self.update_checks()
-            if check:
-                sounds.append('check')
+        check = self.update_checks()
+        if check:
+            event.sounds.append('check')
 
-                if 'move' in sounds:
-                    sounds.remove('move')
-            
-            # if the player is out of legal moves, the game ends
-            if not self.has_legal_moves(self.players[self.turn]):
-                sounds.append('end')
-                self.status = Status.CHECKMATE if check else Status.STALEMATE
+            if 'move' in event.sounds:
+                event.sounds.remove('move')
+        
+        # if the player is out of legal moves, the game ends
+        if not self.has_legal_moves(self.players[self.turn]):
+            event.sounds.append('end')
+            self.status = Status.CHECKMATE if check else Status.STALEMATE
 
+        # registers the move in the game history
+        self.history[-1].append(event.action)
+        if self.turn == 0:
+            self.history.append([])
+        
+        self.print_history()
+        return event
 
-        return Event(label='move', displacement=(piece.position, tuple(target)), sounds=sounds)
     
     def promote(self, promotion_index : int) -> Event:
         if self.promoting is not None:
@@ -422,22 +471,13 @@ class Game:
             self.promoting.promotion_list = [] 
             self.promoting = None 
             
-            sounds = ['promote']    
-            self._next_turn()
-            
-            check = self.update_checks()
-            if check:
-                sounds.append('check')
-            else:
-                sounds.append('move')
-            if not self.has_legal_moves(self.players[self.turn]):
-                sounds.append('end')
-                self.status = Status.CHECKMATE if check else Status.STALEMATE 
-            else:
-                self.status = Status.ONGOING
+            event = self._post_move_update(self.delayed_event)
+            self.delayed_event = None 
 
-            return Event(label='promote', sounds=sounds, promote_to=promotion_index)
-                
+            event.sounds.append('promote')
+            event.action.promote_to = promotion_index
+            
+            return event
         else:
             raise Exception('No pieces are currently promoting.')
     
@@ -486,7 +526,23 @@ class Game:
         return self._piece_has_legal_moves(player.monarchs[0]) or any(self._piece_has_legal_moves(piece) for piece in player.army)
 
 
-
-        
-
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            # 'players' : [p.to_dict() for p in self.players]
+            'dimensions' : self.dimensions,
+            'history' : self.history
+        }
+    
+    @classmethod
+    def from_dict(cls, game : dict):
+        return cls(**game)
+    
+    def print_history(self):
+        i = 1
+        for round in self.history:
+            if len(round) != 0:
+                round_strs = ' :: '.join([str(action) for action in round])
+                print(f'{i}.\t{round_strs}')
+                i+=1
             

@@ -1,0 +1,79 @@
+# Demetre Seturidze
+# Chess
+# Serialization
+
+import json
+from typing import Type, Dict, Optional 
+from abc import ABC, abstractmethod
+
+PrimitiveJSONType = dict | list | str | float | int | bool | None
+
+class Serializable:
+    # serializes this object into a dictionary
+    @abstractmethod
+    def to_dict(self) -> dict:
+        pass 
+
+    # deserializes according to the given dictionary
+    @classmethod 
+    @abstractmethod 
+    def from_dict(cls, dict) -> Optional['Serializable']:
+        pass
+    
+    # recursively finds and maps all available serializable subclasses
+    @classmethod
+    def get_subclass_registry(cls) -> Dict[str, Type['Serializable']]:
+        registry = {}
+        for subclass in cls.__subclasses__():
+            registry[subclass.__name__] = subclass
+            registry.update(subclass.get_subclass_registry())
+        return registry
+
+SerialType = PrimitiveJSONType | Serializable
+
+
+# JSON encoder/decoder for serializable objects
+class Encoder(json.JSONEncoder):
+    def default(self, obj : SerialType):
+        if isinstance(obj, SerialType):
+            # includes the type of the object for deserialization
+            objdict = obj.to_dict()
+            objdict['__type__'] = obj.__class__.__name__
+            return objdict
+        return super().default(obj)
+
+class Decoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+    
+    def object_hook(self, dct : dict):
+        # look for our special type tag in the parsed dictionary
+        if "__type__" in dct:
+            type_name = dct.pop("__type__")
+            registry = Serializable.get_subclass_registry()
+            
+            # Match the tag to the class and instantiate it
+            if type_name in registry:
+                target_class = registry[type_name]
+                return target_class.from_dict(dct)
+                
+        return dct
+
+
+def serialize(
+    obj : SerialType,
+    skipkeys: bool = False,
+    ensure_ascii: bool = True,
+    check_circular: bool = True,
+    allow_nan: bool = True,
+    indent: int | str | None = None,
+    separators: tuple[str, str] | None = None,
+    sort_keys: bool = False,
+    **kwargs
+) -> str:
+    return json.dumps(obj, cls=Encoder, skipkeys=skipkeys, ensure_ascii=ensure_ascii, check_circular=check_circular,allow_nan=allow_nan, indent=indent, separators=separators, sort_keys=sort_keys, **kwargs)
+
+def deserialize(
+    s : str, 
+) -> SerialType:
+    return json.loads(s, cls=Decoder)

@@ -2,8 +2,11 @@
 # Chess
 # Boards
 
-from typing import List, Tuple
-from files.logic.game import *
+from typing import Type, Dict
+from files.logic.moves import Vector, Move, Discrete, Spanning, Leap, Figure 
+from files.logic.game import Game, Piece, Player
+
+import numpy as np
 from abc import ABC, abstractmethod
 
 xhat = np.array([1, 0])
