@@ -3,6 +3,7 @@
 # Client
 
 from files.logic.game import Game, Status, Event
+from files.logic.serialization import serialize, deserialize
 from typing import Type, List 
 import pygame as pg
 from files.logic.sets import Set
@@ -52,7 +53,6 @@ class GameInstance:
                 self.game_over_plaque = self.av.checkmate_plaque if status == Status.CHECKMATE else self.av.stalemate_plaque
             self.game_over_plaque.blit_onto(self.surface)
     
-
     # for all of these: vars contains
     def _ingame_event_loop(self) -> Event:
         result = Event()
@@ -145,16 +145,17 @@ class GameInstance:
         
         return result
 
-    def begin(self):
-        self.game = self.set.new_game()
-
+    def clear(self):
         self.av.selected_piece = None 
         self.promotion_plaque = None 
         self.game_over_plaque = None 
 
         self.var_settings = VarSettings()
         self.av.deselect_squares()
-        
+
+    def begin(self):
+        self.clear()
+        self.game = self.set.new_game()
         self.av.play('start')
 
     def fetch_event(self) -> Event:
@@ -194,11 +195,17 @@ class GameInstance:
         return event
         
 
-    def run_solo(self):
+    def run_solo(self, load = None):
         # keeps track of loop parameters to be able to modularize the event loop.
         # this thing gets passed around and edited in-place as opposed to holding
         # all variables locally inside the run function
-        self.begin()
+        if load is None:
+            self.begin()
+        else:
+            self.clear()
+            self.game = deserialize(load)
+            self.av.play('start')
+
         pg.display.init()
         screen = pg.display.set_mode((self.av.width, self.av.height))
 
@@ -207,6 +214,11 @@ class GameInstance:
             self.frame(event=event)
             screen.blit(self.surface, (0, 0))
             pg.display.flip()
+
+        #debug_serialize(self.game)
+        
+        with open('game.txt', 'w') as f:
+            f.write(serialize(self.game, indent = 2))
 
 
 

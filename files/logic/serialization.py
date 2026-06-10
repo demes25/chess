@@ -4,7 +4,8 @@
 
 import json
 from typing import Type, Dict, Optional 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+import numpy as np
 
 PrimitiveJSONType = dict | list | str | float | int | bool | None
 
@@ -17,8 +18,8 @@ class Serializable:
     # deserializes according to the given dictionary
     @classmethod 
     @abstractmethod 
-    def from_dict(cls, dict) -> Optional['Serializable']:
-        pass
+    def from_dict(cls, dct : dict) -> Optional['Serializable']:
+        return cls(**dct)
     
     # recursively finds and maps all available serializable subclasses
     @classmethod
@@ -31,16 +32,28 @@ class Serializable:
 
 SerialType = PrimitiveJSONType | Serializable
 
+def to_native(obj : np.ndarray):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    
+    # 2. Handle all NumPy scalars (int, float, bool, complex)
+    if isinstance(obj, np.generic):
+        return obj.item()
+    
+    # Return native objects (int, float, str, bool, None) as-is
+    return obj
+
 
 # JSON encoder/decoder for serializable objects
 class Encoder(json.JSONEncoder):
-    def default(self, obj : SerialType):
-        if isinstance(obj, SerialType):
+    def default(self, obj : SerialType | np.ndarray):
+        if isinstance(obj, Serializable):
             # includes the type of the object for deserialization
             objdict = obj.to_dict()
             objdict['__type__'] = obj.__class__.__name__
             return objdict
-        return super().default(obj)
+
+        return super().default(to_native(obj))
 
 class Decoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):

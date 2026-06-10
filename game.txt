@@ -1,0 +1,5301 @@
+{
+  "players": [
+    {
+      "monarchs": [
+        {
+          "figure": {
+            "name": "King",
+            "value": 0,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    -1,
+                    0
+                  ],
+                  [
+                    0,
+                    -1
+                  ],
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ],
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    -1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first": [
+              {
+                "n": 2,
+                "width": 8,
+                "restrict": false,
+                "__type__": "Castle"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            4,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        }
+      ],
+      "army": [
+        {
+          "figure": {
+            "name": "Rook",
+            "value": 5,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            0,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Knight",
+            "value": 3,
+            "moves": [
+              {
+                "displacement": [
+                  1,
+                  2
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Leap"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            1,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Bishop",
+            "value": 3,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            2,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Queen",
+            "value": 9,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              },
+              {
+                "dirs": [
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            3,
+            2
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              2
+            ],
+            [
+              5,
+              2
+            ],
+            [
+              5,
+              2
+            ],
+            [
+              5,
+              2
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              3,
+              2
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Bishop",
+            "value": 3,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            5,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              5,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Knight",
+            "value": 3,
+            "moves": [
+              {
+                "displacement": [
+                  1,
+                  2
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Leap"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            6,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ],
+            [
+              6,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Rook",
+            "value": 5,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            7,
+            0
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            0,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            1,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            2,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            3,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Queen",
+            "value": 9,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              },
+              {
+                "dirs": [
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            1,
+            4
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              4,
+              1
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              3,
+              6
+            ],
+            [
+              3,
+              6
+            ],
+            [
+              2,
+              7
+            ],
+            [
+              2,
+              7
+            ],
+            [
+              2,
+              7
+            ],
+            [
+              2,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            5,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              5,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            6,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              6,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": 1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            7,
+            1
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              7,
+              1
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        }
+      ],
+      "index": 0,
+      "__type__": "Player"
+    },
+    {
+      "monarchs": [
+        {
+          "figure": {
+            "name": "King",
+            "value": 0,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    -1,
+                    0
+                  ],
+                  [
+                    0,
+                    -1
+                  ],
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ],
+                  [
+                    -1,
+                    1
+                  ],
+                  [
+                    -1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first": [
+              {
+                "n": 2,
+                "width": 8,
+                "restrict": false,
+                "__type__": "Castle"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            2,
+            4
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              7
+            ],
+            [
+              4,
+              6
+            ],
+            [
+              4,
+              6
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              4,
+              4
+            ],
+            [
+              4,
+              4
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              2,
+              4
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        }
+      ],
+      "army": [
+        {
+          "figure": {
+            "name": "Rook",
+            "value": 5,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            0,
+            7
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Knight",
+            "value": 3,
+            "moves": [
+              {
+                "displacement": [
+                  1,
+                  2
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Leap"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            1,
+            7
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Bishop",
+            "value": 3,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            5,
+            7
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ],
+            [
+              5,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Knight",
+            "value": 3,
+            "moves": [
+              {
+                "displacement": [
+                  1,
+                  2
+                ],
+                "captures": true,
+                "moves": true,
+                "__type__": "Leap"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            6,
+            7
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              6,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Rook",
+            "value": 5,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ],
+                "captures": true,
+                "moves": true,
+                "min_num": 1,
+                "max_num": null,
+                "min_obstacles": 0,
+                "max_obstacles": 0,
+                "__type__": "Spanning"
+              }
+            ],
+            "first": [],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            7,
+            7
+          ],
+          "promotes": [],
+          "promotion_axis": -1,
+          "history": [
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ],
+            [
+              7,
+              7
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            0,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            1,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            2,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              2,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            5,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              5,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            6,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              6,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        },
+        {
+          "figure": {
+            "name": "Pawn",
+            "value": 1,
+            "moves": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -1
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              },
+              {
+                "dirs": [
+                  [
+                    -1,
+                    -1
+                  ],
+                  [
+                    1,
+                    -1
+                  ]
+                ],
+                "captures": true,
+                "moves": false,
+                "__type__": "Discrete"
+              },
+              {
+                "forward": -1,
+                "__type__": "EnPassant"
+              }
+            ],
+            "first": [
+              {
+                "dirs": [
+                  [
+                    0,
+                    -2
+                  ]
+                ],
+                "captures": false,
+                "moves": true,
+                "__type__": "Discrete"
+              }
+            ],
+            "first_exclusive": false,
+            "__type__": "Figure"
+          },
+          "position": [
+            7,
+            6
+          ],
+          "promotes": [
+            {
+              "name": "Queen",
+              "value": 9,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                },
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Rook",
+              "value": 5,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Knight",
+              "value": 3,
+              "moves": [
+                {
+                  "displacement": [
+                    1,
+                    2
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "__type__": "Leap"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            },
+            {
+              "name": "Bishop",
+              "value": 3,
+              "moves": [
+                {
+                  "dirs": [
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      -1
+                    ]
+                  ],
+                  "captures": true,
+                  "moves": true,
+                  "min_num": 1,
+                  "max_num": null,
+                  "min_obstacles": 0,
+                  "max_obstacles": 0,
+                  "__type__": "Spanning"
+                }
+              ],
+              "first": [],
+              "first_exclusive": false,
+              "__type__": "Figure"
+            }
+          ],
+          "promotion_axis": -1,
+          "history": [
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ],
+            [
+              7,
+              6
+            ]
+          ],
+          "dead": false,
+          "has_moved": false,
+          "just_first": false,
+          "__type__": "Piece"
+        }
+      ],
+      "index": 1,
+      "__type__": "Player"
+    }
+  ],
+  "dimensions": [
+    8,
+    8
+  ],
+  "history": [
+    [
+      {
+        "displacement": [
+          [
+            4,
+            1
+          ],
+          [
+            4,
+            3
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            3,
+            6
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            4,
+            6
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            3,
+            4
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            3,
+            7
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            4,
+            5
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            4,
+            7
+          ],
+          [
+            4,
+            6
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            3,
+            6
+          ],
+          [
+            2,
+            7
+          ]
+        ],
+        "promote_to": 0,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            4,
+            6
+          ],
+          [
+            3,
+            5
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            3,
+            0
+          ],
+          [
+            5,
+            2
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            3,
+            5
+          ],
+          [
+            4,
+            4
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            2,
+            7
+          ],
+          [
+            4,
+            7
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            4,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            5,
+            2
+          ],
+          [
+            3,
+            2
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      },
+      {
+        "displacement": [
+          [
+            3,
+            5
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ],
+    [
+      {
+        "displacement": [
+          [
+            4,
+            7
+          ],
+          [
+            1,
+            4
+          ]
+        ],
+        "promote_to": -1,
+        "__type__": "Action"
+      }
+    ]
+  ],
+  "status": 1,
+  "__type__": "Game"
+}

@@ -2,8 +2,8 @@
 # Chess
 # Moves and Figures
 
-from typing import Type, List, Callable, Tuple
-from abc import ABC, abstractmethod
+from typing import Type, List, Tuple
+from abc import abstractmethod
 import numpy as np  
 from itertools import product, permutations
 
@@ -15,6 +15,9 @@ BooleanMap = np.typing.NDArray[np.bool_]
 
 Game = Type['Game'] # just for typehinting, refers to the 'Game' and 'Piece' objects defined in the game and piece modules.
 Piece = Type['Piece']
+
+xhat = np.array([1, 0])
+yhat = np.array([0, 1])
 
 # returns the scaling of dir that yields disp. 0 if inconsistent
 def scaling(dir : Vector, disp : Vector):
@@ -67,7 +70,7 @@ def scaling_range(board_shape : Vector, pos : Vector, dir : Vector, large_value 
 
 # an abstract class that encompasses all moves
 # TODO: serialize!
-class Move(ABC):
+class Move(Serializable):
     def __init__(
         self,
 
@@ -76,13 +79,14 @@ class Move(ABC):
         captures : bool = True, # True if this move can be executed as a capture
         moves : bool = True, # True if this move can be executed without capturing
 
-        special_condition : Callable[[Game, Vector, Vector], bool] | None = None, # special conditions for special moves
-        special_validity : Callable[[Game, Vector], bool] | None = None, # special validity check (like for en passant)
-        special_exec : Callable[[Game, Piece, Vector], bool] | None = None # special execution. returns true if captures.
+        capture_displacement : Vector | None = None 
+        # if the capture happens elsewhere (like for en passant), 
+        # one may specify the displacement vector from the target square to the capture square. 
+        # if None, takes as capture on target square
     ): 
         assert dirs
 
-        self.directions = []
+        self.directions : List[Vector]= []
         self.rank = None 
 
         self.captures = captures 
@@ -96,16 +100,23 @@ class Move(ABC):
             
             self.directions.append(np.array(dir))
         
-        self.special_condition = special_condition
-        self.special_validity = special_validity
-        self.special_exec = special_exec
+        self.dirs_as_lists = [dir.tolist() for dir in self.directions]
+
+        self.special_execute = None
+        self.capture_displacement = capture_displacement
     
+
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            'dirs' : self.dirs_as_lists,
+            'captures' : self.captures,
+            'moves' : self.moves
+        }
+
     # returns true if the given square is 'valid'
     # i.e. -> if occupied and cannot capture, or not occupied and must capture, then no. otherwise yes.
     def valid_square(self, game : Game, square : Vector):
-        if self.special_validity:
-            return self.special_validity(game, square)
-        
         piece = game.at(square)
             
         # if the target square is not occupied and we may only take, OR if the target square is occupied and we may not take,
@@ -151,27 +162,15 @@ class Discrete(Move):
 
         captures : bool = True,
         moves : bool = True,
-
-        special_condition : Callable[[Game, Vector, Vector], bool] | None = None,
-        special_validity : Callable[[Game, Vector], bool] | None = None, 
-        special_exec : Callable[[Game, Piece, Vector], bool] | None = None,
     ):
-        super().__init__(dirs=dirs, captures=captures, moves=moves, special_condition=special_condition, special_validity=special_validity, special_exec=special_exec)
+        super().__init__(dirs=dirs, captures=captures, moves=moves)
     
     def sees(self, game : Game, start : Vector, end : Vector):
         disp = end - start  
-        
-        b = False 
 
         for dir in self.directions:
             if np.array_equal(disp, dir):
-                b = True
-                break 
-        
-        if b:
-            return self.special_condition is None or self.special_condition(game, start, end)
-        
-        return False 
+                return True
          
     
     def available_squares(self, game : Game, start : Vector):
@@ -220,6 +219,13 @@ class Leap(Discrete):
 
         super().__init__(dirs=dirs, captures=captures, moves=moves)
 
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            'displacement' : self.displacement.tolist(),
+            'captures' : self.captures,
+            'moves' : self.moves
+        }
 
     # returns true if end-start is a valid permutation of the leap displacement
     def sees(self, game : Game, start : Vector, end : Vector):
@@ -253,6 +259,20 @@ class Spanning(Move):
         self.min_obstacles = min_obstacles
         self.max_obstacles = max_obstacles
     
+    # serialization 
+    def to_dict(self) -> dict:
+        additional = {
+            'min_num' : self.min_num,
+            'max_num' : self.max_num,
+            'min_obstacles' : self.min_obstacles,
+            'max_obstacles' : self.max_obstacles
+        }
+
+        dct = super().to_dict()
+        dct.update(additional)
+        
+        return dct
+
     def sees(self, game : Game, start : Vector, end : Vector):
         disp = end - start 
 
@@ -406,7 +426,19 @@ class Compound(Spanning):
     ):
         super().__init__(dirs=spanning_dirs, captures=captures, moves=moves, min_num=min_num, min_obstacles=min_obstacles, max_obstacles=max_obstacles)
         self.discrete = discrete_dirs
+        self.discrete_as_lists = [dir.tolist() if isinstance(dir, np.ndarray) else dir for dir in discrete_dirs]
 
+    # serialization
+    def to_dict(self):
+        return {
+            'discrete_dirs' : self.discrete_as_lists,
+            'spanning_dirs' : self.dirs_as_lists,
+            'captures' : self.captures,
+            'moves' : self.moves,
+            'min_num' : self.min_num,
+            'min_obstacles' : self.min_obstacles,
+            'max_obstacles' : self.max_obstacles
+        }
 
     def sees(self, game : Game, start : Vector, end : Vector):
         offset = None 
@@ -427,12 +459,120 @@ class Compound(Spanning):
                 yield square
 
 
+# SPECIAL MOVES :
+
+class Castle(Discrete):
+    # we create a special move: castle   
+    # we may castle n steps;
+    # the "restrict" parameter allows us to restrict how many squares the king must be moved in order to execute castle.
+    # if restricted, it will only execute castle if the king is slid by n steps. otherwise, any k >= n steps. 
+    # the condition is that the rook must be at the end of the board
+    # also we need to know the board width
+    def __init__(self, n : int = 2, width : int = 8, restrict : bool = False):         
+        
+        self.n = n
+        self.width = width 
+        self.restrict = restrict 
+
+        def castle_exec(game : Game, piece : Piece, target : Vector) -> bool:
+            sign = (target - piece.vector)[0] > 0
+            rook_pos = np.array([width-1, piece.vector[1]]) if sign else np.array([0, piece.vector[1]])
+            dir = xhat if sign else -xhat
+
+            init_pos = piece.vector
+            rook = game.at(rook_pos)
+
+            game.generalized_execute(piece, init_pos + n*dir)
+            game.generalized_execute(rook, init_pos + (n-1)*dir)
+
+            return False
+
+        if restrict:
+            dirs = [(-n, 0), (n, 0)]
+        else:
+            dirs = []
+            for k in range(n, (width+1)//2 + 2):
+                dirs.append((-k, 0))
+                dirs.append((k, 0))
+
+        super().__init__(dirs=dirs, captures = False)
+        self.special_execute = castle_exec
+    
+    # serialization
+    def to_dict(self):
+        return {
+            'n' : self.n,
+            'width' : self.width,
+            'restrict' : self.restrict
+        }
+    
+    def sees(self, game : Game, start : Vector, end : Vector):
+        if super().sees(game, start, end):
+            # we want to ensure that 
+            # a) neither the king nor the rook have moved, nor is there check
+            # b) nothing blocks the path
+            # c) nothing checks the path
+            sign = (end - start)[0] > 0
+            dir = xhat if sign else -xhat
+
+            # checks moves and whether we are in check
+            king = game.at(start)
+            if king is None or king.has_moved or king.player.is_in_check:
+                return False
+
+            rook_pos = np.array([self.width-1, start[1]]) if sign else np.array([0, start[1]])
+            rook = game.at(rook_pos)
+            if rook is None or rook.has_moved:
+                return False
+            
+            # start iterating: if any square is occupied or seen by a piece, we return false. 
+            vec = start + dir
+            while game.in_bounds(vec):
+                if vec[0] != rook_pos[0] and game.at(vec) is not None:
+                    return False
+                
+                for player in game.players:
+                    if player is not king.player:
+                        for monarch in player.monarchs:
+                            if game.sees(monarch, vec):
+                                return False
+                        
+                        for piece in player.army:
+                            if game.sees(piece, vec):
+                                return False
+                
+                vec = vec + dir
+            
+            return True
+        return False 
+
+class EnPassant(Discrete):
+    # forward is either 1 or -1, the sign which constitutes "forward" motion in the y-direction
+    def __init__(self, forward : int):
+        super().__init__([(-1, forward), (1, forward)], moves = False)
+        self.capture_displacement = np.array([0, -forward])
+        self.forward = forward
+
+    # serialization
+    def to_dict(self):
+        return {
+            'forward' : self.forward
+        }
+    
+    def valid_square(self, game : Game, square : Vector):
+        target_pos = square + self.capture_displacement
+        piece = game.at(target_pos) if game.in_bounds(target_pos) else None 
+        # make sure the pawn did a leap
+        if piece is not None and abs(piece.history[0][1] - piece.history[-1][1]) == 2:
+            return piece.figure.name == 'Pawn' and piece.just_first
+        return False 
+
 
 # -- FIGURES -- #
 
 # a figure is a set of moves, basically, along with a name and a value
 
-class Figure:
+class Figure(Serializable):
     def __init__(
         self,
         name : str,
@@ -460,6 +600,18 @@ class Figure:
 
         self.value = value  
         self.name = name
+    
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            'name' : self.name,
+            'value' : self.value,
+
+            'moves' : self.moves,
+
+            'first' : self.first,
+            'first_exclusive' : self.first_exclusive
+        }
     
     def access_map(self, occupation_map : Matrix, pos : tuple | Vector, first_move : bool = False) -> BooleanMap:
         result = np.zeros_like(occupation_map, dtype=np.bool)

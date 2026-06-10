@@ -2,26 +2,29 @@
 # Chess
 # Game
 
-from files.logic.moves import Move, Figure, Vector
+from files.logic.moves import Move, Castle, Figure, Vector
 from typing import Dict, Tuple, List, Callable, Optional
 import numpy as np 
 
+# TODO: SERIALIZATION should be more efficient. currently serializes EVERYTHING
+# and reconstructs upon loading. maybe a separate set of Figures that one loads, and then 
+# we refer to those while constructing more temporary types like Player or Piece or Game.
 from files.logic.serialization import Serializable
 
 # -- THE PLAYER and THE PIECES -- #
 
-class Player:
+class Player(Serializable):
     def __init__(
         self,
-        monarch : 'Piece', # king piece
+        monarchs : List['Piece'] | 'Piece', # king piece
         army : List['Piece'], 
         index : int,
     ):
-
         self.index = index
 
-        self.monarchs = [monarch]
-        monarch.player = self 
+        self.monarchs = [monarchs] if isinstance(monarchs, Piece) else monarchs
+        for monarch in self.monarchs:
+            monarch.player = self 
 
         self.army = army
         for piece in army:
@@ -35,29 +38,59 @@ class Player:
 
         self.is_in_check : bool = False # keeps track if the player is in check
 
-class Piece:
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            'monarchs' : self.monarchs,
+            'army' : self.army,
+            'index' : self.index
+        }
+    
+
+class Piece(Serializable):
     def __init__(
         self,
         figure : Figure,
         position : tuple,
 
         promotes : List['Figure'] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
-        promotion_axis : int = -1 # the promotion axis
+        promotion_axis : int = -1, # the promotion axis
+
+        history : List[tuple] = [], # the history of positions this has had
+        dead : bool = False,
+
+        has_moved : bool = False,
+        just_first : bool = False
     ):
         self.player : Player | None = None 
         self.figure = figure
-        self.position = position
-        self.history = [position]
+        self.position = tuple(position)
+        self.history = history + [position]
         self.vector = np.array(self.position)
 
         self.promotion_list = promotes
         self.promotion_axis = promotion_axis
 
-        self.dead = False
-        self.sprite = None
+        self.dead = dead
 
-        self.has_moved = False 
-        self.just_first = False 
+        self.has_moved = has_moved 
+        self.just_first = just_first
+    
+    # serialization
+    def to_dict(self) -> dict:
+        return {
+            'figure' : self.figure,
+            'position' : self.position,
+            
+            'promotes' : self.promotion_list,
+            'promotion_axis' : self.promotion_axis,
+
+            'history' : self.history[:-1],
+            'dead' : False,
+
+            'has_moved' : False,
+            'just_first' : False
+        }
     
     # returns the displacement vector between given square and current square
     def displacement(self, target : tuple | Vector):
@@ -147,10 +180,7 @@ class Event(Serializable):
             'sounds' : self.sounds,
             'action' : self.action 
         }
-    
-    @classmethod  
-    def from_dict(cls, event : dict) -> 'Event':
-        return Event(label=event['label'], sounds=event['sounds'], action=event['action'])
+
 
 
 #TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
@@ -164,7 +194,8 @@ class Game(Serializable):
         dimensions : List[int],
         players : List[Player],
 
-        history : List[Round] = [[]] # for serialization purposes
+        history : List[Round] = [[]], # for serialization purposes
+        status : int = Status.ONGOING
         ):
 
         self.rank = len(dimensions)
@@ -174,13 +205,9 @@ class Game(Serializable):
 
         self.basis = np.eye(self.rank)
 
-        self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
-        self.turn = len(history[-1]) # the player whose turn it is
-        self.history : List[Round] = [[]] # registers the history
-
         # TODO: REGISTER HISTORY
         
-        self.status : int = Status.ONGOING
+        self.status : int = status 
         
         self.promoting = None # the piece which is currently promoting 
         self.delayed_event = None # the event which is delayed by promotion
@@ -212,8 +239,18 @@ class Game(Serializable):
             
             i=0
         
+
+        # HISTORY/LOADING
+
+        self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
+        self.turn = len(history[-1]) # the player whose turn it is
+        self.history : List[Round] = history # registers the history
+
+
     # returns the entity at the given position
     def at(self, pos : tuple | Vector) -> Piece | None:
+        if not self.in_bounds(pos):
+            return None 
         i, j = tuple(self.board[tuple(pos)])
         return None if i == -1 else self.pieces[i][j]
 
@@ -321,17 +358,17 @@ class Game(Serializable):
 
     # allows us to take a piece that is not at the end position of the move.
     # also allows us to explicitly not capture anything (should be used back-end strictly, in order to avoid inconsistency)
-    def generalized_execute(self, piece : Piece, end_pos : tuple | Vector, kill_target : Vector | None = None) -> bool:
-        if kill_target is not None:
-            target_piece = self.at(kill_target)
-            result = target_piece is not None
-            if result:
-                i, j = tuple(self.board[target_piece.position])
-                self.set_to(target_piece.position, -1, -1)
-                target_piece.die()
-                self.pieces[i].pop(j)
-        else:
-            result = False
+    def generalized_execute(self, piece : Piece, end_pos : tuple | Vector, capture_displacement : Vector | None = None) -> bool:
+        kill_target = end_pos + capture_displacement if capture_displacement is not None else end_pos
+
+        target_piece = self.at(kill_target)
+        result = target_piece is not None
+        if result:
+            i, j = tuple(self.board[target_piece.position])
+            self.set_to(target_piece.position, -1, -1)
+            target_piece.die()
+            self.pieces[i].pop(j)
+
 
         if isinstance(end_pos, np.ndarray):
             piece.vector = end_pos
@@ -348,10 +385,10 @@ class Game(Serializable):
 
     # executes this move
     def _execute(self, move : Move, piece : Piece, target : Vector):
-        if move.special_exec:
-            return move.special_exec(self, piece, target)
+        if move.special_execute:
+            return move.special_execute(self, piece, target)
         else:
-            return self.generalized_execute(piece, target, target)
+            return self.generalized_execute(piece, target, move.capture_displacement)
 
     def _next_turn(self):
         self.turn = (self.turn + 1) % len(self.players)
@@ -390,8 +427,7 @@ class Game(Serializable):
         
         player.is_in_check = False
 
-        castle_like = piece is player.monarchs[0] and move.special_exec is not None
-        sounds = ['castle'] if castle_like else ['move']
+        sounds = ['castle'] if isinstance(move, Castle) else ['move']
 
         target_piece = self.at(target)
 
@@ -477,6 +513,8 @@ class Game(Serializable):
             event.sounds.append('promote')
             event.action.promote_to = promotion_index
             
+            self.status = Status.ONGOING 
+
             return event
         else:
             raise Exception('No pieces are currently promoting.')
@@ -529,14 +567,13 @@ class Game(Serializable):
     # serialization
     def to_dict(self) -> dict:
         return {
-            # 'players' : [p.to_dict() for p in self.players]
+            'players' : self.players,
             'dimensions' : self.dimensions,
-            'history' : self.history
+
+            'history' : self.history,
+            'status' : self.status 
         }
     
-    @classmethod
-    def from_dict(cls, game : dict):
-        return cls(**game)
     
     def print_history(self):
         i = 1
