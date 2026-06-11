@@ -6,9 +6,6 @@ from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional
 import numpy as np 
 
-# TODO: SERIALIZATION should be more efficient. currently serializes EVERYTHING
-# and reconstructs upon loading. maybe a separate set of Figures that one loads, and then 
-# we refer to those while constructing more temporary types like Player or Piece or Game.
 from files.logic.serialization import Serializable
 
 # -- THE PLAYER and THE PIECES -- #
