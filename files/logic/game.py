@@ -66,7 +66,7 @@ class Piece(Serializable):
         self.figure = Figures[name]
         self.name = name
 
-        self.history = history
+        self.history = history.copy()
         self.update_position(position)
 
         self.promotes = promotes 
@@ -227,7 +227,8 @@ class Game(Serializable):
         assert all(player.rank == self.rank for player in players)
         
         self.pieces : List[Dict[int, 'Piece']] = [{} for _ in players] # indexed according to the index of the corresponding player
-
+        self.captured_pieces : List[List[int]] = [[] for _ in players] # indexed likewise, the i'th entry is a list of indices corresponding to the pieces that player i lost.
+        
         i = 0
         for j in range(len(players)):
             player = players[j]
@@ -256,7 +257,7 @@ class Game(Serializable):
 
         self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
         self.turn = len(history[-1]) # the player whose turn it is
-        self.history : List[Round] = history # registers the history
+        self.history : List[Round] = [round.copy() for round in history] # registers the history
 
 
     # returns the entity at the given position
@@ -371,6 +372,7 @@ class Game(Serializable):
             self.set_to(target_piece.position, -1, -1)
             target_piece.die()
             self.pieces[i].pop(j)
+            self.captured_pieces.append(j)
 
         self.set_to(end_pos, *tuple(self.board[piece.position]))
         self.set_to(piece.position, -1, -1)

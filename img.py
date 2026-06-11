@@ -22,7 +22,7 @@ pg.image.save(backend.black_figures['King'], 'black_king.png')
 pg.image.save(backend.white_figures['King'], 'white_king.png')
 pg.image.save(backend.white_figures['Queen'], 'white_queen.png')
 
-font = pg.font.Font(Path(backend.asset_dir, f'font.{backend.font_ext}'), 48)        
+font = pg.font.Font(Path(backend.asset_dir, f'title_font.{backend.font_ext}'), 48)        
 text = font.render('OBCHESSED', True, CristiancitoScheme['tile_white'])
 s_text = font.render('OBCHESSED', True, CristiancitoScheme['player_white'])
 

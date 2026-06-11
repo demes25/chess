@@ -2,13 +2,16 @@
 # Chess
 # Instance
 
+import pygame as pg
+from typing import Type, Tuple, Callable
+from dataclasses import dataclass
+
 from files.logic.game import Game, Status, Event
 from files.logic.serialization import serialize, deserialize
-from typing import Type, Tuple, Callable
-import pygame as pg
 from files.logic.sets import Set
-from files.media.assets import GameBoard, Assets
-from dataclasses import dataclass
+
+from files.media.assets import Assets
+from files.media.av import GameBoard
 
 RAISE = False
 
