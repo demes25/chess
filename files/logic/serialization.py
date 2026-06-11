@@ -40,6 +40,9 @@ def to_native(obj):
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     
+    elif isinstance(obj, (list, tuple)):
+        return [to_native(o) for o in obj]
+    
     # 2. Handle all NumPy scalars (int, float, bool, complex)
     elif isinstance(obj, NP_INT):
         return int(obj)
@@ -63,7 +66,7 @@ class Encoder(json.JSONEncoder):
             objdict['__type__'] = obj.__class__.__name__
             return objdict
 
-        return super().default(to_native(obj))
+        return super().default(obj)
 
 class Decoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):

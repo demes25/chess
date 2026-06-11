@@ -10,6 +10,6 @@ import asyncio
 
 server = GameServer(Chess)
 
-asyncio.run(server.run(enforce_player=True))
+asyncio.run(server.run(host='0.0.0.0', enforce_player=True))
 
 

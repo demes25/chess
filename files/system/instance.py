@@ -10,7 +10,7 @@ from files.logic.sets import Set
 from files.media.assets import AudioVisuals, Assets, new_surface
 from dataclasses import dataclass
 
-RAISE = False 
+RAISE = False
 
 # variable settings for the game backend 
 @dataclass

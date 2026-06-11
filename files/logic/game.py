@@ -6,7 +6,7 @@ from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional
 import numpy as np 
 
-from files.logic.serialization import Serializable
+from files.logic.serialization import Serializable, to_native
 
 # -- THE PLAYER and THE PIECES -- #
 
@@ -40,7 +40,7 @@ class Player(Serializable):
         return {
             'monarchs' : self.monarchs,
             'army' : self.army,
-            'index' : self.index
+            'index' : to_native(self.index)
         }
     
 
@@ -63,9 +63,8 @@ class Piece(Serializable):
         self.figure = Figures[name]
         self.name = name
 
-        self.position = tuple(position)
-        self.history = history + [position]
-        self.vector = np.array(self.position)
+        self.history = history
+        self.update_position(position)
 
         self.promotes = promotes 
         self.promotion_list = [Figures[name] for name in promotes]
@@ -83,15 +82,25 @@ class Piece(Serializable):
             'position' : self.position,
             
             'promotes' : self.promotes,
-            'promotion_axis' : self.promotion_axis,
+            'promotion_axis' : to_native(self.promotion_axis),
 
-            'history' : self.history[:-1],
+            'history' : to_native(self.history[:-1]),
             'dead' : False,
 
             'has_moved' : False,
             'just_first' : False
         }
-    
+
+    def update_position(self, position : tuple | Vector):
+        self.position = tuple(to_native(position))
+        if isinstance(position, np.ndarray):
+            self.vector = position
+        else:
+            self.vector = np.array(position)
+        
+        self.history.append(self.position)
+        
+
     # returns the displacement vector between given square and current square
     def displacement(self, target : tuple | Vector):
         return np.array(target) - self.vector
@@ -149,8 +158,8 @@ class Action(Serializable):
 
     def to_dict(self) -> dict:
         return {
-            'displacement' : [list(self.displacement[0]), list(self.displacement[1])],
-            'promote_to' : self.promote_to
+            'displacement' : to_native(self.displacement),
+            'promote_to' : to_native(self.promote_to)
         }
     
     @classmethod 
@@ -263,22 +272,14 @@ class Game(Serializable):
     # temporarily moves the given piece to the given position and runs the given function with the given arguments
     def condition(self, piece : Piece, pos : tuple | Vector, func : Callable, *args):
         _cpos = piece.position
-        _cvec = piece.vector 
 
-        if isinstance(pos, np.ndarray):
-            vec = pos 
-            pos = tuple(pos)
-        else:
-            pos = pos 
-            vec = np.array(pos)
+        piece.update_position(pos)
+        pos = piece.position
 
-        piece.position = pos
-        piece.vector = vec
-
-        _cplayer, _cpiece = tuple(self.board[_cpos]) # current piece
+        _cplayer, _cpiece = to_native(self.board[_cpos]) # current piece
         self.set_to(_cpos, -1, -1) # removes the current piece from the current position
 
-        _oplayer, _opiece = self.board[pos] # original piece 
+        _oplayer, _opiece = to_native(self.board[pos]) # original piece 
 
         if _opiece != -1:
             self.pieces[_oplayer][_opiece].dead = True 
@@ -287,8 +288,7 @@ class Game(Serializable):
 
         result = func(*args)
 
-        piece.position = _cpos 
-        piece.vector = _cvec 
+        piece.update_position(_cpos)
 
         self.set_to(pos, _oplayer, _opiece)
  
@@ -369,17 +369,10 @@ class Game(Serializable):
             target_piece.die()
             self.pieces[i].pop(j)
 
-
-        if isinstance(end_pos, np.ndarray):
-            piece.vector = end_pos
-            end_pos = tuple(end_pos)
-        else:
-            piece.vector = np.array(end_pos)
-
         self.set_to(end_pos, *tuple(self.board[piece.position]))
         self.set_to(piece.position, -1, -1)
 
-        piece.position = end_pos 
+        piece.update_position(end_pos) 
         
         return result
 
@@ -573,10 +566,10 @@ class Game(Serializable):
     def to_dict(self) -> dict:
         return {
             'players' : self.players,
-            'dimensions' : self.dimensions,
+            'dimensions' : to_native(self.dimensions),
 
             'history' : self.history,
-            'status' : self.status 
+            'status' : to_native(self.status)
         }
     
     
