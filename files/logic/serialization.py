@@ -32,13 +32,23 @@ class Serializable:
 
 SerialType = PrimitiveJSONType | Serializable
 
-def to_native(obj : np.ndarray):
+NP_INT = (np.int8, np.int16, np.int32, np.int64)
+NP_FLOAT = (np.float16, np.float32, np.float64)
+NP_COMPLEX = (np.complex64, np.complex128)
+
+def to_native(obj):
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     
     # 2. Handle all NumPy scalars (int, float, bool, complex)
-    if isinstance(obj, np.generic):
-        return obj.item()
+    elif isinstance(obj, NP_INT):
+        return int(obj)
+    elif isinstance(obj, NP_FLOAT):
+        return float(obj)
+    elif isinstance(obj, NP_COMPLEX):
+        return complex(obj)
+    elif isinstance(obj, np.bool):
+        return bool(obj)
     
     # Return native objects (int, float, str, bool, None) as-is
     return obj

@@ -4,7 +4,7 @@
 
 from files.logic.game import Game, Status, Event
 from files.logic.serialization import serialize, deserialize
-from typing import Type, List 
+from typing import Type, List, Tuple, Callable
 import pygame as pg
 from files.logic.sets import Set
 from files.media.assets import AudioVisuals, Assets, new_surface
@@ -26,13 +26,16 @@ class GameInstance:
         set : Type[Set],
         assets : Assets,
 
-        player_index : int =0
+        player_index : int =0,
+        enforce_player : bool = False
     ):
         self.game : Game | None = None 
         self.set = set 
         self.assets = assets
         self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=player_index)
+        
         self.player_index = player_index
+        self.enforce_player = enforce_player 
 
         self.var_settings = VarSettings()
 
@@ -54,102 +57,113 @@ class GameInstance:
             if self.game_over_plaque is None:
                 self.game_over_plaque = self.av.checkmate_plaque if status == Status.CHECKMATE else self.av.stalemate_plaque
             self.game_over_plaque.blit_onto(self.surface)
-    
-    # for all of these: vars contains
-    def _ingame_event_loop(self, enforce_player : bool = False) -> Event:
-        result = Event()
 
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                self.var_settings.running = False
-            
-            if event.type == pg.MOUSEBUTTONDOWN:
-                # selects the piece
-                pos = self.av.board_pos(event.pos)
-                target = self.game.at(pos)
-                selected = self.av.selected_piece
+    # checks if the pygame event is global and executes
+    # this is defined because it will be used across all event loops
+    def _handle_global(self, event : pg.event.Event) -> Event | None:
+        result = None 
+        if event.type == pg.QUIT:
+            result = self._quit()
+        
+        
+        return result
+        
+    def _handle_ingame(self, event : pg.event.Event) -> Event | None:
+        result = None 
 
-                overall_condition = target is None or not enforce_player or (target.player.index == self.player_index)
+        if event.type == pg.MOUSEBUTTONDOWN:
+            # selects the piece
+            pos = self.av.board_pos(event.pos)
+            target = self.game.at(pos)
+            selected = self.av.selected_piece
 
-                if overall_condition:
-                    if selected is None or (target is not None and target.player == selected.player):
+            overall_condition = target is None or not self.enforce_player or (target.player.index == self.player_index)
+
+            if overall_condition:
+                if selected is None or (target is not None and target.player == selected.player):
+                    self.av.deselect_squares()
+                    self.av.select_piece(target)
+                elif target != selected:
+                    try:
+                        result = self.game.move(selected, pos)
+                        self.av.select_square(pos)
+                    except Exception as e:
                         self.av.deselect_squares()
-                        self.av.select_piece(target)
-                    elif target != selected:
-                        try:
-                            result = self.game.move(selected, pos)
-                            self.av.select_square(pos)
-                        except Exception as e:
-                            self.av.deselect_squares()
-                            
-                        self.av.deselect_piece()
-            
-            if event.type == pg.MOUSEBUTTONUP:
-                selected = self.av.selected_piece
-
-                if selected is not None:
-                    pos = self.av.board_pos(event.pos)
-                    if pos != selected.position:
-                        try:
-                            result = self.game.move(selected, pos)
-                            self.av.select_square(pos)
-                        except Exception as e:
-                            if not RAISE:
-                                self.av.play('illegal')
-                                print(e)
-                                self.av.deselect_squares()
-                            else:
-                                raise 
                         
-                        self.av.deselect_piece()
-                    
-                    else:
-                        self.av.hold_selected = False 
+                    self.av.deselect_piece()
         
-        return result 
+        if event.type == pg.MOUSEBUTTONUP:
+            selected = self.av.selected_piece
+
+            if selected is not None:
+                pos = self.av.board_pos(event.pos)
+                if pos != selected.position:
+                    try:
+                        result = self.game.move(selected, pos)
+                        self.av.select_square(pos)
+                    except Exception as e:
+                        if not RAISE:
+                            self.av.play('illegal')
+                            print(e)
+                            self.av.deselect_squares()
+                        else:
+                            raise 
+                    
+                    self.av.deselect_piece()
+                
+                else:
+                    self.av.hold_selected = False 
+        
+        return result
             
-    def _game_over_event_loop(self) -> Event:
+    def _handle_gameover(self, event : pg.event.Event) -> Event:
         result = Event()
-
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                self.var_settings.running = False
             
-            if event.type == pg.MOUSEBUTTONDOWN:
-                self.var_settings.click_pos = event.pos
-            
-            if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
-                reset = self.game_over_plaque.objects[0]
-                quit = self.game_over_plaque.objects[1]
+        if event.type == pg.MOUSEBUTTONDOWN:
+            self.var_settings.click_pos = event.pos
+        
+        if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
+            reset = self.game_over_plaque.objects[0]
+            quit = self.game_over_plaque.objects[1]
 
-                if reset.hits(event.pos, self.var_settings.click_pos): 
-                    result = Event(label='reset')
-                    self.begin()
-                elif quit.hits(event.pos, self.var_settings.click_pos):
-                    result = Event(label='quit')
-                    self.var_settings.running = False
+            if reset.hits(event.pos, self.var_settings.click_pos): 
+                result = Event(label='reset')
+                self.begin()
+            elif quit.hits(event.pos, self.var_settings.click_pos):
+                result = self._quit()
         
         return result
     
-    def _promotion_event_loop(self, enforce_player : bool = False) -> List[str]:
+    def _handle_promotion(self, event : pg.event.Event) -> Event:
+        result = None
+
+        if event.type == pg.MOUSEBUTTONDOWN:
+            self.var_settings.click_pos = event.pos
+        
+        if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
+            promotion_index = self.promotion_plaque.hit_index(event.pos, self.var_settings.click_pos)
+            if promotion_index >= 0:
+                if not self.enforce_player or self.game.promoting.player.index == self.player_index:
+                    result = self.game.promote(promotion_index=promotion_index)
+                    self.promotion_plaque = None
+        
+        return result
+    
+    
+    # runs an event loop with a given handler.
+    # these are defined above for ingame, game_over, and promotion environments
+    def event_loop(self, handle : Callable[[pg.event.Event], Event]) -> Event:
         result = Event()
 
         for event in pg.event.get():
-            if event.type == pg.QUIT:
-                self.var_settings.running = False
-            
-            if event.type == pg.MOUSEBUTTONDOWN:
-                self.var_settings.click_pos = event.pos
-            
-            if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
-                promotion_index = self.promotion_plaque.hit_index(event.pos, self.var_settings.click_pos)
-                if promotion_index >= 0:
-                    if not enforce_player or self.game.promoting.player.index == self.player_index:
-                        result = self.game.promote(promotion_index=promotion_index)
-                        self.promotion_plaque = None
-        
-        return result
+            handle_result = self._handle_global(event)
+            if handle_result is None:
+                handle_result = handle(event)
+            if handle_result is not None:
+                result = handle_result 
 
+        return result 
+    
     def clear(self):
         self.av.selected_piece = None 
         self.promotion_plaque = None 
@@ -163,16 +177,20 @@ class GameInstance:
         self.game = game if game is not None else self.set()
         self.av.play('start')
 
-    def fetch_event(self, enforce_player : bool = False) -> Event:
+    def _quit(self) -> Event:
+        self.var_settings.running = False 
+        return Event('quit')
+
+    def fetch_event(self) -> Event:
         status = self.game.status 
         if status == Status.ONGOING:
-            event = self._ingame_event_loop(enforce_player=enforce_player)
+            handle = self._handle_ingame
         elif status == Status.PROMOTING:
-            event = self._promotion_event_loop(enforce_player=enforce_player)
+            handle = self._handle_promotion
         else:
-            event = self._game_over_event_loop()
-
-        return event 
+            handle = self._handle_gameover
+        
+        return self.event_loop(handle=handle) 
 
     # flips a frame given the variables and events
     def frame(self, event : Event):

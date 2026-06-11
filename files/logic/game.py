@@ -505,8 +505,6 @@ class Game(Serializable):
         self.history[-1].append(event.action)
         if self.turn == 0:
             self.history.append([])
-        
-        self.print_history()
         return event
 
     
