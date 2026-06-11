@@ -164,7 +164,7 @@ class GameServer:
 
 
 
-from files.system.instance import GameInstance
+from files.system.environment import GameWindow
 from files.logic.game import Event, Game
 import pygame as pg
 
@@ -184,12 +184,35 @@ class GameClient:
 
     async def prime(self):
         async with self.instance_lock:
-            av = self.instance.av 
+            board = self.instance.board 
         
         pg.display.init()
-        self.screen = pg.display.set_mode((av.width, av.height))
-        av.play('start')
+        self.screen = pg.display.set_mode((board.width, board.height))
+        board.play('start')
     
+    # establishes the connection:
+    # sends client id, receives player index, set, and the game 
+    async def establish(self, ws : websockets.ClientConnection):
+        # send client information
+        await ws.send(self.id)
+        print('[CONNECT]')
+
+        # receive the player index 
+        self.index = int(await ws.recv())
+        enforce_player = bool(await ws.recv())
+
+        # receive the set
+        set_obj = deserialize(await(ws.recv()))
+
+        # receive the serialized game object
+        game_obj = deserialize(await(ws.recv()))
+
+        # construct the instance
+        self.instance = GameWindow(set_obj, assets=self.assets, player_index=self.index, enforce_player=enforce_player)
+        self.instance.game = game_obj
+        await self.prime()
+
+
     async def sender(self, ws : websockets.ClientConnection):
         while True:
             await asyncio.sleep(0.5)
@@ -231,31 +254,8 @@ class GameClient:
             async with self.sound_lock:
                 if self.sounds:
                     for sound in self.sounds:
-                        self.instance.av.play(sound)
+                        self.instance.board.play(sound)
                     self.sounds = []
-
-
-    # establishes the connection:
-    # sends client id, receives player index, set, and the game 
-    async def establish(self, ws : websockets.ClientConnection):
-        # send client information
-        await ws.send(self.id)
-        print('[CONNECT]')
-
-        # receive the player index 
-        self.index = int(await ws.recv())
-        enforce_player = bool(await ws.recv())
-
-        # receive the set
-        set_obj = deserialize(await(ws.recv()))
-
-        # receive the serialized game object
-        game_obj = deserialize(await(ws.recv()))
-
-        # construct the instance
-        self.instance = GameInstance(set_obj, assets=self.assets, player_index=self.index, enforce_player=enforce_player)
-        self.instance.game = game_obj
-        await self.prime()
 
     async def main_loop(self):
         # keeps track of loop parameters to be able to modularize the event loop.
@@ -265,10 +265,7 @@ class GameClient:
 
         while running:
             async with self.instance_lock:
-                instance = self.instance
-                event = instance.fetch_event()
-                instance.frame(event=event)
-                self.screen.blit(instance.surface, (0, 0))
+                event = self.instance.frame(self.screen)
             async with self.queue_lock:
                 self.queue.append(event)
 

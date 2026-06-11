@@ -3,7 +3,7 @@
 # Assets -- Graphics and Sounds
 
 # we create a graphics class - which will hold the necessary graphics throughout an instance of the game.
-from typing import Tuple, List, Dict, Callable, Any 
+from typing import Tuple, List, Dict, Callable, Any, Union
 from files.media.schemes import Scheme, Color, DefaultScheme
 import pygame as pg
 from pathlib import Path 
@@ -56,10 +56,11 @@ def tint(surface : Surface, color : Color, opacity : int = 255) -> Surface:
 #
 # by default centers at 0
 class Object:
-    def __init__(self, surface : Surface, center : Tuple[int, int] = (0, 0)):
+    def __init__(self, surface : Surface, center : Tuple[int, int] | None = None):
         self.surface = surface 
         self.rect = surface.get_rect()
-        self.rect.center = center
+        if center is not None:
+            self.rect.center = center
     
     # returns true if both (or the one given) sets of coordinates collide with this object
     def hits(self, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> bool:
@@ -71,8 +72,11 @@ class Object:
     def center_at(self, coords : Tuple[int, int]):
         self.rect.center = coords
 
-    def blit_onto(self, surface : Surface):
-        surface.blit(self.surface, self.rect)
+    def blit_onto(self, dest : Union['Object', Surface]):
+        if isinstance(dest, Object):
+            dest.surface.blit(self.surface, self.rect)
+        else:
+            dest.blit(self.surface, self.rect)
 
 
 class Assets:
@@ -142,7 +146,7 @@ class Assets:
         # width and height are the dimensions of the plaque in terms of tiles, 
         # i.e. 3x5 would return a 3 tile by 5 tile plaque    
         class Plaque(Object):
-            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] = (0, 0), opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
                 color = self.scheme['plaque']
 
@@ -234,7 +238,7 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object], center : Tuple[int, int] = (0, 0), opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], objects : List[Object] = [], center : Tuple[int, int] | None = None, opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, opacity = opacity)
                 plq.objects = objects 
 
@@ -265,18 +269,18 @@ class Assets:
                     x, y = object.rect.center 
                     object.rect.center = (x+dx, y+dy)
 
-            def blit_onto(self, surface : Surface):
-                super().blit_onto(surface)
+            def blit_onto(self, dest : Surface | Object):
+                super().blit_onto(dest)
 
                 for obj in self.objects:
-                    obj.blit_onto(surface)
+                    obj.blit_onto(dest)
                 
         self.Plaque = Plaque
         self.ObjectPlaque = ObjectPlaque
 
     # constructs the game over plaque and necessary objects
     def make_end_plaque(self, label : str, color_name : str | None = None, center : Tuple[int, int] = (0, 0)):
-        plaque = self.ObjectPlaque((5, 3), [])
+        plaque = self.ObjectPlaque(dims=(5, 3), center=(0, 0))
 
         if color_name is None:
             color_name = label.lower()
@@ -302,13 +306,14 @@ class Assets:
         
 from files.logic.game import Piece 
 
-class AudioVisuals:
+class GameBoard(Object):
     def __init__(self, 
         assets : Assets,
         dimensions : List[int] = [8, 8],
         num_players : int = 2,
 
-        player_index : int = 0 # gives the player index whose perspective we are looking from (0 if white, 1 if black)
+        player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black),
+        topleft : Tuple[int, int] = (0, 0)
     ):
         self.rank = len(dimensions)
         self.num_players = num_players
@@ -327,7 +332,10 @@ class AudioVisuals:
 
         self.figure_sprites = [assets.white_figures, assets.black_figures]
 
-        board_surface = Surface((self.width, self.height))
+        self.board = new_surface((self.width, self.height))
+        
+        super().__init__(new_surface((self.width, self.height)))
+        self.rect.topleft = topleft
         
         tiles = (assets.white_tile, assets.black_tile)
         W = assets.tile_width
@@ -338,17 +346,14 @@ class AudioVisuals:
                 # Alternate color based on position
                 tile = tiles[(i+j + player_index) % 2]
 
-                board_surface.blit(tile, (j * W, i * H))
-
-        self.board = Object(board_surface)
-        self.board.rect.topleft = (0, 0)
+                self.board.blit(tile, (j * W, i * H))
 
         self.selected_piece : Piece | None = None 
         self.hold_selected : bool = False 
         self.selected_squares : List[Object] = [] 
 
-        self.checkmate_plaque = assets.make_end_plaque('Checkmate', center=self.board.rect.center)
-        self.stalemate_plaque = assets.make_end_plaque('Stalemate', center=self.board.rect.center)
+        self.checkmate_plaque = assets.make_end_plaque('Checkmate', center=self.rect.center)
+        self.stalemate_plaque = assets.make_end_plaque('Stalemate', center=self.rect.center)
 
         class PromotionPlaque(assets.ObjectPlaque):
 
@@ -369,7 +374,7 @@ class AudioVisuals:
                 else:
                     disp = self.assets.tile_width
                 
-                x, y = self.coords(board_pos)
+                x, y = self.coords(board_pos, offset=False)
                 fx = x
                 
                 sprites = self.figure_sprites[player_index]
@@ -397,8 +402,17 @@ class AudioVisuals:
         self.make_promotion_plaque = PromotionPlaque
 
     # translates a point on the screen to a square on the board
-    def board_pos(self, coords : tuple) -> tuple:
+    # if offset is true, takes into account that topleft may not be (0, 0).
+    # otherwise treats as if topleft if (0, 0)
+    #
+    # usually we'd use offset = False for internal operations, offset = True for external ones
+    def board_pos(self, coords : tuple, offset = True) -> tuple:
         i, j = coords 
+        
+        if offset:
+            x, y = self.rect.topleft
+            i -= x
+            j -= y
 
         I, J = i // self.assets.tile_width, (self.height - j) // self.assets.tile_height
 
@@ -408,14 +422,24 @@ class AudioVisuals:
         return I, J
 
     # translates a square on the board to its center point on the screen
-    def coords(self, board_pos : tuple) -> tuple:
+    # if offset is true, takes into account that topleft may not be (0, 0).
+    # otherwise treats as if topleft if (0, 0)
+    #
+    # usually we'd use offset = False for internal operations, offset = True for external ones
+    def coords(self, board_pos : tuple, offset = True) -> tuple:
         I, J = board_pos
+        x, y = self.rect.topleft
 
         if self.perspective == 1:
             J = self.dimensions[1] - J - 1
 
         i = int(self.assets.tile_width * (I + 0.5))
         j = int(self.height - (J + 0.5)*self.assets.tile_height)
+
+        if offset:
+            x, y = self.rect.topleft
+            i += x
+            y += j 
 
         return i, j 
     
@@ -452,21 +476,25 @@ class AudioVisuals:
         self.assets.sounds[sound_name].play()
 
     # draws the given game to a surface
-    def draw(self, surface : Surface, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None) -> Surface:
-        self.board.blit_onto(surface)
+    def draw(self, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int] | None = None) -> Surface:
+        self.surface.blit(self.board, (0, 0))
 
         for square in self.selected_squares:
-            square.blit_onto(surface)
+            square.blit_onto(self.surface)
            
         for piece_dict, sprite_dict in zip(pieces, self.figure_sprites):
             for piece in piece_dict.values():
                 sprite = sprite_dict[piece.figure.name]
                 if not (piece is self.selected_piece and self.hold_selected):
-                    Object(sprite, self.coords(piece.position)).blit_onto(surface)
+                    Object(sprite, self.coords(piece.position, offset=False)).blit_onto(self.surface)
 
         if self.selected_piece is not None and self.hold_selected:
             piece = self.selected_piece
             sprite = self.figure_sprites[piece.player.index][piece.figure.name]
-            Object(sprite, held_coords).blit_onto(surface)
+            
+            held_x, held_y = held_coords 
+            x, y = self.rect.topleft 
+
+            Object(sprite, (held_x-x, held_y-y)).blit_onto(self.surface)
         
-        return surface
+        return self.surface

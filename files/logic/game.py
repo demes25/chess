@@ -8,6 +8,9 @@ import numpy as np
 
 from files.logic.serialization import Serializable, to_native
 
+# here we rigorously apply 'to_native' hopefully to uproot any 
+# serialization errors 
+
 # -- THE PLAYER and THE PIECES -- #
 
 class Player(Serializable):

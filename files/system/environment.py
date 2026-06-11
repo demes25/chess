@@ -4,10 +4,10 @@
 
 from files.logic.game import Game, Status, Event
 from files.logic.serialization import serialize, deserialize
-from typing import Type, List, Tuple, Callable
+from typing import Type, Tuple, Callable
 import pygame as pg
 from files.logic.sets import Set
-from files.media.assets import AudioVisuals, Assets, new_surface
+from files.media.assets import GameBoard, Assets
 from dataclasses import dataclass
 
 RAISE = False
@@ -19,7 +19,7 @@ class VarSettings:
     click_pos = None 
 
 
-class GameInstance:
+class GameWindow:
     def __init__(
         self,
         
@@ -27,19 +27,22 @@ class GameInstance:
         assets : Assets,
 
         player_index : int =0,
-        enforce_player : bool = False
+        enforce_player : bool = False,
+
+        topleft : Tuple[int, int] = (0, 0)
     ):
+        
         self.game : Game | None = None 
         self.set = set 
         self.assets = assets
-        self.av = AudioVisuals(assets, dimensions=set.dimensions, num_players=2, player_index=player_index)
+        self.board = GameBoard(assets, dimensions=set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
         
         self.player_index = player_index
         self.enforce_player = enforce_player 
 
         self.var_settings = VarSettings()
 
-        self.surface = new_surface((self.av.width, self.av.height))
+        self.topleft = topleft 
 
         self.game_over_plaque = None
         self.promotion_plaque = None 
@@ -51,12 +54,12 @@ class GameInstance:
         elif status == Status.PROMOTING:
             if self.promotion_plaque is None:
                 piece = self.game.promoting
-                self.promotion_plaque = self.av.make_promotion_plaque(piece.promotion_list, piece.player.index, piece.position)
-            self.promotion_plaque.blit_onto(self.surface)
+                self.promotion_plaque = self.board.make_promotion_plaque(piece.promotion_list, piece.player.index, piece.position)
+            self.promotion_plaque.blit_onto(self.board)
         else:
             if self.game_over_plaque is None:
-                self.game_over_plaque = self.av.checkmate_plaque if status == Status.CHECKMATE else self.av.stalemate_plaque
-            self.game_over_plaque.blit_onto(self.surface)
+                self.game_over_plaque = self.board.checkmate_plaque if status == Status.CHECKMATE else self.board.stalemate_plaque
+            self.game_over_plaque.blit_onto(self.board)
 
     # checks if the pygame event is global and executes
     # this is defined because it will be used across all event loops
@@ -73,46 +76,46 @@ class GameInstance:
 
         if event.type == pg.MOUSEBUTTONDOWN:
             # selects the piece
-            pos = self.av.board_pos(event.pos)
+            pos = self.board.board_pos(event.pos)
             target = self.game.at(pos)
-            selected = self.av.selected_piece
+            selected = self.board.selected_piece
 
             overall_condition = target is None or not self.enforce_player or (target.player.index == self.player_index)
 
             if overall_condition:
                 if selected is None or (target is not None and target.player == selected.player):
-                    self.av.deselect_squares()
-                    self.av.select_piece(target)
+                    self.board.deselect_squares()
+                    self.board.select_piece(target)
                 elif target != selected:
                     try:
                         result = self.game.move(selected, pos)
-                        self.av.select_square(pos)
+                        self.board.select_square(pos)
                     except Exception as e:
-                        self.av.deselect_squares()
+                        self.board.deselect_squares()
                         
-                    self.av.deselect_piece()
+                    self.board.deselect_piece()
         
         if event.type == pg.MOUSEBUTTONUP:
-            selected = self.av.selected_piece
+            selected = self.board.selected_piece
 
             if selected is not None:
-                pos = self.av.board_pos(event.pos)
+                pos = self.board.board_pos(event.pos)
                 if pos != selected.position:
                     try:
                         result = self.game.move(selected, pos)
-                        self.av.select_square(pos)
+                        self.board.select_square(pos)
                     except Exception as e:
                         if not RAISE:
-                            self.av.play('illegal')
+                            self.board.play('illegal')
                             print(e)
-                            self.av.deselect_squares()
+                            self.board.deselect_squares()
                         else:
                             raise 
                     
-                    self.av.deselect_piece()
+                    self.board.deselect_piece()
                 
                 else:
-                    self.av.hold_selected = False 
+                    self.board.hold_selected = False 
         
         return result
             
@@ -165,17 +168,17 @@ class GameInstance:
         return result 
     
     def clear(self):
-        self.av.selected_piece = None 
+        self.board.selected_piece = None 
         self.promotion_plaque = None 
         self.game_over_plaque = None 
 
         self.var_settings = VarSettings()
-        self.av.deselect_squares()
+        self.board.deselect_squares()
 
     def begin(self, game = None):
         self.clear()
         self.game = game if game is not None else self.set()
-        self.av.play('start')
+        self.board.play('start')
 
     def _quit(self) -> Event:
         self.var_settings.running = False 
@@ -192,15 +195,24 @@ class GameInstance:
         
         return self.event_loop(handle=handle) 
 
-    # flips a frame given the variables and events
-    def frame(self, event : Event):
-        self.av.draw(self.surface, self.game.pieces, pg.mouse.get_pos())
+    # updates the audio-visual state:
+    # draws the current surface and plays all sounds in the given event.
+    def update_state(self, event : Event):
+        self.board.draw(self.game.pieces, pg.mouse.get_pos())
 
         for sound in event.sounds:
-            self.av.play(sound)
+            self.board.play(sound)
         
         # blits a game over screen if the game over value is 1 or 2 (checkmate or stalemate)
         self.status_screen(self.game.status)
+
+    # fetches the current event, updates the audiovisual state, and blits onto the given screen
+    # returns the fetched event
+    def frame(self, screen : pg.Surface) -> Event:
+        event = self.fetch_event()
+        self.update_state(event=event)
+        self.board.blit_onto(screen)
+        return event
 
     # registers received events (as opposed to producing events)
     def register(self, event : Event) -> Event:
@@ -223,15 +235,13 @@ class GameInstance:
         else:
             self.clear()
             self.game = deserialize(load)
-            self.av.play('start')
+            self.board.play('start')
 
         pg.display.init()
-        screen = pg.display.set_mode((self.av.width, self.av.height))
+        screen = pg.display.set_mode((self.board.width, self.board.height))
 
         while self.var_settings.running:
-            event = self.fetch_event()
-            self.frame(event=event)
-            screen.blit(self.surface, (0, 0))
+            self.frame(screen)
             pg.display.flip()
 
         #debug_serialize(self.game)
