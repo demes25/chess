@@ -4,7 +4,7 @@
 
 from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional
-import numpy as np 
+import numpy as np, time
 
 from files.logic.serialization import Serializable, to_native
 
@@ -144,10 +144,12 @@ class Piece(Serializable):
 # the actual rules and state of the game.
 
 class Status:
+    UNBEGUN = -1
     ONGOING = 0
     CHECKMATE = 1
     STALEMATE = 2
-    PROMOTING = 3
+    TIMEOUT = 3
+    PROMOTING = 4
 
 
 from dataclasses import dataclass, field
@@ -156,19 +158,26 @@ ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n'
 # an action in a game. includes a displacement (start, end), and a promotion index (if we promote)
 @dataclass 
 class Action(Serializable):
-    displacement : Tuple[Tuple[int, int], Tuple[int, int]] | None = None
+    displacement : Tuple[Tuple[int, int], Tuple[int, int]] | None = None  
+    times : List[float] | None = None 
+    start_time : float | None = None 
+    end_time : float | None = None 
     promote_to : int = -1 
 
     def to_dict(self) -> dict:
         return {
             'displacement' : to_native(self.displacement),
+            'times' : to_native(self.times),
+            'start_time' : to_native(self.start_time),
+            'end_time' : to_native(self.end_time),
             'promote_to' : to_native(self.promote_to)
         }
     
     @classmethod 
     def from_dict(cls, action : dict | None) -> Optional['Action']:
         if action is None: return None 
-        return Action(displacement=tuple(tuple(j) for j in action['displacement']), promote_to=action['promote_to'])
+        displacement = action.pop('displacement')
+        return Action(displacement=tuple(tuple(j) for j in displacement), **action)
     
     def __str__(self) -> str:
         moves = [f'{ALPHABET[d[0]]}{d[1]+1}' for d in self.displacement]
@@ -207,8 +216,14 @@ class Game(Serializable):
         players : List[Player],
 
         history : List[Round] = [[]], # for serialization purposes
-        status : int = Status.ONGOING
-        ):
+        status : int = Status.UNBEGUN,
+        times : List[float] | None = None,
+
+        turn_start_time : float | None = None,
+
+        default_time_s : float = 600 # default time 10 min per player
+
+    ):
 
         self.rank = len(dimensions)
         self.board = np.full((*dimensions, 2), -1)
@@ -227,7 +242,15 @@ class Game(Serializable):
         assert all(player.rank == self.rank for player in players)
         
         self.pieces : List[Dict[int, 'Piece']] = [{} for _ in players] # indexed according to the index of the corresponding player
-        self.captured_pieces : List[List[int]] = [[] for _ in players] # indexed likewise, the i'th entry is a list of indices corresponding to the pieces that player i lost.
+        
+        if times is None:
+            self.times = [default_time_s for _ in players]
+        else:
+            self.times = times.copy() 
+
+        self.captured_pieces : List[List[Tuple[int, str]]] = [[] for _ in players] 
+        # indexed similarly:
+        # captured_pieces[i] is a list of tuples (player_index, piece_name) corresponding to the pieces that player i has captured.
         
         i = 0
         for j in range(len(players)):
@@ -257,6 +280,9 @@ class Game(Serializable):
 
         self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
         self.turn = len(history[-1]) # the player whose turn it is
+
+        self.turn_start_time = turn_start_time
+
         self.history : List[Round] = [round.copy() for round in history] # registers the history
 
 
@@ -369,10 +395,13 @@ class Game(Serializable):
         result = target_piece is not None
         if result:
             i, j = tuple(self.board[target_piece.position])
+
             self.set_to(target_piece.position, -1, -1)
             target_piece.die()
             self.pieces[i].pop(j)
-            self.captured_pieces.append(j)
+
+            capturing_player = piece.player.index
+            self.captured_pieces[capturing_player].append((i, target_piece.figure.name))
 
         self.set_to(end_pos, *tuple(self.board[piece.position]))
         self.set_to(piece.position, -1, -1)
@@ -392,10 +421,11 @@ class Game(Serializable):
         self.turn = (self.turn + 1) % len(self.players)
         if self.turn == 0:
             self.move_num += 1
+            self.history.append([])
 
     # executes a move, returns the nature of the move (move, take, check, etc...)
     # allows us to enforce move rules and game rules at will.
-    def move(self, piece : Piece, target : tuple | Vector) -> Event:
+    def move(self, piece : Piece, target : tuple | Vector, update_time : bool = True) -> Event:
         assert len(target) == self.rank
 
         player = piece.player
@@ -467,21 +497,43 @@ class Game(Serializable):
 
         # update turns and moves
         if self.status != Status.PROMOTING:
-            return self._post_move_update(event)
+            return self._post_move_update(event, update_time=update_time)
         else:
             self.delayed_event = event
             return Event()
     
     def register_action(self, action : Action):
+        if self.status == Status.UNBEGUN:
+            self.status = Status.ONGOING
+            self.turn_start_time = time.time()
+
         s, e = action.displacement
-        self.move(self.at(s), e)
+        self.move(self.at(s), e, update_time=False)
 
         if action.promote_to > 0:
-            self.promote(action.promote_to)
+            self.promote(action.promote_to, update_time=False)
+        
+        self.times = action.times.copy()
+        self.turn_start_time = action.end_time
         
     # update process after a move has been completed.
     # checks for checks, registers the necessary sounds, updates history
-    def _post_move_update(self, event : Event):
+    def _post_move_update(self, event : Event, update_time=True):
+        if update_time:
+            if self.status == Status.UNBEGUN:
+                self.status = Status.ONGOING
+                self.turn_start_time = turn_end_time = time.time()
+            elif self.status == Status.ONGOING and update_time:
+                turn_end_time = time.time()
+                time_dif = turn_end_time - self.turn_start_time
+                self.times[self.turn] -= time_dif
+            
+            event.action.times = self.times.copy()
+            event.action.start_time = self.turn_start_time
+            event.action.end_time = turn_end_time
+            
+            self.turn_start_time = turn_end_time    
+        
         self._next_turn()
 
         check = self.update_checks()
@@ -498,19 +550,17 @@ class Game(Serializable):
 
         # registers the move in the game history
         self.history[-1].append(event.action)
-        if self.turn == 0:
-            self.history.append([])
         return event
 
     
-    def promote(self, promotion_index : int) -> Event:
+    def promote(self, promotion_index : int, update_time : bool = False) -> Event:
         if self.promoting is not None:
             self.promoting.figure = self.promoting.promotion_list[promotion_index]
             # we may only promote once
             self.promoting.promotion_list = [] 
             self.promoting = None 
             
-            event = self._post_move_update(self.delayed_event)
+            event = self._post_move_update(self.delayed_event, update_time=update_time)
             self.delayed_event = None 
 
             event.sounds.append('promote')
@@ -574,8 +624,19 @@ class Game(Serializable):
             'dimensions' : to_native(self.dimensions),
 
             'history' : self.history,
-            'status' : to_native(self.status)
+            'status' : to_native(self.status),
+            'times' : to_native(self.times),
+            'turn_start_time' : to_native(self.turn_start_time),
+
+            'captures' : to_native(self.captured_pieces)
         }
+    
+    @classmethod
+    def from_dict(cls, dct) -> 'Game':
+        captured_pieces = dct.pop('captures')
+        game = cls(**dct)
+        game.captured_pieces = captured_pieces
+        return game 
     
     
     def print_history(self):

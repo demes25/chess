@@ -46,8 +46,9 @@ def surface_loader(dims : Tuple[int, int]):
     return _load 
 
 # tints an image in-place (and returns)
-def tint(surface : Surface, color : Color, opacity : int = 255) -> Surface:
-    surface.fill((*color, opacity), special_flags=pg.BLEND_RGBA_MULT)
+def tint(surface : Surface, color : Color | None = None, opacity : int = 255) -> Surface:
+    if color is not None:
+        surface.fill((*color, opacity), special_flags=pg.BLEND_RGBA_MULT)
     return surface
 
 
@@ -92,10 +93,13 @@ class Assets:
             selection_opacity : float = 0.5,
 
             sprite_size : float = 0.95,
+            captured_sprite_size : float = 0.75, # small sprites, for drawing captures 
 
             big_title_size : float = 0.55,
             small_title_size : float = 0.35,
-            text_size : float = 0.2
+
+            text_size : float = 0.2,
+            clock_num_size : float = 0.5625,
         ):
 
         self.tile_dims = tile_dims
@@ -115,30 +119,44 @@ class Assets:
         # blocks with which we can construct plaques 
         self.tiles : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'tiles'), self.sprite_ext, surface_loader(tile_dims))
         
-        # figure sprites
-        self.tile_width, self.tile_height = w, h = tile_dims
-        self.figure_dims = self.figure_width, self.figure_height = sw, sh = sprite_size * w, sprite_size * h
-
-        self.figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((sw,sh)))
-
-        self.white_tile = tint(self.tiles['Tile'].copy(), scheme['tile_white'])
-        self.black_tile = tint(self.tiles['Tile'].copy(), scheme['tile_black'])
-
-        self.white_figures = {
-            name : tint(sprite.copy(), scheme['player_white']) for name, sprite in self.figures.items()
-        }
         
-        self.black_figures = {
-            name : tint(sprite.copy(), scheme['player_black']) for name, sprite in self.figures.items()
-        }
+        self.tile_width, self.tile_height = w, h = tile_dims
+
+        # figure sprites
+        self.figure_dims = self.figure_width, self.figure_height = sw, sh = sprite_size * w, sprite_size * h
+        self.figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((sw,sh)))
+        
+        self.captured_figure_dims = self.captured_figure_width, self.captured_figure_height = ssw, ssh = captured_sprite_size * w, captured_sprite_size * h 
+        self.captured_figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((ssw,ssh)))
+
+        self.player_colors = [scheme['player_white'], scheme['player_black']]
+        self.tile_colors = [scheme['tile_white'], scheme['player_black']]
+
+        self.colored_tiles : List[Surface] = [tint(self.tiles['Tile'].copy(), color=color) for color in self.tile_colors]
+        
+        self.colored_figures : List[Dict[str, Surface]] = [
+            {
+                name : tint(sprite.copy(), color=color) for name, sprite in self.figures.items()
+            } for color in self.player_colors
+        ]
+
+        self.captured_colored_figures = [
+            {
+                name : tint(sprite.copy(), color=color) for name, sprite in self.captured_figures.items()
+            } for color in self.player_colors
+        ]
+
 
         self.selected_tile = tint(self.tiles['Tile'].copy(), scheme['select'], opacity=int(selection_opacity * 255))
 
+        # TODO: MAKE BITMAPS INSTEAD OF TTF FILES!!
         title_font_path = Path(self.asset_dir, f'title_font.{font_ext}')
 
         self.big_title = pg.font.Font(title_font_path, int(big_title_size * h))
         self.small_title = pg.font.Font(title_font_path, int(small_title_size * h))
+
         self.text_font = pg.font.Font(Path(self.asset_dir, f'text_font.{font_ext}'), int(text_size * h))
+        self.clock_font = pg.font.Font(Path(self.asset_dir, f'text_font.{font_ext}'), int(clock_num_size * h))
 
         self.sounds : Dict[str, Sound] = dict_from_dir(self.sound_dir, self.sound_ext, func=Sound)
 
@@ -146,10 +164,9 @@ class Assets:
         # width and height are the dimensions of the plaque in terms of tiles, 
         # i.e. 3x5 would return a 3 tile by 5 tile plaque    
         class Plaque(Object):
-            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
-                color = self.scheme['plaque']
-
+    
                 plq.width, plq.height = width, height = dims 
 
                 # special cases if any of the dimensions are one
@@ -185,7 +202,6 @@ class Assets:
                         surface.blit(h, (i*tile_w, 0))
                     
                     surface = tint(surface, color=color, opacity = opacity)
-
                 else:
                     surface = new_surface((width * tile_w, height * tile_h))
 
@@ -238,8 +254,8 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object] = [], center : Tuple[int, int] | None = None, opacity : int = int(plaque_opacity * 255)):
-                super().__init__(dims=dims, center=center, opacity = opacity)
+            def __init__(plq, dims : Tuple[int, int], objects : List[Object] = [], center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
+                super().__init__(dims=dims, center=center, color=color, opacity=opacity)
                 plq.objects = objects 
 
             def which_hits(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> Object:
@@ -283,7 +299,8 @@ class Assets:
         plaque = self.ObjectPlaque(dims=(5, 3), center=(0, 0))
 
         if color_name is None:
-            color_name = label.lower()
+            color_name = label 
+        color_name = color_name.lower()
 
         dx_r = plaque.rect.width // 5
         dx_q = plaque.rect.width // 4

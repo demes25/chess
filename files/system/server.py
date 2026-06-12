@@ -6,20 +6,20 @@ import asyncio, websockets, uuid, time
 from typing import List, Dict
 from files.logic.serialization import serialize, deserialize
 from files.logic.sets import Set
-from files.media.assets import Assets
 import random
 
 
-RAISE = False 
+RAISE = True 
 
 
 # hosts a game        
 class GameServer:
-    def __init__(self, set : Set, num_players = 2):
+    def __init__(self, set : Set, num_players : int = 2, default_time_s : int = 600):
         self.players : List[websockets.ClientConnection | None] = [None] * num_players
         self.player_dict : Dict[str, int] = {}
 
         self.set = set
+        self.default_time_s = default_time_s
         self.game = None 
 
         self.num_joined = 0
@@ -67,9 +67,14 @@ class GameServer:
                     wait_condition = self.num_joined != self.num_players
             
         async with self.lock:
-            player = self.players[index]
-            if player is not None:
-                await player.send(msg)
+            if index == -1: # if index = -1, send to all
+                for player in self.players:
+                    if player is not None:
+                        await player.send(msg)
+            else:
+                player = self.players[index]
+                if player is not None:
+                    await player.send(msg)
 
     async def safe_send_except(self, index : int, msg : str, timeout : float | None = None, wait : bool = False):
         if wait:
@@ -94,17 +99,20 @@ class GameServer:
             
         async with self.lock:
             index = self.assign(ws, id)
-            # send the player index 
-            await ws.send(str(index))
-            # send 1 if player side is enforced, 0 else
-            await ws.send(str(self.enforce_player))
-            # send the relevant set 
-            await ws.send(serialize(self.set))
-
-            if self.game is None:
-                self.game = self.set()
             
-            await ws.send(serialize(self.game))
+            
+            if self.game is None:
+                self.game = self.set(timer=self.default_time_s)
+
+            args = serialize({
+                    'index' : index,
+                    'enforce_player' : self.enforce_player,
+                    'set' : self.set,
+                    'game' : self.game
+                }
+            )
+            
+        await ws.send(args)
         
         print(f'[CONNECT] {id}')
         return index 
@@ -131,10 +139,14 @@ class GameServer:
                 cmd = deserialize(message)
                 if isinstance(cmd, Event):
 
-                    # if this is reset, then we reset
+                    # if this is reset, then we reset and send the new game to everybody
                     if cmd.label == 'reset':
                         async with self.lock:
-                            self.game = self.set()
+                            self.game = self.set(self.default_time_s)
+                            msg = serialize(self.game)
+
+                        await self.safe_send(-1, msg)
+
 
                     # if this is an action, we update the server's board.
                     if cmd.label == 'action':
@@ -152,6 +164,8 @@ class GameServer:
 
         except Exception as e:
             print(f'[EXCEPTION] {e}')
+            if RAISE:
+                raise
         finally:
             if index is not None:
                 await self.disconnect(index)
@@ -166,16 +180,17 @@ class GameServer:
 
 from files.system.environment import GameWindow
 from files.logic.game import Event, Game
+from files.media.av import AVType
 import pygame as pg
 
 class GameClient:
-    def __init__(self, assets : Assets, id : str | None = None):
+    def __init__(self, av : AVType, id : str | None = None):
         self.sound_lock = asyncio.Lock()
         self.instance_lock = asyncio.Lock()
         self.queue_lock = asyncio.Lock()
 
         self.id = str(uuid.uuid1()) if id is None else id
-        self.assets = assets 
+        self.av = av
         self.sounds : List[str] = []
 
         # list of things to send 
@@ -184,10 +199,12 @@ class GameClient:
 
     async def prime(self):
         async with self.instance_lock:
-            board = self.instance.board 
+            w = self.instance.pixel_width
+            h = self.instance.pixel_height
+            board=self.instance.board
         
         pg.display.init()
-        self.screen = pg.display.set_mode((board.width, board.height))
+        self.screen = pg.display.set_mode((w, h))
         board.play('start')
     
     # establishes the connection:
@@ -197,25 +214,28 @@ class GameClient:
         await ws.send(self.id)
         print('[CONNECT]')
 
+        # receive the handshake
+        handshake = deserialize(await ws.recv())
+
         # receive the player index 
-        self.index = int(await ws.recv())
-        enforce_player = bool(await ws.recv())
+        self.index = handshake['index']
+        enforce_player = handshake['enforce_player']
 
         # receive the set
-        set_obj = deserialize(await(ws.recv()))
+        set_obj = handshake['set']
 
         # receive the serialized game object
-        game_obj = deserialize(await(ws.recv()))
+        game_obj : Game = handshake['game']
 
         # construct the instance
-        self.instance = GameWindow(set_obj, assets=self.assets, player_index=self.index, enforce_player=enforce_player)
-        self.instance.game = game_obj
+        self.instance = GameWindow(set_obj, av=self.av, player_index=self.index, enforce_player=enforce_player)
+        self.instance.begin(game=game_obj)
         await self.prime()
 
 
-    async def sender(self, ws : websockets.ClientConnection):
+    async def sender(self, ws : websockets.ClientConnection, interval : float = 0.01):
         while True:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(interval)
             async with self.queue_lock:
                 for _ in range(len(self.queue)):
                     cmd = self.queue.pop()
@@ -247,6 +267,7 @@ class GameClient:
             elif isinstance(obj, Game):
                 async with self.instance_lock:
                     self.instance.begin(game=obj)
+                    self.instance.board.play('start')
 
     async def play_listened_sounds(self):
         while True:

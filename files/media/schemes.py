@@ -22,7 +22,7 @@ DefaultScheme : Scheme = {
     'text' : (220, 192, 180),
 
     'select' : (128, 45, 25),
-    'see' : (230, 100, 50)
+    'see' : (230, 100, 50),
 }
 
 IndianScheme : Scheme = {

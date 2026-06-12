@@ -6,7 +6,7 @@ H = W = 384
 
 backend = Assets((W, H), CristiancitoScheme, sprite_size=1.0)
 
-tiles = [backend.white_tile, backend.black_tile]
+tiles = backend.colored_tiles
 surface = new_surface((W*8, H*8))
 
 for i in range(8):
@@ -18,9 +18,9 @@ for i in range(8):
 
 pg.image.save(surface, 'board.png')
 
-pg.image.save(backend.black_figures['King'], 'black_king.png')
-pg.image.save(backend.white_figures['King'], 'white_king.png')
-pg.image.save(backend.white_figures['Queen'], 'white_queen.png')
+pg.image.save(backend.colored_figures[1]['King'], 'black_king.png')
+pg.image.save(backend.colored_figures[0]['King'], 'white_king.png')
+pg.image.save(backend.colored_figures[0]['Queen'], 'white_queen.png')
 
 font = pg.font.Font(Path(backend.asset_dir, f'title_font.{backend.font_ext}'), 48)        
 text = font.render('OBCHESSED', True, CristiancitoScheme['tile_white'])

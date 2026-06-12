@@ -54,7 +54,9 @@ class Set(Serializable):
             'black_pawns' : self.black_pawns
         }
 
-    def __call__(self) -> Game:
+    def __call__(self, 
+        timer : float = 600 # timer for the players - default 10 min
+    ) -> Game:
         white_monarchs = [
             Piece(*args) for args in self.white_monarchs
         ]
@@ -79,7 +81,7 @@ class Set(Serializable):
         white = Player(monarchs=white_monarchs, army=white_pieces + white_pawns, index=0)
         black = Player(monarchs=black_monarchs, army=black_pieces + black_pawns, index=1)
 
-        return Game(self.dimensions, [white, black], history=[[]])
+        return Game(self.dimensions, [white, black], default_time_s=timer)
 
 # a chess set
 chess_pieces = ['Rook', 'Knight', 'Bishop', 'Queen']
