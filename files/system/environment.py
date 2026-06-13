@@ -3,15 +3,14 @@
 # Instance
 
 import pygame as pg, time
-from typing import Type, Tuple, Callable, List
+from typing import Type, Tuple, Callable
 from dataclasses import dataclass
 
 from files.logic.game import Game, Status, Event
 from files.logic.serialization import serialize, deserialize
 from files.logic.sets import Set
 
-from files.media.assets import Assets
-from files.media.av import AudioVisuals, AVType, to_AV
+from files.media.av import AVType, to_AV, new_window
 
 RAISE = False
 
@@ -39,7 +38,7 @@ class GameWindow:
         self.game : Game | None = None 
         self.set = set 
 
-        av = to_AV(av)
+        self.av = av = to_AV(av)
 
         self.board = av.GameBoard(dimensions=set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
         self.sidebar = av.GameSideBar(player_index=player_index, env_height=set.dimensions[1], topleft=self.board.rect.topright)
@@ -59,7 +58,7 @@ class GameWindow:
 
         self.game_over_plaque = None
         self.promotion_plaque = None 
-
+        
     # blits the game over screen (if game over)
     def status_screen(self, status : int):
         if status == Status.UNBEGUN or status == Status.ONGOING:
@@ -270,14 +269,15 @@ class GameWindow:
         self.begin(deserialize(load), timer)
         self.board.play('start')
     
+        icon = self.av.assets.colored_figures[0]['King']
+        caption = 'OBCHESSED'
 
-        pg.display.init()
-        screen = pg.display.set_mode((self.pixel_width, self.pixel_height))
+        screen = new_window((self.pixel_width, self.pixel_height), icon=icon, caption=caption)
 
         while self.var_settings.running:
             event = self.frame(screen)
             if event.label == 'reset':
-                self.begin(timer)
+                self.begin(timer=timer)
                 self.board.play('start')
             pg.display.flip()
 

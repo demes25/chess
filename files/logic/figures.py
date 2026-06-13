@@ -7,7 +7,7 @@ from abc import abstractmethod
 import numpy as np  
 from itertools import product, permutations
 
-from files.logic.serialization import Serializable
+from files.logic.serialization import Serializable, to_native
 
 Vector = np.typing.NDArray[np.int_] # for typehinting - vector is a 1-d integer array
 Matrix = np.typing.NDArray[np.int_] # matrix is a 2-d integer array
@@ -100,7 +100,7 @@ class Move(Serializable):
             
             self.directions.append(np.array(dir))
         
-        self.dirs_as_lists = [dir.tolist() for dir in self.directions]
+        self.dirs_native = to_native(dirs)
 
         self.special_execute = None
         self.capture_displacement = capture_displacement
@@ -109,7 +109,7 @@ class Move(Serializable):
     # serialization
     def to_dict(self) -> dict:
         return {
-            'dirs' : self.dirs_as_lists,
+            'dirs' : self.dirs_native,
             'captures' : self.captures,
             'moves' : self.moves
         }
@@ -205,11 +205,8 @@ class Leap(Discrete):
     ):  
         # we keep a numpy array to compare against,
         # but generate permutations with a python list.
-        if isinstance(displacement, np.ndarray):
-            self.displacement = np.sort(np.abs(displacement))
-            displacement = displacement.tolist()
-        else:
-            self.displacement = np.sort(np.abs(np.array(displacement)))
+        self.displacement = np.sort(np.abs(np.array(displacement)))
+        displacement = self.disp_native = to_native(self.displacement)
 
         # generate all signed permutations of the displacement
         dirs = []
@@ -222,7 +219,7 @@ class Leap(Discrete):
     # serialization
     def to_dict(self) -> dict:
         return {
-            'displacement' : self.displacement.tolist(),
+            'displacement' : self.disp_native,
             'captures' : self.captures,
             'moves' : self.moves
         }
@@ -425,14 +422,14 @@ class Compound(Spanning):
         max_obstacles : int = 0,
     ):
         super().__init__(dirs=spanning_dirs, captures=captures, moves=moves, min_num=min_num, min_obstacles=min_obstacles, max_obstacles=max_obstacles)
-        self.discrete = discrete_dirs
-        self.discrete_as_lists = [dir.tolist() if isinstance(dir, np.ndarray) else dir for dir in discrete_dirs]
-
+        self.discrete = [np.array(dir) for dir in discrete_dirs]
+        self.disc_native = to_native(self.discrete)
+        
     # serialization
     def to_dict(self):
         return {
-            'discrete_dirs' : self.discrete_as_lists,
-            'spanning_dirs' : self.dirs_as_lists,
+            'discrete_dirs' : self.disc_native,
+            'spanning_dirs' : self.dirs_native,
             'captures' : self.captures,
             'moves' : self.moves,
             'min_num' : self.min_num,

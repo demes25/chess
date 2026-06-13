@@ -276,8 +276,8 @@ class AudioVisuals:
                 plaque_opacity : int = 64,
                 player_opacity : int = 196
             ):
-                self.x_margin = int(margin * assets.tile_width)
-                self.y_margin = int(margin * assets.tile_height) 
+                self.x_pixel_margin = int(margin * assets.tile_width)
+                self.y_pixel_margin = int(margin * assets.tile_height) 
 
                 super().__init__(dims=dims, center=center, color=None, opacity=255)
     
@@ -288,25 +288,30 @@ class AudioVisuals:
                 player_tint = tint(self.surface.copy(), color=assets.player_colors[player_index], opacity=player_opacity)
                 self.background.blit(player_tint, (0,0))
 
+                self.pixel_width, self.pixel_height = dims[0] * assets.tile_width, dims[1] * assets.tile_height
+
+                self.FIGURES_PER_ROW = int((self.pixel_width - 2*self.x_pixel_margin)/assets.captured_figure_width)
+
+                self.INIT_X = self.x_pixel_margin + assets.captured_figure_width // 2
+                self.MAX_X = self.INIT_X + (self.FIGURES_PER_ROW-1)*assets.captured_figure_width
+
 
             # pieces: list of [player_index, piece_name]
             def draw(self, pieces : List[Tuple[int, str]] = []):
                 self.surface = self.background.copy()
 
-                CURR_HEIGHT = self.y_margin + assets.captured_figure_height // 2
-                INIT_WIDTH = CURR_WIDTH = self.x_margin + assets.captured_figure_width // 2
-
-                MAX_WIDTH = assets.captured_figure_width * assets.tile_width  - 2*INIT_WIDTH + 3
+                CURR_Y = self.y_pixel_margin + assets.captured_figure_height // 2
+                CURR_X = self.INIT_X
 
                 for player, piece_name in pieces:
-                    obj = Object(assets.captured_colored_figures[player][piece_name], (CURR_WIDTH, CURR_HEIGHT))
+                    obj = Object(assets.captured_colored_figures[player][piece_name], (CURR_X, CURR_Y))
                     obj.blit_onto(self.surface)
 
-                    CURR_WIDTH += assets.captured_figure_width
+                    CURR_X += assets.captured_figure_width
                     
-                    if CURR_WIDTH > MAX_WIDTH:
-                        CURR_WIDTH = INIT_WIDTH
-                        CURR_HEIGHT += assets.captured_figure_height
+                    if CURR_X > self.MAX_X:
+                        CURR_X = self.INIT_X
+                        CURR_Y += assets.captured_figure_height
                 
                 return self.surface
 
@@ -383,18 +388,24 @@ class AudioVisuals:
                 return self.surface 
 
 
-
-
-
-
-
-                    
+        this.assets = assets 
 
         #this.GameSideBar = GameSideBar
         this.GameBoard = GameBoard
         this.Timer = Timer 
         this.FigureArray = FigureArray
         this.GameSideBar = GameSideBar
+
+
+def new_window(size : Tuple[int, int], caption : str | None = None, icon : Surface | Object | None = None):
+    pg.display.init()
+    if caption is not None:
+        pg.display.set_caption(caption)
+    if icon is not None:
+        if isinstance(icon, Object):
+            icon = icon.surface
+        pg.display.set_icon(icon)
+    return pg.display.set_mode(size=size)
         
 
 

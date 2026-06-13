@@ -3,7 +3,7 @@ from files.media.assets import Assets
 import asyncio
 
 
-assets = Assets((76, 76))
+assets = Assets((80, 80))
 
 client = GameClient(assets)
 

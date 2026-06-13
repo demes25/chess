@@ -1,5 +1,5 @@
 from files.logic.sets import Wildebeest, Chess, Shatranj
-from files.system.environment import GameWindow, Assets
+from files.system.environment import GameWindow
 
 
-GameWindow(Chess, (76, 76)).run_solo(2)
+GameWindow(Chess, (64, 64)).run_solo(600)

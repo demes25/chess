@@ -180,7 +180,7 @@ class GameServer:
 
 from files.system.environment import GameWindow
 from files.logic.game import Event, Game
-from files.media.av import AVType
+from files.media.av import AVType, new_window
 import pygame as pg
 
 class GameClient:
@@ -203,8 +203,11 @@ class GameClient:
             h = self.instance.pixel_height
             board=self.instance.board
         
-        pg.display.init()
-        self.screen = pg.display.set_mode((w, h))
+        icon = self.av.assets.colored_figures[0]['King']
+        caption = 'OBCHESSED'
+
+        self.screen = new_window((w, h), icon=icon, caption=caption)
+        
         board.play('start')
     
     # establishes the connection:

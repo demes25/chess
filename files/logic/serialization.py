@@ -4,20 +4,19 @@
 
 import json
 from typing import Type, Dict, Optional 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 import numpy as np
 
 PrimitiveJSONType = dict | list | str | float | int | bool | None
 
-class Serializable:
+class Serializable(ABC):
     # serializes this object into a dictionary
     @abstractmethod
     def to_dict(self) -> dict:
         pass 
 
     # deserializes according to the given dictionary
-    @classmethod 
-    @abstractmethod 
+    @classmethod
     def from_dict(cls, dct : dict) -> Optional['Serializable']:
         return cls(**dct)
     
@@ -38,7 +37,7 @@ NP_COMPLEX = (np.complex64, np.complex128)
 
 def to_native(obj):
     if isinstance(obj, np.ndarray):
-        return obj.tolist()
+        return to_native(obj.tolist())
     
     elif isinstance(obj, (list, tuple)):
         return [to_native(o) for o in obj]
