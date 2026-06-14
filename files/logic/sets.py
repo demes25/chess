@@ -10,8 +10,6 @@ from files.logic.game import Game, Piece, Player
 import numpy as np
 from abc import ABC, abstractmethod
 
-# TODO: Make sets instantiable instead of fixed classes
-
 # we define a *set*. i.e. a set of dimensions and starting armies for each player.
 class Set(Serializable):
     

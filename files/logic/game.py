@@ -206,8 +206,6 @@ class Event(Serializable):
 
 #TODO: sometimes checkmates register erroneously, like when queen should be able to take the attacker
 #TODO: add takebacks, show previous positions, etc...
-#TODO: make game a separate thing on top of the board. the board should be able to be set up however it be so desired,
-# with whichever pieces.
 Round = List[Action]
 class Game(Serializable):
     def __init__(
@@ -231,8 +229,6 @@ class Game(Serializable):
         self.players = players
 
         self.basis = np.eye(self.rank)
-
-        # TODO: REGISTER HISTORY
         
         self.status : int = status 
         

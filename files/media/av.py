@@ -78,10 +78,6 @@ class AudioVisuals:
                         # extends rightwards from the promotion square, unless that clashes with 
                         # board dimensions, in which case we go leftwards.
                         # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
-                        # rudimentary: for now, the default is that the promotion plaque 
-                        # extends rightwards from the promotion square, unless that clashes with 
-                        # board dimensions, in which case we go leftwards.
-                        # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
                         if (self.dimensions[0]-board_pos[0]) < len(figures):
                             disp = -assets.tile_width
                         else:
