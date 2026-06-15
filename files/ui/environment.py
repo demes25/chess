@@ -3,13 +3,13 @@
 # Instance
 
 import pygame as pg, time
-from typing import Type, Tuple, Callable
+from typing import Tuple, Callable
 from dataclasses import dataclass
 
-from files.logic.game import Game, Status, Event
 from netlib.serialization import serialize, deserialize
-from files.logic.sets import Set
 
+from files.logic.game import Game, Status, Event
+from files.logic.sets import Set
 from files.ui.av import AVType, to_AV, new_window
 
 RAISE = False
@@ -24,7 +24,7 @@ class GameWindow:
     def __init__(
         self,
         
-        set : Type[Set],
+        set : Set,
         av : AVType,
 
         # TODO: GENERALIZE FOR SIDEBAR SIZES
