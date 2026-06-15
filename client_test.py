@@ -1,10 +1,12 @@
-from files.system.server import GameClient
+from files.system.game_server import OnlinePlayer
+from files.system import logs 
 from files.media.assets import Assets
 import asyncio
 
+logs.init()
 
 assets = Assets((80, 80))
 
-client = GameClient(assets)
+client = OnlinePlayer(assets)
 
 asyncio.run(client.run())

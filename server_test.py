@@ -1,9 +1,12 @@
 from files.logic.sets import Wildebeest, Chess, Shatranj
-from files.system.server import GameServer
+from files.system.game_server import OnlineGame
+from netlib import logs
 import asyncio
 
-server = GameServer(Chess)
+logs.init()
 
-asyncio.run(server.run(host='0.0.0.0', enforce_player=True))
+server = OnlineGame(Chess)
+
+asyncio.run(server.run())
 
 

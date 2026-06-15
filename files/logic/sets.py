@@ -4,7 +4,7 @@
 
 from typing import Type, Dict, Tuple, List
 from files.logic.figures import Figures
-from files.logic.serialization import Serializable
+from netlib.serialization import Serializable
 from files.logic.game import Game, Piece, Player
 
 import numpy as np

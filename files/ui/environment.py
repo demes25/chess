@@ -7,10 +7,10 @@ from typing import Type, Tuple, Callable
 from dataclasses import dataclass
 
 from files.logic.game import Game, Status, Event
-from files.logic.serialization import serialize, deserialize
+from netlib.serialization import serialize, deserialize
 from files.logic.sets import Set
 
-from files.media.av import AVType, to_AV, new_window
+from files.ui.av import AVType, to_AV, new_window
 
 RAISE = False
 

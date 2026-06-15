@@ -1,4 +1,4 @@
-from files.media.av import to_AV, pg
+from files.ui.av import to_AV, pg
 
 av = to_AV((64, 64))
 

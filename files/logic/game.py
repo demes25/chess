@@ -6,7 +6,7 @@ from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional
 import numpy as np, time
 
-from files.logic.serialization import Serializable, to_native
+from netlib.serialization import Serializable, to_native
 
 # here we rigorously apply 'to_native' hopefully to uproot any 
 # serialization errors 
@@ -275,7 +275,7 @@ class Game(Serializable):
         # HISTORY/LOADING
 
         self.move_num = len(history)-1 # the amount of times that every player has made a move (after each player makes one move, we increment)
-        self.turn = len(history[-1]) # the player whose turn it is
+        self.turn = len(history[-1]) % len(self.players) # the player whose turn it is
 
         self.turn_start_time = turn_start_time
 

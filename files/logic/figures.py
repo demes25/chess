@@ -7,7 +7,7 @@ from abc import abstractmethod
 import numpy as np  
 from itertools import product, permutations
 
-from files.logic.serialization import Serializable, to_native
+from netlib.serialization import Serializable, to_native
 
 Vector = np.typing.NDArray[np.int_] # for typehinting - vector is a 1-d integer array
 Matrix = np.typing.NDArray[np.int_] # matrix is a 2-d integer array
