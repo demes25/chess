@@ -32,6 +32,8 @@ class GameWindow:
         player_index : int =0,
         enforce_player : bool = False,
 
+        default_time_s : float = 600,
+
         topleft : Tuple[int, int] = (0, 0)
     ):
         
@@ -51,6 +53,8 @@ class GameWindow:
 
         self.player_index = player_index
         self.enforce_player = enforce_player 
+
+        self.default_time_s = default_time_s
 
         self.var_settings = VarSettings()
 
@@ -198,9 +202,9 @@ class GameWindow:
         self.var_settings = VarSettings()
         self.board.deselect_squares()
 
-    def begin(self, game = None, timer = 600):
+    def begin(self, game = None):
         self.clear()
-        self.game = game if game is not None else self.game_set.new_game(timer=timer)
+        self.game = game if game is not None else self.game_set.new_game(timer=self.default_time_s)
         self.times = self.game.times.copy()
 
     def _quit(self) -> Event:

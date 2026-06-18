@@ -86,6 +86,7 @@ class OnlineGame(Server):
             args = serialize({
                     'index' : connection.index,
                     'enforce_player' : self.enforce_player,
+                    'default_time' : self.default_time_s,
                     'set' : self.game_set,
                     'game' : self.game
                 }
@@ -192,7 +193,7 @@ class OnlinePlayer(SenderClient):
         game_obj : Game = handshake['game']
 
         # construct the instance
-        self.instance = GameWindow(set_obj, av=self.av, player_index=self.index, enforce_player=enforce_player)
+        self.instance = GameWindow(set_obj, av=self.av, player_index=self.index, enforce_player=enforce_player, default_time_s=handshake['default_time'])
         self.instance.begin(game=game_obj)
         logs.info(self, f'Connected {ws.id}')
         await self.prime()

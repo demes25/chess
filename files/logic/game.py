@@ -149,7 +149,7 @@ class Status:
     PROMOTING = 4
 
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, fields, field
 
 ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
 # an action in a game. includes a displacement (start, end), and a promotion index (if we promote)
@@ -162,13 +162,14 @@ class Action(Serializable):
     promote_to : int = -1 
 
     def to_dict(self) -> dict:
-        return {
-            'displacement' : to_native(self.displacement),
-            'times' : to_native(self.times),
-            'start_time' : to_native(self.start_time),
-            'end_time' : to_native(self.end_time),
-            'promote_to' : to_native(self.promote_to)
-        }
+        result = {}
+
+        for field in fields(self):
+            obj = getattr(self, field.name)
+            if obj is not None:
+                result[field.name] = to_native(obj)
+
+        return result
     
     @classmethod 
     def from_dict(cls, action : dict | None) -> Optional['Action']:
