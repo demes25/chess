@@ -1,5 +1,5 @@
 from files.system.game_server import OnlinePlayer
-from files.system import logs 
+from netlib import logs 
 from files.media.assets import Assets
 import asyncio
 

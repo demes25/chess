@@ -254,9 +254,9 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object] = [], center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], objects : List[Object] | None = None, center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, color=color, opacity=opacity)
-                plq.objects = objects 
+                plq.objects = objects or []
 
             def which_hits(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> Object:
                 for obj in plq.objects:

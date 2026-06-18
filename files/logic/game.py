@@ -53,10 +53,10 @@ class Piece(Serializable):
         name : str,
         position : tuple,
 
-        promotes : List[str] = [], # a list of figures to which a figure may promote upon reaching the other end of the board 
+        promotes : List[str] | None = None, # a list of figures to which a figure may promote upon reaching the other end of the board 
         promotion_axis : int = -1, # the promotion axis
 
-        history : List[tuple] = [], # the history of positions this has had
+        history : List[tuple] | None = None, # the history of positions this has had
         dead : bool = False,
 
         has_moved : bool = False,
@@ -66,10 +66,10 @@ class Piece(Serializable):
         self.figure = Figures[name]
         self.name = name
 
-        self.history = history.copy()
+        self.history = history = history or []
         self.update_position(position)
 
-        self.promotes = promotes 
+        self.promotes = promotes = promotes or []
         self.promotion_list = [Figures[name] for name in promotes]
         self.promotion_axis = promotion_axis
 
@@ -213,7 +213,7 @@ class Game(Serializable):
         dimensions : List[int],
         players : List[Player],
 
-        history : List[Round] = [[]], # for serialization purposes
+        history : List[Round] | None = None, # for serialization purposes
         status : int = Status.UNBEGUN,
         times : List[float] | None = None,
 
@@ -222,6 +222,7 @@ class Game(Serializable):
         default_time_s : float = 600 # default time 10 min per player
 
     ):
+        history = history or [[]]
 
         self.rank = len(dimensions)
         self.board = np.full((*dimensions, 2), -1)
@@ -279,7 +280,7 @@ class Game(Serializable):
 
         self.turn_start_time = turn_start_time
 
-        self.history : List[Round] = [round.copy() for round in history] # registers the history
+        self.history : List[Round] = history # registers the history
 
 
     # returns the entity at the given position

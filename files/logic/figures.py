@@ -622,14 +622,14 @@ class Figure(Serializable):
         name : str,
         value : int,   
 
-        moves : List[Move] = [], # list of valid moves
+        moves : List[Move], # list of valid moves
     
-        first : List[Move] = [], # list of valid first moves
+        first : List[Move] | None = None, # list of valid first moves
         first_exclusive : bool = False, # True if can ONLY do the above first moves 
         ):
 
         # ensure the piece has something that it can do
-        assert moves
+        assert moves or first
 
         dim = moves[0].rank
 
@@ -637,7 +637,7 @@ class Figure(Serializable):
         assert all(move.rank == dim for move in moves) 
 
         self.moves = moves
-        self.first = first 
+        self.first = first or []
         self.first_exclusive = first_exclusive
 
         self.dim = dim 

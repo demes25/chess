@@ -8,6 +8,7 @@ from typing import List, Dict
 
 from netlib.serialization import serialize, deserialize
 from netlib.server import Server, SenderClient, Address
+from netlib import logs
 
 from files.logic.game import Event
 from files.logic.sets import Set
@@ -91,8 +92,8 @@ class OnlineGame(Server):
             )
             
         await ws.send(args)
-        
-        print(f'[CONNECT] {id}')
+        logs.info(self, f'Connected {id}')
+
         return connection
     
     async def disconnect(self, connection : Connection):
@@ -101,7 +102,7 @@ class OnlineGame(Server):
             self.player_list[connection.index] = None 
             self.available_spots.append(connection.index)
         
-        print(f'[DISCONNECT] {id}')
+        logs.info(self, f'Disconnected {id}')
     
     # registers the message, returns true if we keep going
     async def register(self, message : str, connection : Connection) -> bool:
@@ -141,8 +142,8 @@ from files.ui.av import AVType, to_AV, new_window
 import pygame as pg
 
 class OnlinePlayer(SenderClient):
-    def __init__(self, av : AVType, id : str | None = None, send_interval : float = 0.01, sound_interval : float = 0.02):
-        self.id = str(uuid.uuid1()) if id is None else id
+    def __init__(self, av : AVType, id : str | None = None, send_interval : float = 0.01, sound_interval : float = 0.02, log_name : str | None = None):
+        self.id = id
         self.av = to_AV(av)
 
         self.sound_lock = asyncio.Lock()
@@ -154,7 +155,7 @@ class OnlinePlayer(SenderClient):
         self.sounds : List[str] = []
         self.instance = None
 
-        super().__init__(send_interval)
+        super().__init__(send_interval, log_name=log_name)
 
     async def prime(self):
         async with self.instance_lock:
@@ -172,6 +173,9 @@ class OnlinePlayer(SenderClient):
     # establishes the connection:
     # sends client id, receives player index, set, and the game 
     async def establish(self, ws : websockets.ClientConnection):
+        if self.id is None:
+            self.id = str(ws.id)
+
         # send client information
         await ws.send(self.id)
 
@@ -191,11 +195,12 @@ class OnlinePlayer(SenderClient):
         # construct the instance
         self.instance = GameWindow(set_obj, av=self.av, player_index=self.index, enforce_player=enforce_player)
         self.instance.begin(game=game_obj)
+        logs.info(self, f'Connected {ws.id}')
         await self.prime()
     
     # listens to events from the socket
     async def register(self, message : str):
-        print(f'RECV :: {message}')
+        logs.info(self, f'RECV :: {message}')
         obj = deserialize(message)
 
         if isinstance(obj, Event):
@@ -212,7 +217,7 @@ class OnlinePlayer(SenderClient):
     # sends a message to the given socket connection
     async def send(self, message : Event, ws : websockets.ClientConnection):
         cmd = serialize(message)
-        print(f'SEND :: {cmd}')
+        logs.info(self, f'SEND :: {message}')
         await ws.send(cmd)
 
         if message.label == 'quit':
