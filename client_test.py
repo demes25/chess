@@ -5,8 +5,8 @@ import asyncio
 
 logs.init()
 
-assets = Assets((80, 80))
+assets = Assets((32, 32))
 
-client = OnlinePlayer(assets)
+client = OnlinePlayer(assets, id='Demecito')
 
 asyncio.run(client.run())

@@ -507,7 +507,7 @@ class Game(Serializable):
         s, e = action.displacement
         self.move(self.at(s), e, update_time=False)
 
-        if action.promote_to > 0:
+        if action.promote_to >= 0:
             self.promote(action.promote_to, update_time=False)
         
         self.times = action.times.copy()
@@ -550,21 +550,21 @@ class Game(Serializable):
         return event
 
     
-    def promote(self, promotion_index : int, update_time : bool = False) -> Event:
+    def promote(self, promotion_index : int, update_time : bool = True) -> Event:
         if self.promoting is not None:
             self.promoting.figure = self.promoting.promotion_list[promotion_index]
             # we may only promote once
             self.promoting.promotion_list = [] 
             self.promoting = None 
             
-            event = self._post_move_update(self.delayed_event, update_time=update_time)
-            self.delayed_event = None 
-
-            event.sounds.append('promote')
-            event.action.promote_to = promotion_index
-            
             self.status = Status.ONGOING 
 
+
+            event = self._post_move_update(self.delayed_event, update_time=update_time)
+            self.delayed_event = None 
+            
+            event.sounds.append('promote')
+            event.action.promote_to = promotion_index
             return event
         else:
             raise Exception('No pieces are currently promoting.')

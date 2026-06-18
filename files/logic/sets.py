@@ -11,7 +11,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 # we define a *set*. i.e. a set of dimensions and starting armies for each player.
-class Set(Serializable):
+class GameSet(Serializable):
     
     def __init__(
         self, 
@@ -52,7 +52,7 @@ class Set(Serializable):
             'black_pawns' : self.black_pawns
         }
 
-    def __call__(self, 
+    def new_game(self, 
         timer : float = 600 # timer for the players - default 10 min
     ) -> Game:
         white_monarchs = [
@@ -84,7 +84,7 @@ class Set(Serializable):
 # a chess set
 chess_pieces = ['Rook', 'Knight', 'Bishop', 'Queen']
 chess_promotion = ['Queen', 'Rook', 'Bishop', 'Knight']
-Chess = Set(
+Chess = GameSet(
     dimensions=[8, 8],
 
     white_monarchs=[('King', (4, 0))],
@@ -108,7 +108,7 @@ Chess = Set(
 # a shatranj set
 shatranj_pieces = ['Rook', 'Knight', 'Alfil', 'Ferz']
 shatranj_promotion = ['Ferz']
-Shatranj = Set(
+Shatranj = GameSet(
     dimensions=[8, 8],
 
     white_monarchs=[('ShatranjKing', (4, 0))],
@@ -132,7 +132,7 @@ Shatranj = Set(
 # a wildebeest set
 wildebeest_pieces = ['Rook', 'Knight', 'Camel', 'Camel', 'Wildebeest', 'Queen', 'Bishop', 'Bishop', 'Knight', 'Rook']
 wildebeest_promotion = ['Queen', 'Wildebeest']
-Wildebeest = Set(
+Wildebeest = GameSet(
     dimensions = [11, 10],
     
     white_monarchs=[('WildebeestKing', (5, 0))],

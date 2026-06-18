@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from netlib.serialization import serialize, deserialize
 
 from files.logic.game import Game, Status, Event
-from files.logic.sets import Set
+from files.logic.sets import GameSet
 from files.ui.av import AVType, to_AV, new_window
 
 RAISE = False
@@ -24,7 +24,7 @@ class GameWindow:
     def __init__(
         self,
         
-        set : Set,
+        game_set : GameSet,
         av : AVType,
 
         # TODO: GENERALIZE FOR SIDEBAR SIZES
@@ -36,12 +36,12 @@ class GameWindow:
     ):
         
         self.game : Game | None = None 
-        self.set = set 
+        self.game_set = game_set 
 
         self.av = av = to_AV(av)
 
-        self.board = av.GameBoard(dimensions=set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
-        self.sidebar = av.GameSideBar(player_index=player_index, env_height=set.dimensions[1], topleft=self.board.rect.topright)
+        self.board = av.GameBoard(dimensions=game_set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
+        self.sidebar = av.GameSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=self.board.rect.topright)
 
         self.pixel_width = self.board.pixel_width + self.sidebar.pixel_width
         self.pixel_height = self.board.pixel_height
@@ -200,7 +200,7 @@ class GameWindow:
 
     def begin(self, game = None, timer = 600):
         self.clear()
-        self.game = game if game is not None else self.set(timer)
+        self.game = game if game is not None else self.game_set.new_game(timer=timer)
         self.times = self.game.times.copy()
 
     def _quit(self) -> Event:
@@ -258,6 +258,7 @@ class GameWindow:
             self.var_settings.running = False 
         elif event.label == 'action':
             self.game.register_action(event.action)
+            self.times = event.action.times.copy()
         
         return event
         

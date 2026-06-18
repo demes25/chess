@@ -11,7 +11,7 @@ from netlib.server import Server, SenderClient, Address
 from netlib import logs
 
 from files.logic.game import Event
-from files.logic.sets import Set
+from files.logic.sets import GameSet
 import random
 
 
@@ -28,14 +28,14 @@ class OnlineGame(Server):
             super().__init__(socket)
 
 
-    def __init__(self, set : Set, num_players : int = 2, default_time_s : float = 600, enforce_player : bool = True):
+    def __init__(self, game_set : GameSet, num_players : int = 2, default_time_s : float = 600, enforce_player : bool = True):
         super().__init__()
 
         # associates the ID of a game client to their index in the game
         self.player_dict : Dict[str, int] = {}
         self.player_list : List[OnlineGame.Connection] = [None] * num_players
 
-        self.set = set
+        self.game_set = game_set
         self.default_time_s = default_time_s
         self.game = None 
 
@@ -81,12 +81,12 @@ class OnlineGame(Server):
             connection = self.assign(ws, id)
             
             if self.game is None:
-                self.game = self.set(timer=self.default_time_s)
+                self.game = self.game_set.new_game(timer=self.default_time_s)
 
             args = serialize({
                     'index' : connection.index,
                     'enforce_player' : self.enforce_player,
-                    'set' : self.set,
+                    'set' : self.game_set,
                     'game' : self.game
                 }
             )
@@ -112,10 +112,7 @@ class OnlineGame(Server):
             # if this is reset, then we reset and send the new game to everybody
             if cmd.label == 'reset':
                 async with self.lock:
-                    self.game = self.set(self.default_time_s)
-                    game_ser = serialize(self.game)
-
-                await self.broadcast(game_ser)
+                    self.game = self.game_set.new_game(self.default_time_s)
 
             # if this is an action, we update the server's board.
             if cmd.label == 'action':
@@ -217,8 +214,13 @@ class OnlinePlayer(SenderClient):
     # sends a message to the given socket connection
     async def send(self, message : Event, ws : websockets.ClientConnection):
         cmd = serialize(message)
-        logs.info(self, f'SEND :: {message}')
+        logs.info(self, f'SEND :: {cmd}')
         await ws.send(cmd)
+
+        if message.label == 'reset':
+            async with self.instance_lock:
+                self.instance.begin()
+                self.instance.board.play('start')
 
         if message.label == 'quit':
             await ws.close(reason=message.label)
