@@ -128,15 +128,12 @@ class Piece(Serializable):
     def available_squares(self, game):
         if not self.has_moved:
             for move in self.figure.first:
-                for square in move.available_squares(game, self.vector):
-                    yield square
+                yield from move.available_squares(game, self.vector)
             
-            if self.figure.first_exclusive:
-                return
-        
-        for move in self.figure.moves:
-            for square in move.available_squares(game, self.vector):
-                yield square
+        if not self.figure.first_exclusive:    
+            for move in self.figure.moves:
+                yield from move.available_squares(game, self.vector)
+                
 
 
 
@@ -414,6 +411,7 @@ class Game(Serializable):
         else:
             return self.generalized_execute(piece, target, move.capture_displacement)
 
+    # increments the turn and updates the game history
     def _next_turn(self):
         self.turn = (self.turn + 1) % len(self.players)
         if self.turn == 0:

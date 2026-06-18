@@ -367,7 +367,7 @@ class Spanning(Move):
 
     def available_squares(self, game : Game, start : Vector):
         if self.max_num is None:
-            def _in_bounds(i):
+            def _in_bounds(_):
                 return True 
         else:
             def _in_bounds(i):

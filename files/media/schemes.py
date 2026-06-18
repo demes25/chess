@@ -37,6 +37,9 @@ IndianScheme : Scheme = {
 
     'plaque' : (140, 120, 100),
     'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 
 
@@ -54,6 +57,9 @@ DaniacitaScheme : Scheme = {
 
     'plaque' : (60, 120, 100),
     'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 
 CristiancitoScheme : Scheme = {
@@ -68,6 +74,9 @@ CristiancitoScheme : Scheme = {
 
     'plaque' : (120, 70, 60),
     'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 
 # don't torture Raymah :(
@@ -83,6 +92,9 @@ RaymacitaScheme : Scheme = {
 
     'plaque' : (53, 97, 143),
     'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 
 
@@ -97,7 +109,10 @@ JoaquitoScheme : Scheme = {
     'stalemate' : (200, 180, 150),
 
     'plaque' : (120, 70, 60),
-    'text' : (220, 192, 180)
+    'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 
 LiamcitoScheme : Scheme = {
@@ -111,6 +126,9 @@ LiamcitoScheme : Scheme = {
     'stalemate' : (200, 180, 150),
 
     'plaque' : (60, 70, 120),
-    'text' : (220, 192, 180)
+    'text' : (220, 192, 180),
+
+    'select' : (128, 45, 25),
+    'see' : (230, 100, 50),
 }
 

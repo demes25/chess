@@ -337,7 +337,7 @@ class AudioVisuals:
                 self.dims = env_w, env_h
 
                 assert (env_height >= 2 * (margin + arr_h + margin + clock_h + margin))
-                assert (env_w > clock_w)
+                assert (env_w >= (clock_w + 2*margin))
 
                 self.pixel_width, self.pixel_height = pixel_dims = (env_w*assets.tile_width, env_h*assets.tile_height)
 
@@ -383,7 +383,77 @@ class AudioVisuals:
                 
                 return self.surface 
 
+        class ChatSideBar(Object):
+            def __init__(
+                self,
+                chat_dims : Tuple[int, int] = (5, 5),
+                entry_dims : Tuple[int, int] = (5, 2),
 
+                env_height : float = 8,
+                margin : float = 0.25,
+
+                color : Color = assets.scheme['plaque'],
+
+                player_index : int = 0, # the player whose perspective we are on
+                
+                topleft : Tuple[int, int] = (0, 0)
+            ):  
+                chat_w, chat_h = chat_dims
+                entry_w, entry_h = entry_dims
+
+                env_w = chat_w + 2 * margin
+                env_h = env_height
+
+                self.dims = env_w, env_h
+
+                assert (env_height >= (margin + chat_h + margin + entry_h + margin))
+                assert (env_w >= (entry_w + 2*margin))
+
+                self.pixel_width, self.pixel_height = pixel_dims = (env_w*assets.tile_width, env_h*assets.tile_height)
+
+                surface = new_surface(pixel_dims)
+                surface.fill(color)
+
+                super().__init__(surface)
+                self.background = surface
+                
+                X, Y = self.rect.center # take local center
+                self.rect.topleft = topleft # THEN shift the rectangle
+
+                pixel_margin_y = int(margin * assets.tile_height)
+                clock_midpt_y = int(clock_h * assets.tile_height/ 2)
+
+                clock_center_disp = pixel_margin_y + clock_midpt_y
+                sign = 1 if player_index == 0 else -1
+
+                signed_clock_disp = sign * clock_center_disp 
+                
+                clock_centers = [(X, Y + signed_clock_disp), (X, Y - signed_clock_disp)]
+
+                arr_center_disp = 2* pixel_margin_y + int((arr_h/2 + clock_h) * assets.tile_height)
+                signed_arr_disp = sign * arr_center_disp
+
+                arr_centers = [(X, Y + signed_arr_disp), (X, Y - signed_arr_disp)]
+                
+                self.clocks = [Timer(clock_dims, center=center, player_index=i) for center, i in zip(clock_centers, range(2))] 
+                self.arrs = [FigureArray((arr_w, arr_h), center=center,margin=margin,player_index=i) for center, i in zip(arr_centers, range(2))]
+
+            
+            def draw(self, times_s : List[int], captured_pieces : List[List[Tuple[int, str]]]):
+                self.surface = self.background.copy()
+                
+                assert len(times_s) == len(captured_pieces), 'player numbers must match'
+                for clock, time_s in zip(self.clocks, times_s):
+                    clock.draw(time_s=time_s)
+                    clock.blit_onto(self.surface)
+                
+                for arr, pieces in zip(self.arrs, captured_pieces):
+                    arr.draw(pieces=pieces)
+                    arr.blit_onto(self.surface)
+                
+                return self.surface 
+
+        
         this.assets = assets 
 
         #this.GameSideBar = GameSideBar

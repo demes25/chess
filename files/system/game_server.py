@@ -120,6 +120,8 @@ class OnlineGame(Server):
                     self.game.register_action(cmd.action)
 
             if cmd.label == 'quit':
+                with open('game.txt', 'w') as f:
+                    f.write(serialize(self.game))
                 await connection.close(reason=cmd.label)
 
             # Relay message to other players, if not None
