@@ -22,13 +22,13 @@ class AudioVisuals:
         class GameBoard(Object):
             def __init__(
                 self, 
-                dimensions : List[int] = [8, 8], # dimensions of the game board, in tiles
+                dims : List[int] = [8, 8], # dimensions of the game board, in tiles
                 num_players : int = 2,
 
                 player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black),
                 topleft : Tuple[int, int] = (0, 0) # gives the position of the topleft corner of the board
             ):
-                self.rank = len(dimensions)
+                self.rank = len(dims)
                 self.num_players = num_players
                 self.player_index = player_index
 
@@ -37,13 +37,12 @@ class AudioVisuals:
                 assert self.rank == 2
                 assert self.num_players == 2
 
-                self.COLS, self.ROWS = self.dimensions = dimensions
-                self.pixel_width = self.COLS * assets.tile_width
-                self.pixel_height = self.ROWS * assets.tile_height 
+                self.COLS, self.ROWS = self.dims = dims
+                self.pixel_width, self.pixel_height = self.pixels = assets.dims_to_pixels(dims)
 
-                self.board = new_surface((self.pixel_width, self.pixel_height))
+                self.board = new_surface(self.pixels)
                 
-                super().__init__(new_surface((self.pixel_width, self.pixel_height)))
+                super().__init__(new_surface(self.pixels))
                 self.rect.topleft = topleft
             
                 W = assets.tile_width
@@ -55,10 +54,6 @@ class AudioVisuals:
                         tile = assets.colored_tiles[(i+j + player_index) % 2]
 
                         self.board.blit(tile, (j * W, i * H))
-
-                self.figure_sprites = [
-
-                ]
 
                 self.selected_piece : Piece | None = None 
                 self.hold_selected : bool = False 
@@ -78,7 +73,7 @@ class AudioVisuals:
                         # extends rightwards from the promotion square, unless that clashes with 
                         # board dimensions, in which case we go leftwards.
                         # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
-                        if (self.dimensions[0]-board_pos[0]) < len(figures):
+                        if (self.dims[0]-board_pos[0]) < len(figures):
                             disp = -assets.tile_width
                         else:
                             disp = assets.tile_width
@@ -126,7 +121,7 @@ class AudioVisuals:
                 I, J = i // assets.tile_width, (self.pixel_height - j) // assets.tile_height
 
                 if self.player_index == 1:
-                    J = self.dimensions[1] - J - 1
+                    J = self.dims[1] - J - 1
 
                 return I, J
 
@@ -140,7 +135,7 @@ class AudioVisuals:
                 x, y = self.rect.topleft
 
                 if self.player_index == 1:
-                    J = self.dimensions[1] - J - 1
+                    J = self.dims[1] - J - 1
 
                 i = int(assets.tile_width * (I + 0.5))
                 j = int(self.pixel_height - (J + 0.5)*assets.tile_height)
@@ -168,7 +163,7 @@ class AudioVisuals:
                 obj = Object(assets.selected_tile) 
 
                 if self.player_index == 0:
-                    i = self.dimensions[1] - i - 1 
+                    i = self.dims[1] - i - 1 
                 
                 obj.rect.topleft = (j * w, i * h)
                 self.selected_squares.append(obj) 
@@ -255,6 +250,7 @@ class AudioVisuals:
                 self.surface.blit(time_surface, time_rect)
 
                 return self.surface 
+        
 
         # An array of figures:
         # to represent captured figures.
@@ -272,8 +268,7 @@ class AudioVisuals:
                 plaque_opacity : int = 64,
                 player_opacity : int = 196
             ):
-                self.x_pixel_margin = int(margin * assets.tile_width)
-                self.y_pixel_margin = int(margin * assets.tile_height) 
+                self.x_pixel_margin, self.y_pixel_margin = assets.dims_to_pixels((margin, margin))
 
                 super().__init__(dims=dims, center=center, color=None, opacity=255)
     
@@ -284,7 +279,7 @@ class AudioVisuals:
                 player_tint = tint(self.surface.copy(), color=assets.player_colors[player_index], opacity=player_opacity)
                 self.background.blit(player_tint, (0,0))
 
-                self.pixel_width, self.pixel_height = dims[0] * assets.tile_width, dims[1] * assets.tile_height
+                self.pixel_width, self.pixel_height = self.pixels = assets.dims_to_pixels(dims)
 
                 self.FIGURES_PER_ROW = int((self.pixel_width - 2*self.x_pixel_margin)/assets.captured_figure_width)
 
@@ -293,21 +288,22 @@ class AudioVisuals:
 
 
             # pieces: list of [player_index, piece_name]
-            def draw(self, pieces : List[Tuple[int, str]] = []):
+            def draw(self, pieces : List[Tuple[int, str]] | None = None):
                 self.surface = self.background.copy()
 
                 CURR_Y = self.y_pixel_margin + assets.captured_figure_height // 2
                 CURR_X = self.INIT_X
+                
+                if pieces:
+                    for player, piece_name in pieces:
+                        obj = Object(assets.captured_colored_figures[player][piece_name], (CURR_X, CURR_Y))
+                        obj.blit_onto(self.surface)
 
-                for player, piece_name in pieces:
-                    obj = Object(assets.captured_colored_figures[player][piece_name], (CURR_X, CURR_Y))
-                    obj.blit_onto(self.surface)
-
-                    CURR_X += assets.captured_figure_width
-                    
-                    if CURR_X > self.MAX_X:
-                        CURR_X = self.INIT_X
-                        CURR_Y += assets.captured_figure_height
+                        CURR_X += assets.captured_figure_width
+                        
+                        if CURR_X > self.MAX_X:
+                            CURR_X = self.INIT_X
+                            CURR_Y += assets.captured_figure_height
                 
                 return self.surface
 
@@ -383,6 +379,11 @@ class AudioVisuals:
                 
                 return self.surface 
 
+
+        class TextBox(assets.Plaque):
+            pass
+
+
         class ChatSideBar(Object):
             def __init__(
                 self,
@@ -417,50 +418,27 @@ class AudioVisuals:
                 super().__init__(surface)
                 self.background = surface
                 
-                X, Y = self.rect.center # take local center
+                #X, Y = self.rect.center # take local center
                 self.rect.topleft = topleft # THEN shift the rectangle
 
-                pixel_margin_y = int(margin * assets.tile_height)
-                clock_midpt_y = int(clock_h * assets.tile_height/ 2)
-
-                clock_center_disp = pixel_margin_y + clock_midpt_y
-                sign = 1 if player_index == 0 else -1
-
-                signed_clock_disp = sign * clock_center_disp 
-                
-                clock_centers = [(X, Y + signed_clock_disp), (X, Y - signed_clock_disp)]
-
-                arr_center_disp = 2* pixel_margin_y + int((arr_h/2 + clock_h) * assets.tile_height)
-                signed_arr_disp = sign * arr_center_disp
-
-                arr_centers = [(X, Y + signed_arr_disp), (X, Y - signed_arr_disp)]
-                
-                self.clocks = [Timer(clock_dims, center=center, player_index=i) for center, i in zip(clock_centers, range(2))] 
-                self.arrs = [FigureArray((arr_w, arr_h), center=center,margin=margin,player_index=i) for center, i in zip(arr_centers, range(2))]
+                #pixel_margin_y = int(margin * assets.tile_height)
 
             
             def draw(self, times_s : List[int], captured_pieces : List[List[Tuple[int, str]]]):
-                self.surface = self.background.copy()
-                
-                assert len(times_s) == len(captured_pieces), 'player numbers must match'
-                for clock, time_s in zip(self.clocks, times_s):
-                    clock.draw(time_s=time_s)
-                    clock.blit_onto(self.surface)
-                
-                for arr, pieces in zip(self.arrs, captured_pieces):
-                    arr.draw(pieces=pieces)
-                    arr.blit_onto(self.surface)
-                
-                return self.surface 
+                ...
 
         
         this.assets = assets 
 
         #this.GameSideBar = GameSideBar
         this.GameBoard = GameBoard
+
         this.Timer = Timer 
         this.FigureArray = FigureArray
         this.GameSideBar = GameSideBar
+
+        this.TextBox = TextBox
+        this.ChatSideBar = ChatSideBar
 
 
 def new_window(size : Tuple[int, int], caption : str | None = None, icon : Surface | Object | None = None):

@@ -7,6 +7,13 @@ from typing import Tuple, Dict
 Color = Tuple[int, int, int]
 Scheme = Dict[str, Color]
 
+GRAYSCALE : Tuple[Color] = (
+    (255, 255, 255), # light
+    (191, 191, 191), # standard
+    (127, 127, 127), # shade
+    (64, 64, 64)     # border
+)
+
 # Color Schemes
 DefaultScheme : Scheme = {
     'tile_white' : (250, 242, 210),

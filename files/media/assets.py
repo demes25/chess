@@ -167,7 +167,7 @@ class Assets:
             def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
     
-                plq.width, plq.height = width, height = dims 
+                plq.dims = plq.width, plq.height = width, height = dims
 
                 # special cases if any of the dimensions are one
                 if width == 1 and height == 1:
@@ -290,9 +290,100 @@ class Assets:
 
                 for obj in self.objects:
                     obj.blit_onto(dest)
+        
+        
+                # a scrollable object, with a view
+
+
+        class View(Object):
+            def __init__(vw, view_dims : Tuple[float, float], scroll_speed : int = 1, reference : Surface | None = None, reference_topleft = (0, 0), center : Tuple[int, int] | None = None):
+                vw.view_dims = view_dims
+                vw.view_pixels = self.dims_to_pixels(view_dims)
+
+                vw.scroll_speed = scroll_speed
+
+                # by default, we start with the view at the top-left of the given surface
+                vw.MAX_TOP = 0
+                vw.MAX_LEFT = 0
                 
+                vw.MIN_TOP = 0
+                vw.MAX_TOP = 0
+
+                vw._left, vw._top = reference_topleft
+                
+                view_surface = new_surface(vw.view_pixels)
+                super().__init__(view_surface, center=center)
+
+                if reference is None:
+                    vw.reference = None 
+                else:
+                    vw.set_reference(reference)
+
+
+            # restricts the view to be within bounds.
+            # returns False if all is well and nothing needed to be corrected,
+            # True otherwise
+            def restrict(vw) -> bool:
+                corrected = False 
+
+                if vw._top > 0:
+                    vw._top = 0
+                    corrected = True
+
+                if vw._top < vw.MIN_TOP:
+                    vw._top = vw.MIN_TOP
+                    corrected = True 
+
+                if vw._left > 0:
+                    vw._left = 0
+                    corrected = True 
+                
+                if vw._left < vw.MIN_LEFT:
+                    vw._left = vw.MIN_LEFT
+                    corrected = True 
+                
+                return corrected
+
+            
+            def flip(vw):
+                vw.surface = new_surface(vw.view_pixels)
+                vw.surface.blit(vw.reference, (vw._left, vw._top))
+
+            def set_reference(vw, reference : Surface):
+                vw.reference = reference
+                back_rect = reference.get_rect()
+
+                back_width = back_rect.width 
+                back_height = back_rect.height 
+
+                vw.MAX_TOP = max(0, vw.rect.height - back_height)
+                vw.MAX_LEFT = max(0, )
+                vw.MIN_TOP = min(-back_height + vw.rect.height, 0)
+                vw.MIN_LEFT = min(-back_width + vw.rect.width)
+
+                vw.restrict()
+                vw.flip()
+            
+            # returns True if restrict returns True
+            # by defaults restricts the view to be contained within 
+            def scroll(vw, dx : int = 0, dy : int = 0, restrict : bool = True) -> bool:
+                vw._left -= dx 
+                vw._top -= dy 
+
+                corrected = vw.restrict() if restrict else False
+
+                vw.flip()
+
+                return corrected
+                
+                
+                
+
+
+
         self.Plaque = Plaque
         self.ObjectPlaque = ObjectPlaque
+        self.View = View
 
     # constructs the game over plaque and necessary objects
     def make_end_plaque(self, label : str, color_name : str | None = None, center : Tuple[int, int] = (0, 0)):
@@ -319,3 +410,18 @@ class Assets:
         plaque.center_at(center)
 
         return plaque 
+
+
+    # takes from tile-based size to pixel-based size
+    def dims_to_pixels(self, dims : Tuple[float, float]) -> Tuple[int, int]:
+        return (
+            int(dims[0] * self.tile_width),
+            int(dims[1] * self.tile_height)
+        )
+    
+    # takes from pixel-based size to tile-based size
+    def pixels_to_dims(self, pixels : Tuple[int, int]) -> Tuple[float, float]:
+        return (
+            float(pixels[0])/self.tile_width,
+            float(pixels[1])/self.tile_height
+        )
