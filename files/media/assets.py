@@ -233,13 +233,6 @@ class Assets:
             def __init__(plq, dims : TileIntCoords, objects : List[Object] | None = None, center : Coords | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, color=color, opacity=opacity)
                 plq.objects = objects or []
-
-            def which_hits(plq, coords : Coords, prev_coords : Coords | None = None) -> Object:
-                for obj in plq.objects:
-                    if obj.hits(coords, prev_coords):
-                        return obj 
-                    
-                return None 
             
             # returns the index in plq.objects of the object that has been hit
             def hit_index(plq, coords : Coords, prev_coords : Coords | None = None) -> int:

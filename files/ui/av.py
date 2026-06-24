@@ -98,14 +98,19 @@ class AudioVisuals:
                             center = (x + int(disp*(width -1)/2.0), y)
                         )
 
-                    # returns the figure which the given coordinates collide with
-                    def which_hits(plq, coords : Coords, prev_coords : Coords | None = None) -> Figure:
-                        for i in range(plq.width):
-                            if plq.objects[i].hits(coords, prev_coords):
-                                return plq.figures[i]
+                    # returns the index in plq.objects of the object that has been hit
+                    # adjusts for the topleft coordinate of the game board
+                    def hit_index(plq, coords : Coords, prev_coords : Coords | None = None) -> int:
+                        TL_X, TL_Y, = self.rect.topleft
                         
-                        return None 
+                        coords = (coords[0] - TL_X, coords[1] - TL_Y)
 
+                        if prev_coords is not None:
+                            prev_coords = (prev_coords[0] - TL_X, prev_coords[1] - TL_Y)
+
+                        return super().hit_index(coords, prev_coords)
+                    
+                    
                 self.make_promotion_plaque = PromotionPlaque
 
             # translates a point on the screen to a square on the board
