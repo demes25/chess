@@ -610,7 +610,10 @@ class Game(Serializable):
         if len(player.monarchs) > 1:
             return True 
         
-        return self._piece_has_legal_moves(player.monarchs[0]) or any(self._piece_has_legal_moves(piece) for piece in player.army)
+        king_can_move = self._piece_has_legal_moves(player.monarchs[0])
+        anything_else_can_move = any(self._piece_has_legal_moves(piece) for piece in player.army)
+
+        return king_can_move or anything_else_can_move
 
 
     # serialization

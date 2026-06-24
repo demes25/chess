@@ -3,8 +3,10 @@
 # Assets -- Graphics and Sounds
 
 # we create a graphics class - which will hold the necessary graphics throughout an instance of the game.
-from typing import Tuple, List, Dict, Callable, Any, Union
+from typing import Tuple, List, Dict, Union
 from files.media.schemes import Scheme, Color, DefaultScheme
+from files.media.fonts import Alphabet, Font
+from files.media.tools import Surface, Sound, dict_from_dir, tint, surface_loader, new_surface
 import pygame as pg
 from pathlib import Path 
 
@@ -12,44 +14,10 @@ DEFAULT_ASSET_DIR = Path(Path.cwd(), 'files', 'media')
 
 DEFAULT_SOUND_EXT = 'mp3'
 DEFAULT_SPRITE_EXT = 'png'
-DEFAULT_FONT_EXT = 'ttf'
-
-Sound = pg.mixer.Sound
-Surface = pg.surface.Surface 
+DEFAULT_FONT_EXT = 'png'
 
 pg.init()
 pg.mixer.init()
-
-# iterates through files of the given extension, yields the file stem name and the path object.
-# applies func before yielding if specified
-def file_iter(dir : Path, ext : str, func : Callable[[Path], Any] | None = None):
-    if func is None:
-        for path in Path(dir).glob(f'*.{ext}'):
-            yield (path.stem, path)
-    else:
-        for path in Path(dir).glob(f'*.{ext}'):
-            yield (path.stem, func(path))
-
-# iterates through all files with a given extension in the given directory and returns a dictionary of them,
-# keyed by the 'stems' (i.e. extensionless names) of the files in question
-def dict_from_dir(dir : Path, ext : str, func : Callable[[Path], Any] | None = None):
-    return {name : obj for name, obj in file_iter(dir=dir, ext=ext, func=func)}
-
-# creates a blank transparent surface of the given dimensions
-def new_surface(dims : Tuple[int, int]):
-    return Surface(dims, pg.SRCALPHA)
-
-# returns a function that loads images and scales them to the given dimension
-def surface_loader(dims : Tuple[int, int]):
-    def _load(path : Path):
-        return pg.transform.scale(pg.image.load(path), dims)
-    return _load 
-
-# tints an image in-place (and returns)
-def tint(surface : Surface, color : Color | None = None, opacity : int = 255) -> Surface:
-    if color is not None:
-        surface.fill((*color, opacity), special_flags=pg.BLEND_RGBA_MULT)
-    return surface
 
 
 # wraps a surface to be able to blit/move easier.
@@ -98,7 +66,7 @@ class Assets:
             big_title_size : float = 0.55,
             small_title_size : float = 0.35,
 
-            text_size : float = 0.2,
+            text_size : float = 0.140625,
             clock_num_size : float = 0.5625,
         ):
 
@@ -107,6 +75,7 @@ class Assets:
 
         self.asset_dir = Path(asset_dir) 
         self.sprite_dir = Path(self.asset_dir, 'sprites')
+        self.font_dir = Path(self.sprite_dir, 'fonts')
         self.sound_dir = Path(self.asset_dir, 'sounds')
 
         self.sprite_ext = sprite_ext
@@ -129,8 +98,9 @@ class Assets:
         self.captured_figure_dims = self.captured_figure_width, self.captured_figure_height = ssw, ssh = captured_sprite_size * w, captured_sprite_size * h 
         self.captured_figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((ssw,ssh)))
 
-        self.player_colors = [scheme['player_white'], scheme['player_black']]
-        self.tile_colors = [scheme['tile_white'], scheme['player_black']]
+        self.player_colors = [scheme.player_white, scheme.player_black]
+        self.tile_colors = [scheme.tile_white, scheme.player_black]
+        self.text_colors = [scheme.text_white, scheme.text_black]
 
         self.colored_tiles : List[Surface] = [tint(self.tiles['Tile'].copy(), color=color) for color in self.tile_colors]
         
@@ -147,16 +117,22 @@ class Assets:
         ]
 
 
-        self.selected_tile = tint(self.tiles['Tile'].copy(), scheme['select'], opacity=int(selection_opacity * 255))
+        self.selected_tile = tint(self.tiles['Tile'].copy(), scheme.select, opacity=int(selection_opacity * 255))
 
-        # TODO: MAKE BITMAPS INSTEAD OF TTF FILES!!
-        title_font_path = Path(self.asset_dir, f'title_font.{font_ext}')
 
-        self.big_title = pg.font.Font(title_font_path, int(big_title_size * h))
-        self.small_title = pg.font.Font(title_font_path, int(small_title_size * h))
+        self.text_alphabet = Alphabet(
+            Path(self.font_dir, f'text.{font_ext}')
+        )
 
-        self.text_font = pg.font.Font(Path(self.asset_dir, f'text_font.{font_ext}'), int(text_size * h))
-        self.clock_font = pg.font.Font(Path(self.asset_dir, f'text_font.{font_ext}'), int(clock_num_size * h))
+        self.title_alphabet = Alphabet(
+            Path(self.font_dir, f'title.{font_ext}')
+        )
+
+        self.big_title = Font(self.title_alphabet, int(big_title_size * h))
+        self.small_title = Font(self.title_alphabet, int(small_title_size * h))
+
+        self.text_font = Font(self.text_alphabet, int(text_size * h))
+        self.clock_font = Font(self.text_alphabet, int(clock_num_size * h))
 
         self.sounds : Dict[str, Sound] = dict_from_dir(self.sound_dir, self.sound_ext, func=Sound)
 
@@ -164,7 +140,7 @@ class Assets:
         # width and height are the dimensions of the plaque in terms of tiles, 
         # i.e. 3x5 would return a 3 tile by 5 tile plaque    
         class Plaque(Object):
-            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
     
                 plq.dims = plq.width, plq.height = width, height = dims
@@ -254,7 +230,7 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object] | None = None, center : Tuple[int, int] | None = None, color : Color | None = self.scheme['plaque'], opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : Tuple[int, int], objects : List[Object] | None = None, center : Tuple[int, int] | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, color=color, opacity=opacity)
                 plq.objects = objects or []
 
@@ -357,9 +333,9 @@ class Assets:
                 back_height = back_rect.height 
 
                 vw.MAX_TOP = max(0, vw.rect.height - back_height)
-                vw.MAX_LEFT = max(0, )
+                vw.MAX_LEFT = max(0, vw.rect.width - back_width)
                 vw.MIN_TOP = min(-back_height + vw.rect.height, 0)
-                vw.MIN_LEFT = min(-back_width + vw.rect.width)
+                vw.MIN_LEFT = min(-back_width + vw.rect.width, 0)
 
                 vw.restrict()
                 vw.flip()
@@ -386,23 +362,22 @@ class Assets:
         self.View = View
 
     # constructs the game over plaque and necessary objects
-    def make_end_plaque(self, label : str, color_name : str | None = None, center : Tuple[int, int] = (0, 0)):
+    def make_end_plaque(self, label : str, color : Color | None = None, center : Tuple[int, int] = (0, 0)):
         plaque = self.ObjectPlaque(dims=(5, 3), center=(0, 0))
 
-        if color_name is None:
-            color_name = label 
-        color_name = color_name.lower()
+        if color is None:
+            color = self.scheme.__getattribute__(label.lower()) 
 
         dx_r = plaque.rect.width // 5
         dx_q = plaque.rect.width // 4
         dy = plaque.rect.height // 7
 
-        label_object = Object(self.big_title.render(label, True, self.scheme[color_name]), center=(0, - dy))
+        label_object = Object(self.big_title.render(label.upper(), color), center=(0, - dy))
 
-        reset_button = Object(self.small_title.render('Reset', True, self.scheme['text']))
+        reset_button = Object(self.small_title.render('RESET', self.scheme.text))
         reset_button.rect.center = (dx_r, dy)
 
-        quit_button = Object(self.small_title.render('Quit', True, self.scheme['text']))
+        quit_button = Object(self.small_title.render('QUIT', self.scheme.text))
         quit_button.rect.center = (-dx_q, dy)
 
         plaque.objects = [reset_button, quit_button, label_object]

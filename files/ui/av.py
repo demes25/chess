@@ -4,7 +4,9 @@
 
 from typing import List, Tuple, Dict, Any
 from files.media.assets import Object, Assets, Surface, new_surface, tint, Color
+from files.media.fonts import TextEntry, TextRecord
 from files.logic.game import Piece 
+
 import pygame as pg
 
 
@@ -61,7 +63,7 @@ class AudioVisuals:
 
                 self.checkmate_plaque = assets.make_end_plaque('Checkmate', center=self.rect.center)
                 self.stalemate_plaque = assets.make_end_plaque('Stalemate', center=self.rect.center)
-                self.timeout_plaque = assets.make_end_plaque('Timeout', color_name='stalemate', center=self.rect.center)
+                self.timeout_plaque = assets.make_end_plaque('Timeout', color = assets.scheme.stalemate, center=self.rect.center)
 
                 class PromotionPlaque(assets.ObjectPlaque):
 
@@ -242,7 +244,7 @@ class AudioVisuals:
 
                 time_str = f'{minute_str}:{second_str}'
                 
-                time_surface = assets.clock_font.render(time_str, True, self.num_color)
+                time_surface = assets.clock_font.render(time_str, self.num_color)
                 time_rect = time_surface.get_rect()
                 time_rect.center = self._center 
 
@@ -274,7 +276,7 @@ class AudioVisuals:
     
                 self.background = self.surface
 
-                plaque_tint = tint(self.surface.copy(), color=assets.scheme['plaque'], opacity=plaque_opacity)
+                plaque_tint = tint(self.surface.copy(), color=assets.scheme.plaque, opacity=plaque_opacity)
                 self.background.blit(plaque_tint, (0,0))
                 player_tint = tint(self.surface.copy(), color=assets.player_colors[player_index], opacity=player_opacity)
                 self.background.blit(player_tint, (0,0))
@@ -317,7 +319,7 @@ class AudioVisuals:
                 env_height : float = 8,
                 margin : float = 0.25,
 
-                color : Color = assets.scheme['plaque'],
+                color : Color = assets.scheme.plaque,
                 #array_dims : Tuple[int, int],
 
                 player_index : int = 0, # the player whose perspective we are on
@@ -380,20 +382,16 @@ class AudioVisuals:
                 return self.surface 
 
 
-        class TextBox(assets.Plaque):
-            pass
-
-
         class ChatSideBar(Object):
             def __init__(
                 self,
-                chat_dims : Tuple[int, int] = (5, 5),
-                entry_dims : Tuple[int, int] = (5, 2),
+                chat_dims : Tuple[int, int] = (4, 4),
+                entry_dims : Tuple[int, int] = (4, 2),
 
                 env_height : float = 8,
-                margin : float = 0.25,
+                margin : float = 0.32,
 
-                color : Color = assets.scheme['plaque'],
+                color : Color = assets.scheme.plaque,
 
                 player_index : int = 0, # the player whose perspective we are on
                 
@@ -402,7 +400,7 @@ class AudioVisuals:
                 chat_w, chat_h = chat_dims
                 entry_w, entry_h = entry_dims
 
-                env_w = chat_w + 2 * margin
+                env_w = max(chat_w, entry_w) + 2 * margin
                 env_h = env_height
 
                 self.dims = env_w, env_h
@@ -410,22 +408,60 @@ class AudioVisuals:
                 assert (env_height >= (margin + chat_h + margin + entry_h + margin))
                 assert (env_w >= (entry_w + 2*margin))
 
-                self.pixel_width, self.pixel_height = pixel_dims = (env_w*assets.tile_width, env_h*assets.tile_height)
+                self.pixel_width, self.pixel_height = pixel_dims = assets.dims_to_pixels((env_w, env_h))
 
                 surface = new_surface(pixel_dims)
                 surface.fill(color)
 
                 super().__init__(surface)
-                self.background = surface
                 
-                #X, Y = self.rect.center # take local center
+                X, Y = self.rect.center # take local center
                 self.rect.topleft = topleft # THEN shift the rectangle
+                
+                collective_height = chat_h + margin + entry_h 
+                top_margin = (env_height - collective_height)/2
+                left_margin = margin
 
-                #pixel_margin_y = int(margin * assets.tile_height)
+                chat_topleft = assets.dims_to_pixels((left_margin, top_margin))
+                entry_topleft = assets.dims_to_pixels((left_margin, top_margin + chat_h + margin))
+
+                # generalize this
+                self.chat_plaque = assets.Plaque(dims=chat_dims, opacity=100)
+                self.chat_plaque.rect.topleft = chat_topleft
+
+                self.entry_plaque = assets.Plaque(dims=entry_dims, opacity=128)
+                self.entry_plaque.rect.topleft = entry_topleft
+
+                self.chat_plaque.blit_onto(self)
+                self.entry_plaque.blit_onto(self)
+
+                self.background = self.surface
+
+                chat_view_dims = (chat_dims[0] - 2 * margin, chat_dims[1] - 2*margin)
+                entry_view_dims = (entry_dims[0] - 2 * margin, entry_dims[1] - 2*margin)
+
+                chat_pixel_width = int(chat_view_dims[0] * assets.tile_width)
+                entry_pixel_width = int(entry_view_dims[0] * assets.tile_width)
+
+                self.chat = TextRecord(font=assets.text_font, pixel_width=chat_pixel_width)
+                self.entry = TextEntry(font=assets.text_font, pixel_width=entry_pixel_width, color=assets.text_colors[player_index])
+
+                self.chat_view = assets.View(chat_view_dims, center=self.chat_plaque.rect.center)
+                self.entry_view = assets.View(entry_view_dims, center=self.entry_plaque.rect.center)
 
             
-            def draw(self, times_s : List[int], captured_pieces : List[List[Tuple[int, str]]]):
-                ...
+            def receive_text(self, text : str, player_index : int = 0):
+                self.chat.register(text, color=assets.text_colors[player_index])
+                self.chat_view.set_reference(self.chat.surface)
+            
+            def register_event(self, event : pg.event.Event):
+                self.entry.register(event)
+                self.entry_view.set_reference(self.entry.surface)
+
+            def draw(self):
+                self.surface = self.background.copy()
+                self.entry_view.blit_onto(self.surface)
+                self.chat_view.blit_onto(self.surface)
 
         
         this.assets = assets 
@@ -437,7 +473,6 @@ class AudioVisuals:
         this.FigureArray = FigureArray
         this.GameSideBar = GameSideBar
 
-        this.TextBox = TextBox
         this.ChatSideBar = ChatSideBar
 
 

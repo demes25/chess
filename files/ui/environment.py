@@ -42,7 +42,7 @@ class GameWindow:
 
         self.av = av = to_AV(av)
 
-        self.board = av.GameBoard(dimensions=game_set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
+        self.board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
         self.sidebar = av.GameSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=self.board.rect.topright)
 
         self.pixel_width = self.board.pixel_width + self.sidebar.pixel_width
@@ -267,11 +267,11 @@ class GameWindow:
         return event
         
 
-    def run_solo(self, timer = 600, load = 'null'):
+    def run_solo(self, load = 'null'):
         # keeps track of loop parameters to be able to modularize the event loop.
         # this thing gets passed around and edited in-place as opposed to holding
         # all variables locally inside the run function
-        self.begin(deserialize(load), timer)
+        self.begin(deserialize(load))
         self.board.play('start')
     
         icon = self.av.assets.colored_figures[0]['King']
@@ -282,7 +282,7 @@ class GameWindow:
         while self.var_settings.running:
             event = self.frame(screen)
             if event.label == 'reset':
-                self.begin(timer=timer)
+                self.begin()
                 self.board.play('start')
             pg.display.flip()
 
