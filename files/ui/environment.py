@@ -6,11 +6,12 @@ import pygame as pg, time
 from typing import Tuple, Callable
 from dataclasses import dataclass
 
-from netlib.serialization import serialize, deserialize
+from netlib.serialization import serialize, deserialize, Message
 
 from files.logic.game import Game, Status, Event
 from files.logic.sets import GameSet
 from files.ui.av import AVType, to_AV, new_window
+from files.media.utils import Coords
 
 RAISE = False
 
@@ -34,7 +35,7 @@ class GameWindow:
 
         default_time_s : float = 600,
 
-        topleft : Tuple[int, int] = (0, 0)
+        topleft : Coords = (0, 0)
     ):
         
         self.game : Game | None = None 
@@ -42,10 +43,11 @@ class GameWindow:
 
         self.av = av = to_AV(av)
 
-        self.board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index, topleft=topleft)
-        self.sidebar = av.GameSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=self.board.rect.topright)
+        self.chatbar = av.ChatSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=topleft)
+        self.board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index, topleft=self.chatbar.rect.topright)
+        self.statbar = av.GameSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=self.board.rect.topright)
 
-        self.pixel_width = self.board.pixel_width + self.sidebar.pixel_width
+        self.pixel_width = self.chatbar.pixel_width + self.board.pixel_width + self.statbar.pixel_width
         self.pixel_height = self.board.pixel_height
         
         self.times = None
@@ -53,15 +55,18 @@ class GameWindow:
 
         self.player_index = player_index
         self.enforce_player = enforce_player 
+        
+        self.outgoing_text_color = av.assets.text_colors[player_index]
+        self.incoming_text_color = av.assets.text_colors[(player_index + 1) % 2]
 
         self.default_time_s = default_time_s
 
         self.var_settings = VarSettings()
 
-        self.topleft = topleft 
-
         self.game_over_plaque = None
         self.promotion_plaque = None 
+
+        self.text_mode = False
         
     # blits the game over screen (if game over)
     def status_screen(self, status : int):
@@ -78,6 +83,18 @@ class GameWindow:
             self.game_over_plaque.blit_onto(self.board)
 
 
+    def enter_text_mode(self):
+        if not self.text_mode:
+            self.text_mode = True 
+            self.chatbar.entry.show_pointer()
+            self.chatbar.update_entry_view()
+
+    def exit_text_mode(self):
+        if self.text_mode:
+            self.text_mode = False 
+            self.chatbar.entry.hide_pointer()
+            self.chatbar.update_entry_view()
+
 
     # checks if the pygame event is global and executes
     # this is defined because it will be used across all event loops
@@ -86,9 +103,15 @@ class GameWindow:
         if event.type == pg.QUIT:
             result = self._quit()
         
-        
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if self.chatbar.hits(event.pos):
+                self.enter_text_mode()
+            else:
+                self.exit_text_mode()
+
         return result
         
+
     def _handle_ingame(self, event : pg.event.Event) -> Event | None:
         result = None 
 
@@ -137,8 +160,8 @@ class GameWindow:
         
         return result
             
-    def _handle_gameover(self, event : pg.event.Event) -> Event:
-        result = Event()
+    def _handle_gameover(self, event : pg.event.Event) -> Event | None:
+        result = None
             
         if event.type == pg.MOUSEBUTTONDOWN:
             self.var_settings.click_pos = event.pos
@@ -154,7 +177,7 @@ class GameWindow:
         
         return result
     
-    def _handle_promotion(self, event : pg.event.Event) -> Event:
+    def _handle_promotion(self, event : pg.event.Event) -> Event | None:
         result = None
 
         if event.type == pg.MOUSEBUTTONDOWN:
@@ -169,21 +192,76 @@ class GameWindow:
         
         return result
     
+
+    def _handle_text(self, event : pg.event.Event) -> Event | None:
+        result = None 
+
+        if event.type == pg.TEXTINPUT:
+            text = event.text
+            self.chatbar.entry.register(text)
+        
+        if event.type == pg.KEYDOWN:
+            if event.key == pg.K_BACKSPACE:
+                self.chatbar.entry.backspace()
+            
+            if event.key == pg.K_RETURN:
+                text = self.chatbar.entry.reset()
+                if text != '':
+                    result = Event(
+                        label='text',
+                        text=text
+                    )
+                    self.chatbar.chat.register(text, color=self.outgoing_text_color)
+                    self.chatbar.update_chat_view()
+
+            if event.key == pg.K_LEFT:
+                self.chatbar.entry.move_ptr_left()
+            
+            if event.key == pg.K_RIGHT:
+                self.chatbar.entry.move_ptr_right()
+        
+        self.chatbar.update_entry_view()
     
-    # runs an event loop with a given handler.
-    # these are defined above for ingame, game_over, and promotion environments
-    def event_loop(self, handle : Callable[[pg.event.Event], Event]) -> Event:
+        return result
+
+
+        
+
+
+    # handles the event.
+    # subhandlers are defined above for text, ingame, game_over, and promotion environments    
+    def handle(self, event : pg.event.Event) -> Event:
+        result = self._handle_global(event)
+
+        if result is None:
+            if self.text_mode:
+                handle = self._handle_text
+            else:
+                status = self.game.status 
+                if status == Status.UNBEGUN or status == Status.ONGOING:
+                    handle = self._handle_ingame
+                elif status == Status.PROMOTING:
+                    handle = self._handle_promotion
+                else:
+                    handle = self._handle_gameover
+    
+            result = handle(event)
+        
+        return result 
+
+
+    def fetch_event(self) -> Event:
         result = Event()
 
         for event in pg.event.get():
-            handle_result = self._handle_global(event)
-            if handle_result is None:
-                handle_result = handle(event)
+            handle_result = self.handle(event)
             if handle_result is not None:
-                result = handle_result 
-
+                result = handle_result
+        
         return result 
     
+
+
     def update_times(self):
         if self.game.status == Status.ONGOING:
             turn_start_clock = self.game.times[self.game.turn]
@@ -211,23 +289,14 @@ class GameWindow:
         self.var_settings.running = False 
         return Event('quit')
 
-    def fetch_event(self) -> Event:
-        status = self.game.status 
-        if status == Status.UNBEGUN or status == Status.ONGOING:
-            handle = self._handle_ingame
-        elif status == Status.PROMOTING:
-            handle = self._handle_promotion
-        else:
-            handle = self._handle_gameover
-        
-        return self.event_loop(handle=handle) 
 
     # updates the audio-visual state:
     # draws the current surface and plays all sounds in the given event.
     def update_state(self, event : Event):
         self.update_times()
+        self.chatbar.draw()
         self.board.draw(self.game.pieces, pg.mouse.get_pos())
-        self.sidebar.draw(self.times, self.game.captured_pieces)
+        self.statbar.draw(self.times, self.game.captured_pieces)
 
         if self.game.status == Status.TIMEOUT and not self.timeout:
             event.label = 'timeout'
@@ -245,8 +314,11 @@ class GameWindow:
     def frame(self, screen : pg.Surface) -> Event:
         event = self.fetch_event()
         self.update_state(event=event)
+
+        self.chatbar.blit_onto(screen)
         self.board.blit_onto(screen)
-        self.sidebar.blit_onto(screen)
+        self.statbar.blit_onto(screen)
+
         return event
 
     # registers received events (as opposed to producing events)
@@ -254,7 +326,7 @@ class GameWindow:
         if event.label == 'reset':
             self.begin()
             self.board.play('start')
-        if event.label == 'timeout':
+        elif event.label == 'timeout':
             self.game.status = Status.TIMEOUT
             self.board.play('end')
 
@@ -263,6 +335,9 @@ class GameWindow:
         elif event.label == 'action':
             self.game.register_action(event.action)
             self.times = event.action.times.copy()
+        
+        elif event.label == 'text':
+            self.chatbar.chat.register(event.text, color=self.incoming_text_color)
         
         return event
         

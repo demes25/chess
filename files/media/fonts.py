@@ -2,11 +2,10 @@
 # Chess
 # Alphabets
 
-from typing import Tuple, Dict, List 
+from typing import Dict, List 
 from pathlib import Path 
 import pygame as pg 
-from files.media.tools import Surface, new_surface, isolate_alpha_blend
-from files.media.schemes import Color 
+from files.media.utils import Color, Coords, Surface, new_surface, isolate_alpha_blend
 from collections import UserDict
 
 
@@ -19,7 +18,7 @@ class Alphabet(UserDict):
     # saves a template for the given font size, includes divisors if so wanted
     # the general font template 
     @staticmethod
-    def template(pixels : Tuple[int, int], include_placeholders : bool = True, path : str | Path | None = None) -> Surface:
+    def template(pixels : Coords, include_placeholders : bool = True, path : str | Path | None = None) -> Surface:
         width, height = pixels 
         total_width = width * Alphabet.ASCII_COUNT
 
@@ -88,7 +87,7 @@ class Alphabet(UserDict):
 
     def get_scaled(
         self,
-        pixels : Tuple[int, int] | None, # pixel-dimensions height of each letter
+        pixels : Coords | None, # pixel-dimensions height of each letter
     ) -> Dict[str, Surface]:
         
         if pixels is None:
@@ -146,7 +145,7 @@ class Font(UserDict):
         
         letter_and_gap = self.pixel_width + self.gap_size
         width = letter_and_gap * len(text) - self.gap_size
-        surface = new_surface(dims=(width, self.pixel_height))
+        surface = new_surface((width, self.pixel_height))
 
         X = 0
 
@@ -157,7 +156,7 @@ class Font(UserDict):
         surface = isolate_alpha_blend(surface=surface, color=color, opacity=opacity)
 
         if background_color is not None:
-            background = new_surface(dims=(width, self.pixel_height))
+            background = new_surface((width, self.pixel_height))
             background.fill(background_color)
             background.blit(surface, (0, 0))
             return background
@@ -216,7 +215,13 @@ class TextEntry:
         self.string : str = ''
         
         self.pointer = 0
+            
+        _pointer = new_surface((font.gap_size, font.pixel_height))
+        _pointer.fill((0, 0, 0))
+        self.pointer_surface = isolate_alpha_blend(_pointer, color=color, opacity=200)
+
         self.pointer_coords = (0, 0)
+        self.pointer_shown = False
 
         self.lengths = []
 
@@ -229,7 +234,7 @@ class TextEntry:
     def pixel_height(self) -> int:
         return max(len(self.lengths), 1) * (self.font.pixel_height + self.font.gap_size) - self.font.gap_size
 
-    def pointer_to_coord(self, pointer : int) -> Tuple[int, int]:
+    def pointer_to_coord(self, pointer : int) -> Coords:
         y_coord = 0
 
         for l in self.lengths:
@@ -241,7 +246,7 @@ class TextEntry:
 
         return (x_coord, y_coord)
 
-    def coord_to_pointer(self, coords : Tuple[int, int]):
+    def coord_to_pointer(self, coords : Coords):
         x_coord, y_coord = coords
 
         height = y_coord // (self.font.pixel_height + self.font.gap_size)
@@ -266,31 +271,68 @@ class TextEntry:
 
         self.surface = isolate_alpha_blend(surface, color=self.color, opacity=self.opacity)
 
-    def register(self, event : pg.event.Event):
-        if event.type == pg.TEXTINPUT:
-            text = event.text
-            
-            self.string = self.string[:self.pointer] + text + self.string[self.pointer:]
-            self.pointer += len(text)
+        if self.pointer_shown:
+            self.surface.blit(self.pointer_surface, self.pointer_coords)
+        
 
-            self.update()
-
-
-        elif event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE and self.pointer > 0:
-            remainder = self.string[self.pointer:]
+    def move_ptr_left(self):
+        if self.pointer > 0:
             self.pointer -= 1
-
-            self.string = self.string[:self.pointer] + remainder
-
+            self.pointer_coords = self.pointer_to_coord(self.pointer)
+        
+        if self.show_pointer:
+            self.update()
+    
+    def move_ptr_right(self):
+        if self.pointer < len(self.string):
+            self.pointer += 1
+            self.pointer_coords = self.pointer_to_coord(self.pointer)
+        
+        if self.show_pointer:
             self.update()
     
 
-    def register_text(self, text : str):
+    def show_pointer(self):
+        if not self.pointer_shown:
+            self.surface.blit(self.pointer_surface, self.pointer_coords)
+            self.pointer_shown = True 
+    
+    def hide_pointer(self):
+        if self.pointer_shown:
+            self.pointer_shown = False 
+            self.update()
+
+
+    def backspace(self):
+        if self.pointer > 0:
+            remainder = self.string[self.pointer:]
+            self.pointer -= 1
+            self.pointer_coords = self.pointer_to_coord(self.pointer)
+
+            self.string = self.string[:self.pointer] + remainder
+            self.update()
+        
+    
+    def register(self, text : str):
         self.string = self.string[:self.pointer] + text + self.string[self.pointer:]
         self.pointer += len(text)
+        self.pointer_coords = self.pointer_to_coord(self.pointer)
 
         self.update()
 
+    def reset(self) -> str:
+        string = self.string
+
+        self.string = '' 
+        self.pointer = 0
+        self.pointer_coords = (0, 0)
+
+        self.lengths = []
+
+        self.surface = new_surface((self.pixel_width, self.pixel_height))
+
+        return string 
+    
 
 class TextRecord:
     def __init__(

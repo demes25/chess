@@ -2,9 +2,10 @@
 # Chess
 # AudioVisuals
 
-from typing import List, Tuple, Dict, Any
-from files.media.assets import Object, Assets, Surface, new_surface, tint, Color
+from typing import List, Tuple, Dict
+from files.media.assets import Object, Assets
 from files.media.fonts import TextEntry, TextRecord
+from files.media.utils import Color, Coords, TileIntCoords, Surface, new_surface, tint, isolate_alpha_blend
 from files.logic.game import Piece 
 
 import pygame as pg
@@ -28,7 +29,7 @@ class AudioVisuals:
                 num_players : int = 2,
 
                 player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black),
-                topleft : Tuple[int, int] = (0, 0) # gives the position of the topleft corner of the board
+                topleft : Coords = (0, 0) # gives the position of the topleft corner of the board
             ):
                 self.rank = len(dims)
                 self.num_players = num_players
@@ -40,7 +41,7 @@ class AudioVisuals:
                 assert self.num_players == 2
 
                 self.COLS, self.ROWS = self.dims = dims
-                self.pixel_width, self.pixel_height = self.pixels = assets.dims_to_pixels(dims)
+                self.pixel_width, self.pixel_height = self.pixels = assets.tiles_to_pixels(dims)
 
                 self.board = new_surface(self.pixels)
                 
@@ -68,7 +69,7 @@ class AudioVisuals:
                 class PromotionPlaque(assets.ObjectPlaque):
 
                     from files.logic.figures import Figure 
-                    def __init__(plq, figures : List[Figure], player_index : int, board_pos : Tuple[int, int]):
+                    def __init__(plq, figures : List[Figure], player_index : int, board_pos : Coords):
                         plq.figures = figures
                     
                         # rudimentary: for now, the default is that the promotion plaque 
@@ -98,7 +99,7 @@ class AudioVisuals:
                         )
 
                     # returns the figure which the given coordinates collide with
-                    def which_hits(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> Figure:
+                    def which_hits(plq, coords : Coords, prev_coords : Coords | None = None) -> Figure:
                         for i in range(plq.width):
                             if plq.objects[i].hits(coords, prev_coords):
                                 return plq.figures[i]
@@ -182,7 +183,7 @@ class AudioVisuals:
                 assets.sounds[sound_name].play()
 
             # draws the given game to a surface
-            def draw(self, pieces : List[Dict[int, Piece]], held_coords : Tuple[int, int]) -> Surface:
+            def draw(self, pieces : List[Dict[int, Piece]], held_coords : Coords) -> Surface:
                 self.surface.blit(self.board, (0, 0))
 
                 for square in self.selected_squares:
@@ -209,13 +210,13 @@ class AudioVisuals:
         class Timer(assets.Plaque):
             def __init__(
                 self,
-                dims : Tuple[int, int] = (3, 1),
-                center : Tuple[int, int] = (0,0),
+                dims : TileIntCoords = (3, 1),
+                center : Coords = (0,0),
                 player_index : int = 0
             ):
 
                 clock_color = assets.tile_colors[player_index]
-                num_color = assets.tile_colors[1-player_index]
+                num_color = assets.text_colors[1-player_index]
 
                 super().__init__(dims=dims, center=None, color=clock_color, opacity=255)
 
@@ -260,8 +261,8 @@ class AudioVisuals:
             def __init__(
                 self, 
                 
-                dims : Tuple[int, int],
-                center : Tuple[int, int] = (0, 0),
+                dims : TileIntCoords,
+                center : Coords = (0, 0),
 
                 margin : float = 0.25,
 
@@ -270,7 +271,7 @@ class AudioVisuals:
                 plaque_opacity : int = 64,
                 player_opacity : int = 196
             ):
-                self.x_pixel_margin, self.y_pixel_margin = assets.dims_to_pixels((margin, margin))
+                self.x_pixel_margin, self.y_pixel_margin = assets.tiles_to_pixels((margin, margin))
 
                 super().__init__(dims=dims, center=center, color=None, opacity=255)
     
@@ -281,7 +282,7 @@ class AudioVisuals:
                 player_tint = tint(self.surface.copy(), color=assets.player_colors[player_index], opacity=player_opacity)
                 self.background.blit(player_tint, (0,0))
 
-                self.pixel_width, self.pixel_height = self.pixels = assets.dims_to_pixels(dims)
+                self.pixel_width, self.pixel_height = self.pixels = assets.tiles_to_pixels(dims)
 
                 self.FIGURES_PER_ROW = int((self.pixel_width - 2*self.x_pixel_margin)/assets.captured_figure_width)
 
@@ -313,18 +314,17 @@ class AudioVisuals:
         class GameSideBar(Object):
             def __init__(
                 self,
-                arr_dims : Tuple[int, int] = (5, 2),
-                clock_dims : Tuple[int, int] = (3, 1),
+                arr_dims : TileIntCoords = (5, 2),
+                clock_dims : TileIntCoords = (3, 1),
 
                 env_height : float = 8,
                 margin : float = 0.25,
 
                 color : Color = assets.scheme.plaque,
-                #array_dims : Tuple[int, int],
 
                 player_index : int = 0, # the player whose perspective we are on
                 
-                topleft : Tuple[int, int] = (0, 0)
+                topleft : Coords = (0, 0)
             ):  
                 arr_w, arr_h = arr_dims
                 clock_w, clock_h = clock_dims 
@@ -385,8 +385,8 @@ class AudioVisuals:
         class ChatSideBar(Object):
             def __init__(
                 self,
-                chat_dims : Tuple[int, int] = (4, 4),
-                entry_dims : Tuple[int, int] = (4, 2),
+                chat_dims : TileIntCoords = (5, 4),
+                entry_dims : TileIntCoords = (5, 2),
 
                 env_height : float = 8,
                 margin : float = 0.32,
@@ -395,7 +395,7 @@ class AudioVisuals:
 
                 player_index : int = 0, # the player whose perspective we are on
                 
-                topleft : Tuple[int, int] = (0, 0)
+                topleft : Coords = (0, 0)
             ):  
                 chat_w, chat_h = chat_dims
                 entry_w, entry_h = entry_dims
@@ -408,22 +408,21 @@ class AudioVisuals:
                 assert (env_height >= (margin + chat_h + margin + entry_h + margin))
                 assert (env_w >= (entry_w + 2*margin))
 
-                self.pixel_width, self.pixel_height = pixel_dims = assets.dims_to_pixels((env_w, env_h))
-
+                self.pixel_width, self.pixel_height = pixel_dims = assets.tiles_to_pixels((env_w, env_h))
+                
                 surface = new_surface(pixel_dims)
                 surface.fill(color)
 
                 super().__init__(surface)
                 
-                X, Y = self.rect.center # take local center
                 self.rect.topleft = topleft # THEN shift the rectangle
                 
                 collective_height = chat_h + margin + entry_h 
                 top_margin = (env_height - collective_height)/2
                 left_margin = margin
 
-                chat_topleft = assets.dims_to_pixels((left_margin, top_margin))
-                entry_topleft = assets.dims_to_pixels((left_margin, top_margin + chat_h + margin))
+                chat_topleft = assets.tiles_to_pixels((left_margin, top_margin))
+                entry_topleft = assets.tiles_to_pixels((left_margin, top_margin + chat_h + margin))
 
                 # generalize this
                 self.chat_plaque = assets.Plaque(dims=chat_dims, opacity=100)
@@ -443,20 +442,21 @@ class AudioVisuals:
                 chat_pixel_width = int(chat_view_dims[0] * assets.tile_width)
                 entry_pixel_width = int(entry_view_dims[0] * assets.tile_width)
 
-                self.chat = TextRecord(font=assets.text_font, pixel_width=chat_pixel_width)
-                self.entry = TextEntry(font=assets.text_font, pixel_width=entry_pixel_width, color=assets.text_colors[player_index])
+                font = assets.text_font
+
+                self.chat = TextRecord(font=font, pixel_width=chat_pixel_width)
+                self.entry = TextEntry(font=font, pixel_width=entry_pixel_width, color=assets.text_colors[player_index])
 
                 self.chat_view = assets.View(chat_view_dims, center=self.chat_plaque.rect.center)
                 self.entry_view = assets.View(entry_view_dims, center=self.entry_plaque.rect.center)
-
             
-            def receive_text(self, text : str, player_index : int = 0):
-                self.chat.register(text, color=assets.text_colors[player_index])
+            
+            def update_chat_view(self):
                 self.chat_view.set_reference(self.chat.surface)
             
-            def register_event(self, event : pg.event.Event):
-                self.entry.register(event)
+            def update_entry_view(self):
                 self.entry_view.set_reference(self.entry.surface)
+
 
             def draw(self):
                 self.surface = self.background.copy()
@@ -476,7 +476,7 @@ class AudioVisuals:
         this.ChatSideBar = ChatSideBar
 
 
-def new_window(size : Tuple[int, int], caption : str | None = None, icon : Surface | Object | None = None):
+def new_window(size : Coords, caption : str | None = None, icon : Surface | Object | None = None):
     pg.display.init()
     if caption is not None:
         pg.display.set_caption(caption)
@@ -488,7 +488,7 @@ def new_window(size : Tuple[int, int], caption : str | None = None, icon : Surfa
         
 
 
-AVType = AudioVisuals | Assets | Tuple[int, int]
+AVType = AudioVisuals | Assets | Coords
 
 def to_AV(obj : AVType):
     if isinstance(obj, AudioVisuals):

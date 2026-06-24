@@ -6,7 +6,7 @@
 from typing import Tuple, List, Dict, Union
 from files.media.schemes import Scheme, Color, DefaultScheme
 from files.media.fonts import Alphabet, Font
-from files.media.tools import Surface, Sound, dict_from_dir, tint, surface_loader, new_surface
+from files.media.utils import Coords, TileCoords, TileIntCoords, Surface, Sound, dict_from_dir, tint, surface_loader, new_surface
 import pygame as pg
 from pathlib import Path 
 
@@ -23,20 +23,20 @@ pg.mixer.init()
 # wraps a surface to be able to blit/move easier.
 # also makes registering hits easier.
 class Object:
-    def __init__(self, surface : Surface, center : Tuple[int, int] | None = None):
+    def __init__(self, surface : Surface, center : Coords | None = None):
         self.surface = surface 
         self.rect = surface.get_rect()
         if center is not None:
             self.rect.center = center
     
     # returns true if both (or the one given) sets of coordinates collide with this object
-    def hits(self, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> bool:
+    def hits(self, coords : Coords, prev_coords : Coords | None = None) -> bool:
         if prev_coords is None:
             return self.rect.collidepoint(coords)
         else:
             return self.rect.collidepoint(coords) and self.rect.collidepoint(prev_coords)
     
-    def center_at(self, coords : Tuple[int, int]):
+    def center_at(self, coords : Coords):
         self.rect.center = coords
 
     def blit_onto(self, dest : Union['Object', Surface]):
@@ -49,7 +49,7 @@ class Object:
 class Assets:
     def __init__(
             self, 
-            tile_dims : Tuple[int, int], 
+            tile_dims : Coords, 
             scheme : Scheme = DefaultScheme, 
 
             asset_dir : Path | str = DEFAULT_ASSET_DIR, 
@@ -140,7 +140,7 @@ class Assets:
         # width and height are the dimensions of the plaque in terms of tiles, 
         # i.e. 3x5 would return a 3 tile by 5 tile plaque    
         class Plaque(Object):
-            def __init__(plq, dims : Tuple[int, int], center : Tuple[int, int] | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : TileIntCoords, center : Coords | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
                 tile_w, tile_h = self.tile_dims 
     
                 plq.dims = plq.width, plq.height = width, height = dims
@@ -230,11 +230,11 @@ class Assets:
             #
             # it is taken that the listed objects are positioned wrt to the center of the plaque
             # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : Tuple[int, int], objects : List[Object] | None = None, center : Tuple[int, int] | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
+            def __init__(plq, dims : TileIntCoords, objects : List[Object] | None = None, center : Coords | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
                 super().__init__(dims=dims, center=center, color=color, opacity=opacity)
                 plq.objects = objects or []
 
-            def which_hits(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> Object:
+            def which_hits(plq, coords : Coords, prev_coords : Coords | None = None) -> Object:
                 for obj in plq.objects:
                     if obj.hits(coords, prev_coords):
                         return obj 
@@ -242,15 +242,14 @@ class Assets:
                 return None 
             
             # returns the index in plq.objects of the object that has been hit
-            def hit_index(plq, coords : Tuple[int, int], prev_coords : Tuple[int, int] | None = None) -> int:
+            def hit_index(plq, coords : Coords, prev_coords : Coords | None = None) -> int:
                 for i in range(len(plq.objects)):
                     if plq.objects[i].hits(coords, prev_coords):
                         return i
                     
                 return -1
             
-
-            def center_at(plq, coords : Tuple[int, int]):
+            def center_at(plq, coords : Coords):
                 x_curr, y_curr = plq.rect.center
                 x_next, y_next = plq.rect.center = coords 
                 
@@ -272,9 +271,9 @@ class Assets:
 
 
         class View(Object):
-            def __init__(vw, view_dims : Tuple[float, float], scroll_speed : int = 1, reference : Surface | None = None, reference_topleft = (0, 0), center : Tuple[int, int] | None = None):
+            def __init__(vw, view_dims : TileCoords, scroll_speed : int = 1, reference : Surface | None = None, reference_topleft = (0, 0), center : Coords | None = None):
                 vw.view_dims = view_dims
-                vw.view_pixels = self.dims_to_pixels(view_dims)
+                vw.view_pixels = self.tiles_to_pixels(view_dims)
 
                 vw.scroll_speed = scroll_speed
 
@@ -362,7 +361,7 @@ class Assets:
         self.View = View
 
     # constructs the game over plaque and necessary objects
-    def make_end_plaque(self, label : str, color : Color | None = None, center : Tuple[int, int] = (0, 0)):
+    def make_end_plaque(self, label : str, color : Color | None = None, center : Coords = (0, 0)):
         plaque = self.ObjectPlaque(dims=(5, 3), center=(0, 0))
 
         if color is None:
@@ -388,14 +387,14 @@ class Assets:
 
 
     # takes from tile-based size to pixel-based size
-    def dims_to_pixels(self, dims : Tuple[float, float]) -> Tuple[int, int]:
+    def tiles_to_pixels(self, dims : TileCoords | TileIntCoords) -> Coords:
         return (
             int(dims[0] * self.tile_width),
             int(dims[1] * self.tile_height)
         )
     
     # takes from pixel-based size to tile-based size
-    def pixels_to_dims(self, pixels : Tuple[int, int]) -> Tuple[float, float]:
+    def pixels_to_tiles(self, pixels : Coords) -> TileCoords:
         return (
             float(pixels[0])/self.tile_width,
             float(pixels[1])/self.tile_height

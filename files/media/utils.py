@@ -3,12 +3,16 @@
 # Tools -- for loading and manipulating assets
 
 from typing import Tuple, Callable, Any
-from files.media.schemes import Color
 import pygame as pg
 from pathlib import Path 
 
-Sound = pg.mixer.Sound
-Surface = pg.surface.Surface 
+Coords = Tuple[int, int]
+TileIntCoords = Tuple[int, int]
+TileCoords = Tuple[float, float]
+
+Color = Tuple[int, int, int]
+Surface = pg.surface.Surface
+Sound = pg.mixer.Sound 
 
 # iterates through files of the given extension, yields the file stem name and the path object.
 # applies func before yielding if specified
@@ -26,13 +30,13 @@ def dict_from_dir(dir : Path, ext : str, func : Callable[[Path], Any] | None = N
     return {name : obj for name, obj in file_iter(dir=dir, ext=ext, func=func)}
 
 # creates a blank transparent surface of the given dimensions
-def new_surface(dims : Tuple[int, int]):
-    return Surface(dims, pg.SRCALPHA)
+def new_surface(shape : Coords):
+    return Surface(shape, pg.SRCALPHA)
 
 # returns a function that loads images and scales them to the given dimension
-def surface_loader(dims : Tuple[int, int]):
+def surface_loader(shape : Coords):
     def _load(path : Path):
-        return pg.transform.scale(pg.image.load(path), dims)
+        return pg.transform.scale(pg.image.load(path), shape)
     return _load 
 
 # tints an image in-place (and returns)

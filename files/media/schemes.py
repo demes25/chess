@@ -4,9 +4,7 @@
 
 from typing import Tuple, Dict
 from dataclasses import dataclass
-
-Color = Tuple[int, int, int]
-Scheme = Dict[str, Color]
+from files.media.utils import Color
 
 GRAYSCALE : Tuple[Color] = (
     (255, 255, 255), # light

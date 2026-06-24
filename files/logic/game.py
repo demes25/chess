@@ -192,12 +192,14 @@ class Event(Serializable):
     label : str = 'none'
     sounds : List[str] = field(default_factory=list)
     action : Action | None = None 
+    text : str | None = None
 
     def to_dict(self) -> dict:
         return {
             'label' : self.label,
             'sounds' : self.sounds,
-            'action' : self.action 
+            'action' : self.action,
+            'text' : self.text 
         }
 
 
