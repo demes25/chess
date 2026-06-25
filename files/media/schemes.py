@@ -22,7 +22,7 @@ class Scheme:
     player_black : Color = (130, 100, 90)
 
     text_white : Color = (255, 248, 220)
-    text_black : Color = (20, 10, 5)
+    text_black : Color = (50, 35, 25)
 
     checkmate : Color = (255, 25, 15)
     stalemate : Color = (200, 180, 150)
