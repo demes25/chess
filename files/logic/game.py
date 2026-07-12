@@ -190,6 +190,7 @@ class Event(Serializable):
     # quit if quit,
     # promote if promote.
     label : str = 'none'
+    index : int = -1
     sounds : List[str] = field(default_factory=list)
     action : Action | None = None 
     text : str | None = None
@@ -197,6 +198,7 @@ class Event(Serializable):
     def to_dict(self) -> dict:
         return {
             'label' : self.label,
+            'index' : self.index,
             'sounds' : self.sounds,
             'action' : self.action,
             'text' : self.text 
@@ -500,7 +502,7 @@ class Game(Serializable):
                     self.promoting = piece
                     self.status = Status.PROMOTING
 
-        event = Event(label='action', action=action, sounds=sounds)
+        event = Event(label='action', index=self.turn, action=action, sounds=sounds)
 
         # update turns and moves
         if self.status != Status.PROMOTING:

@@ -69,8 +69,7 @@ class GameWindow(Environment):
         self.player_index = player_index
         self.enforce_player = enforce_player 
         
-        self.outgoing_text_color = av.assets.scheme.chat_texts[player_index]
-        self.incoming_text_color = av.assets.scheme.chat_texts[(player_index + 1) % 2]
+        self.text_colors = av.assets.scheme.chat_texts
 
         self.default_time_s = default_time_s
 
@@ -167,7 +166,7 @@ class GameWindow(Environment):
             button = self.game_over_plaque.which_hits(event.pos, self.var_settings.click_pos)
 
             if button == 'reset': 
-                result = Event(label='reset')
+                result = Event(label='reset', index=self.player_index)
                 self.game_over_plaque = None 
 
             elif button == 'quit':
@@ -192,6 +191,15 @@ class GameWindow(Environment):
         return result
     
 
+    def register_chat(self, text : str, index : int):
+        self.chatbar.chat_box.register(text, color=self.text_colors[index])
+
+    def register_chat_history(self, history : list[tuple[str, int]]):
+        cb = self.chatbar.chat_box
+
+        for text, index in history:
+            cb.register(text, color=self.text_colors[index])
+
     def _handle_text(self, event : pg.event.Event) -> Event | None:
         result = None 
 
@@ -209,10 +217,11 @@ class GameWindow(Environment):
                 if text != '':
                     result = Event(
                         label='text',
+                        index=self.player_index,
                         text=text
                     )
 
-                    self.chatbar.chat_box.register(text, color=self.outgoing_text_color)
+                    self.register_chat(text, self.player_index)
 
             if event.key == pg.K_LEFT:
                 self.chatbar.entry_box.move_ptr_left()
@@ -305,7 +314,7 @@ class GameWindow(Environment):
 
     def _quit(self) -> Event:
         self.var_settings.running = False 
-        return Event('quit')
+        return Event('quit', index=self.player_index)
 
     # fetches the current event, updates the audiovisual state, and blits onto the given screen
     # returns the fetched event
@@ -348,7 +357,7 @@ class GameWindow(Environment):
             self.times = event.action.times.copy()
         
         elif event.label == 'text':
-            self.chatbar.chat_box.register(event.text, color=self.incoming_text_color)
+            self.register_chat(event.text, event.index)
         
         return event
         

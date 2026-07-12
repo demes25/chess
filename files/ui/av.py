@@ -19,8 +19,7 @@ import pygame as pg
 Dimensions = tuple[int | float, int | float]
 IntPair = tuple[int, int]
 
-# ALL DIMENSIONS ARE IN TERMS OF TILES!!
-# TODO: GENERALIZE
+# TODO: make CHAT HISTORY communicable.
 
 # a wrapper class for audiovisuals given the necessary assets (see Assets).
 
@@ -463,7 +462,9 @@ class AudioVisuals:
                 margin : int = 5,
                 text_margin : int = 4,
 
-                color : Color = assets.scheme.plaque,
+                #chat_history : list[tuple[str, int]] | None = None,
+
+                background_color : Color = assets.scheme.plaque,
 
                 player_index : int = 0, # the player whose perspective we are on
                 
@@ -482,7 +483,7 @@ class AudioVisuals:
                 assert (env_w >= (entry_w + 2 * self.margins[0]))
 
                 surface = new_surface((env_w, env_h))
-                surface.fill(color.rgba)
+                surface.fill(background_color.rgba)
 
                 super().__init__(surface, origin=origin)
                 
@@ -507,6 +508,11 @@ class AudioVisuals:
                 entry_view_shape = (entry_shape[0] - 2 * self.text_margins[0], entry_shape[1] - 2*self.text_margins[1])
                 
                 chat_box = TextRecord(font=font, width=chat_view_shape[0])
+
+                #if chat_history is not None:
+                #    for chat, i in chat_history:
+                #        chat_box.register(chat, i, color=assets.scheme.chat_texts[i])
+
                 entry_box = TextEntry(font=font, width=entry_view_shape[0], color=self.text_color)
                 
                 chat_view = objects.View(chat_plaque, chat_box)

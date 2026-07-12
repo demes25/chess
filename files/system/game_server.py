@@ -37,7 +37,9 @@ class OnlineGame(Server):
 
         self.game_set = game_set
         self.default_time_s = default_time_s
+
         self.game = None 
+        self.chat_history : list[tuple[str, int]] = []
 
         self.num_players = num_players
 
@@ -88,7 +90,8 @@ class OnlineGame(Server):
                     'enforce_player' : self.enforce_player,
                     'default_time' : self.default_time_s,
                     'set' : self.game_set,
-                    'game' : self.game
+                    'game' : self.game,
+                    'chat_history' : self.chat_history 
                 }
             )
             
@@ -124,6 +127,10 @@ class OnlineGame(Server):
                 with open('game.txt', 'w') as f:
                     f.write(serialize(self.game))
                 await connection.close(reason=cmd.label)
+
+            if cmd.label == 'text':
+                async with self.lock:
+                    self.chat_history.append((cmd.text, cmd.index))
 
             # Relay message to other players, if not None
             if cmd.label != 'none':
@@ -194,6 +201,10 @@ class OnlinePlayer(SenderClient):
 
         # construct the instance
         self.instance = GameWindow(set_obj, av=self.av, player_index=self.index, enforce_player=enforce_player, default_time_s=handshake['default_time'])
+        
+        chat_history = handshake['chat_history']
+        self.instance.register_chat_history(chat_history)
+
         self.instance.begin(game=game_obj)
         logs.info(self, f'Connected {ws.id}')
         await self.prime()
