@@ -287,7 +287,10 @@ class Game(Serializable):
     def at(self, pos : tuple | Vector) -> Piece | None:
         if not self.in_bounds(pos):
             return None 
-        i, j = tuple(self.board[tuple(pos)])
+        pos = tuple(pos)
+        pos = (int(pos[0]), int(pos[1]))
+
+        i, j = tuple(self.board[pos])
         return None if i == -1 else self.pieces[i][j]
 
     def set_to(self, pos : tuple | Vector, player_index : int, piece_index : int):
@@ -425,6 +428,12 @@ class Game(Serializable):
     # allows us to enforce move rules and game rules at will.
     def move(self, piece : Piece, target : tuple | Vector, update_time : bool = True) -> Event:
         assert len(target) == self.rank
+
+        target = tuple(target)
+        target = (
+            int(target[0]),
+            int(target[1])
+        )
 
         player = piece.player
 

@@ -3,392 +3,268 @@
 # Assets -- Graphics and Sounds
 
 # we create a graphics class - which will hold the necessary graphics throughout an instance of the game.
-from typing import Tuple, List, Dict, Union
-from files.media.schemes import Scheme, Color, DefaultScheme
-from files.media.fonts import Alphabet, Font
-from files.media.utils import Coords, TileCoords, TileIntCoords, Surface, Sound, dict_from_dir, tint, surface_loader, new_surface
-import pygame as pg
+from files.media.schemes import Scheme, DefaultScheme
+from typing import Sequence
+
+from netlib.filecaster import here
+
+from applib.fonts import Alphabet, Font 
+from applib.utils import Coords, Surface, Sound, dict_from_dir, phase, loader, new_surface, scale
+from applib.colors import Color
+
 from pathlib import Path 
 
-DEFAULT_ASSET_DIR = Path(Path.cwd(), 'files', 'media')
+from pygame.mixer import init
+
+# TODO: move this elsewhere
+init()
+
+DEFAULT_ASSET_DIR = here()
 
 DEFAULT_SOUND_EXT = 'mp3'
 DEFAULT_SPRITE_EXT = 'png'
 DEFAULT_FONT_EXT = 'png'
 
-pg.init()
-pg.mixer.init()
-
-
-# wraps a surface to be able to blit/move easier.
-# also makes registering hits easier.
-class Object:
-    def __init__(self, surface : Surface, center : Coords | None = None):
-        self.surface = surface 
-        self.rect = surface.get_rect()
-        if center is not None:
-            self.rect.center = center
-    
-    # returns true if both (or the one given) sets of coordinates collide with this object
-    def hits(self, coords : Coords, prev_coords : Coords | None = None) -> bool:
-        if prev_coords is None:
-            return self.rect.collidepoint(coords)
-        else:
-            return self.rect.collidepoint(coords) and self.rect.collidepoint(prev_coords)
-    
-    def center_at(self, coords : Coords):
-        self.rect.center = coords
-
-    def blit_onto(self, dest : Union['Object', Surface]):
-        if isinstance(dest, Object):
-            dest.surface.blit(self.surface, self.rect)
-        else:
-            dest.blit(self.surface, self.rect)
-
-
 class Assets:
     def __init__(
-            self, 
-            tile_dims : Coords, 
-            scheme : Scheme = DefaultScheme, 
+            self,  
 
             asset_dir : Path | str = DEFAULT_ASSET_DIR, 
+            
             sprite_ext = DEFAULT_SPRITE_EXT, 
             sound_ext = DEFAULT_SOUND_EXT, 
             font_ext=DEFAULT_FONT_EXT, 
 
-            plaque_opacity : float = 0.8,
-            selection_opacity : float = 0.5,
-
-            sprite_size : float = 0.95,
-            captured_sprite_size : float = 0.75, # small sprites, for drawing captures 
-
-            big_title_size : float = 0.55,
-            small_title_size : float = 0.35,
-
-            text_size : float = 0.140625,
-            clock_num_size : float = 0.5625,
+            scaling : int | float | Coords | tuple[float, float] | None = None,
+            scheme : Scheme = DefaultScheme
         ):
 
-        self.tile_dims = tile_dims
-        self.scheme = scheme 
-
+        # paths
         self.asset_dir = Path(asset_dir) 
-        self.sprite_dir = Path(self.asset_dir, 'sprites')
+
+        self.sprite_dir = Path(asset_dir, 'sprites')
         self.font_dir = Path(self.sprite_dir, 'fonts')
-        self.sound_dir = Path(self.asset_dir, 'sounds')
+        self.sound_dir = Path(asset_dir, 'sounds')
 
         self.sprite_ext = sprite_ext
         self.sound_ext = sound_ext
         self.font_ext = font_ext
 
-        self.selection_opacity = selection_opacity
-        self.plaque_opacity = plaque_opacity
+        self.load(scaling=scaling, scheme=scheme)
 
-        # blocks with which we can construct plaques 
-        self.tiles : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'tiles'), self.sprite_ext, surface_loader(tile_dims))
-        
-        
-        self.tile_width, self.tile_height = w, h = tile_dims
+
+    def _load(self, scaling : int | float | Coords | tuple[float, float] | None = None):
+
+        if scaling is None:
+            self.pixel_shape = (1, 1)
+        elif isinstance(scaling, tuple):
+            self.pixel_shape = scaling
+        else:
+            self.pixel_shape = (scaling, scaling)
+
+        # loading
+        self.loader = loader(scaling=scaling)
+
+        # tiles 
+        self.tiles : dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'tiles'), self.sprite_ext, self.loader)
+        self.plaque_bases : dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'plaques'), self.sprite_ext, self.loader)
 
         # figure sprites
-        self.figure_dims = self.figure_width, self.figure_height = sw, sh = sprite_size * w, sprite_size * h
-        self.figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((sw,sh)))
-        
-        self.captured_figure_dims = self.captured_figure_width, self.captured_figure_height = ssw, ssh = captured_sprite_size * w, captured_sprite_size * h 
-        self.captured_figures : Dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, surface_loader((ssw,ssh)))
+        self.figures : dict[str, Surface] = dict_from_dir(Path(self.sprite_dir, 'figures'), self.sprite_ext, self.loader)
+        self.captured_figs : dict[str, Surface] = {
+            name : scale(item, 0.5) for name, item in self.figures.items()
+        }
 
-        self.player_colors = [scheme.player_white, scheme.player_black]
-        self.tile_colors = [scheme.tile_white, scheme.player_black]
-        self.text_colors = [scheme.text_white, scheme.text_black]
+        # shapes
+        self.tile_shape = self.tiles['Tile'].get_size()
+        self.figure_shape = self.figures['Pawn'].get_size()
+        self.captured_fig_shape = self.captured_figs['Pawn'].get_size()
 
-        self.colored_tiles : List[Surface] = [tint(self.tiles['Tile'].copy(), color=color) for color in self.tile_colors]
-        
-        self.colored_figures : List[Dict[str, Surface]] = [
-            {
-                name : tint(sprite.copy(), color=color) for name, sprite in self.figures.items()
-            } for color in self.player_colors
-        ]
+        self.plaque_large_corner_shape = self.plaque_bases['TopLeft'].get_size()
+        self.plaque_small_corner_shape = self.plaque_bases['TopLeftSmall'].get_size()
 
-        self.captured_colored_figures = [
-            {
-                name : tint(sprite.copy(), color=color) for name, sprite in self.captured_figures.items()
-            } for color in self.player_colors
-        ]
+        self.plaque_horiz_margin_shape = self.plaque_bases['Left'].get_size()
+        self.plaque_vert_margin_shape = self.plaque_bases['Top'].get_size()
+
+        self.plaque_body_shape = self.plaque_bases['Body'].get_size()
 
 
-        self.selected_tile = tint(self.tiles['Tile'].copy(), scheme.select, opacity=int(selection_opacity * 255))
-
-
+        # fonts
         self.text_alphabet = Alphabet(
-            Path(self.font_dir, f'text.{font_ext}')
+            Path(self.font_dir, f'text.{self.font_ext}')
         )
 
         self.title_alphabet = Alphabet(
-            Path(self.font_dir, f'title.{font_ext}')
-        )
-
-        self.big_title = Font(self.title_alphabet, int(big_title_size * h))
-        self.small_title = Font(self.title_alphabet, int(small_title_size * h))
-
-        self.text_font = Font(self.text_alphabet, int(text_size * h))
-        self.clock_font = Font(self.text_alphabet, int(clock_num_size * h))
-
-        self.sounds : Dict[str, Sound] = dict_from_dir(self.sound_dir, self.sound_ext, func=Sound)
-
-        # constructs a plaque using blocks sprites
-        # width and height are the dimensions of the plaque in terms of tiles, 
-        # i.e. 3x5 would return a 3 tile by 5 tile plaque    
-        class Plaque(Object):
-            def __init__(plq, dims : TileIntCoords, center : Coords | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
-                tile_w, tile_h = self.tile_dims 
-    
-                plq.dims = plq.width, plq.height = width, height = dims
-
-                # special cases if any of the dimensions are one
-                if width == 1 and height == 1:
-                    surface = tint(self.tiles['Single'].copy(), color=color, opacity=opacity)
-                
-                elif width == 1:
-                    surface = new_surface((tile_w, height * tile_h))
-
-                    t = self.tiles['Top']
-                    b = self.tiles['Bottom']
-                    v = self.tiles['Vertical']
-
-                    surface.blit(t, (0, 0))
-                    surface.blit(b, (0, (height-1)*tile_h))
-
-                    for i in range(1, height-1):
-                        surface.blit(v, (0, i*tile_h))
-                    
-                    surface = tint(surface, color=color, opacity = opacity)
-
-                elif height == 1:
-                    surface = new_surface((width * tile_w, tile_h))
-
-                    l = self.tiles['Left']
-                    r = self.tiles['Right']
-                    h = self.tiles['Horizontal']
-
-                    surface.blit(l, (0, 0))
-                    surface.blit(r, ((width-1)*tile_w, 0))
-
-                    for i in range(1, width-1):
-                        surface.blit(h, (i*tile_w, 0))
-                    
-                    surface = tint(surface, color=color, opacity = opacity)
-                else:
-                    surface = new_surface((width * tile_w, height * tile_h))
-
-                    tl = self.tiles['TopLeft']
-                    bl = self.tiles['BottomLeft']
-                    tr = self.tiles['TopRight']
-                    br = self.tiles['BottomRight']
-
-                    BOTTOM = (height-1) * tile_h 
-                    RIGHT = (width-1) * tile_w 
-
-                    surface.blit(tl, (0, 0))
-                    surface.blit(bl, (0, BOTTOM))
-                    surface.blit(tr, (RIGHT, 0))
-                    surface.blit(br, (RIGHT, BOTTOM))
-                    
-
-                    te = self.tiles['TopEdge']
-                    be = self.tiles['BottomEdge']
-                    le = self.tiles['LeftEdge']
-                    re = self.tiles['RightEdge']
-                    
-                    for i in range(1, width-1):
-                        I = i * tile_w 
-                        surface.blit(te, (I, 0))
-                        surface.blit(be, (I, BOTTOM))
-                    
-                    
-                    for i in range(1, height-1):
-                        I = i * tile_h 
-                        surface.blit(le, (0, I))
-                        surface.blit(re, (RIGHT, I))
-                    
-                    
-                    m = self.tiles['Middle']
-                    for i in range(1, width-1):
-                        for j in range(1, height-1):
-                            surface.blit(m, (i * tile_w, j * tile_h))
-                    
-                    
-                    surface = tint(surface, color=color, opacity=opacity)
-
-                super().__init__(surface, center=center)
-
-
-        class ObjectPlaque(Plaque):
-            # a plaque that "contains" other objects -- for example, a promotion plaque
-            # which contains a list of figures,
-            # or a game over plaque which contains buttons -- reset, quit, etc
-            #
-            # it is taken that the listed objects are positioned wrt to the center of the plaque
-            # i.e. -- as if the plaque's center is (0, 0). 
-            def __init__(plq, dims : TileIntCoords, objects : List[Object] | None = None, center : Coords | None = None, color : Color | None = self.scheme.plaque, opacity : int = int(plaque_opacity * 255)):
-                super().__init__(dims=dims, center=center, color=color, opacity=opacity)
-                plq.objects = objects or []
-            
-            # returns the index in plq.objects of the object that has been hit
-            def hit_index(plq, coords : Coords, prev_coords : Coords | None = None) -> int:
-                for i in range(len(plq.objects)):
-                    if plq.objects[i].hits(coords, prev_coords):
-                        return i
-                    
-                return -1
-            
-            def center_at(plq, coords : Coords):
-                x_curr, y_curr = plq.rect.center
-                x_next, y_next = plq.rect.center = coords 
-                
-                dx = x_next - x_curr
-                dy = y_next - y_curr
-
-                for object in plq.objects:
-                    x, y = object.rect.center 
-                    object.rect.center = (x+dx, y+dy)
-
-            def blit_onto(self, dest : Surface | Object):
-                super().blit_onto(dest)
-
-                for obj in self.objects:
-                    obj.blit_onto(dest)
+            Path(self.font_dir, f'title.{self.font_ext}')
+        )   
         
+        if scaling:
+            height_scaling = scaling[1] if isinstance(scaling, tuple) else scaling
         
-                # a scrollable object, with a view
+            title_height = self.title_alphabet.glyph_height * height_scaling
+            text_height = self.text_alphabet.glyph_height * height_scaling
+        else:
+            title_height = self.title_alphabet.glyph_height
+            text_height = self.text_alphabet.glyph_height
 
+        self.title_font = Font(self.title_alphabet, int(title_height))
+        self.text_font = Font(self.text_alphabet, int(text_height))
 
-        class View(Object):
-            def __init__(vw, view_dims : TileCoords, scroll_speed : int = 1, reference : Surface | None = None, reference_topleft = (0, 0), center : Coords | None = None):
-                vw.view_dims = view_dims
-                vw.view_pixels = self.tiles_to_pixels(view_dims)
+        self.half_title_font = Font(self.title_alphabet, int(title_height / 2))
+        self.half_text_font = Font(self.text_alphabet, int(text_height / 2))
 
-                vw.scroll_speed = scroll_speed
+        self.quarter_text_font = Font(self.text_alphabet, int(text_height / 4))
 
-                # by default, we start with the view at the top-left of the given surface
-                vw.MAX_TOP = 0
-                vw.MAX_LEFT = 0
-                
-                vw.MIN_TOP = 0
-                vw.MAX_TOP = 0
-
-                vw._left, vw._top = reference_topleft
-                
-                view_surface = new_surface(vw.view_pixels)
-                super().__init__(view_surface, center=center)
-
-                if reference is None:
-                    vw.reference = None 
-                else:
-                    vw.set_reference(reference)
-
-
-            # restricts the view to be within bounds.
-            # returns False if all is well and nothing needed to be corrected,
-            # True otherwise
-            def restrict(vw) -> bool:
-                corrected = False 
-
-                if vw._top > 0:
-                    vw._top = 0
-                    corrected = True
-
-                if vw._top < vw.MIN_TOP:
-                    vw._top = vw.MIN_TOP
-                    corrected = True 
-
-                if vw._left > 0:
-                    vw._left = 0
-                    corrected = True 
-                
-                if vw._left < vw.MIN_LEFT:
-                    vw._left = vw.MIN_LEFT
-                    corrected = True 
-                
-                return corrected
-
-            
-            def flip(vw):
-                vw.surface = new_surface(vw.view_pixels)
-                vw.surface.blit(vw.reference, (vw._left, vw._top))
-
-            def set_reference(vw, reference : Surface):
-                vw.reference = reference
-                back_rect = reference.get_rect()
-
-                back_width = back_rect.width 
-                back_height = back_rect.height 
-
-                vw.MAX_TOP = max(0, vw.rect.height - back_height)
-                vw.MAX_LEFT = max(0, vw.rect.width - back_width)
-                vw.MIN_TOP = min(-back_height + vw.rect.height, 0)
-                vw.MIN_LEFT = min(-back_width + vw.rect.width, 0)
-
-                vw.restrict()
-                vw.flip()
-            
-            # returns True if restrict returns True
-            # by defaults restricts the view to be contained within 
-            def scroll(vw, dx : int = 0, dy : int = 0, restrict : bool = True) -> bool:
-                vw._left -= dx 
-                vw._top -= dy 
-
-                corrected = vw.restrict() if restrict else False
-
-                vw.flip()
-
-                return corrected
-                
-                
-                
-
-
-
-        self.Plaque = Plaque
-        self.ObjectPlaque = ObjectPlaque
-        self.View = View
-
-    # constructs the game over plaque and necessary objects
-    def make_end_plaque(self, label : str, color : Color | None = None, center : Coords = (0, 0)):
-        plaque = self.ObjectPlaque(dims=(5, 3), center=(0, 0))
-
-        if color is None:
-            color = self.scheme.__getattribute__(label.lower()) 
-
-        dx_r = plaque.rect.width // 5
-        dx_q = plaque.rect.width // 4
-        dy = plaque.rect.height // 7
-
-        label_object = Object(self.big_title.render(label.upper(), color), center=(0, - dy))
-
-        reset_button = Object(self.small_title.render('RESET', self.scheme.text))
-        reset_button.rect.center = (dx_r, dy)
-
-        quit_button = Object(self.small_title.render('QUIT', self.scheme.text))
-        quit_button.rect.center = (-dx_q, dy)
-
-        plaque.objects = [reset_button, quit_button, label_object]
-
-        plaque.center_at(center)
-
-        return plaque 
-
-
-    # takes from tile-based size to pixel-based size
-    def tiles_to_pixels(self, dims : TileCoords | TileIntCoords) -> Coords:
-        return (
-            int(dims[0] * self.tile_width),
-            int(dims[1] * self.tile_height)
-        )
+        # sounds
+        self.sounds : dict[str, Sound] = dict_from_dir(self.sound_dir, self.sound_ext, func=Sound)
     
-    # takes from pixel-based size to tile-based size
-    def pixels_to_tiles(self, pixels : Coords) -> TileCoords:
-        return (
-            float(pixels[0])/self.tile_width,
-            float(pixels[1])/self.tile_height
+    def set_scheme(self, scheme : Scheme = DefaultScheme):
+        self.scheme = scheme
+
+        self.colored_figures : tuple[dict[str, Surface], dict[str, Surface]] = tuple(
+            {
+                name : phase(img, color) for name, img in self.figures.items()
+            } for color in scheme.players
         )
+
+        self.colored_capt_figs : tuple[dict[str, Surface], dict[str, Surface]] = tuple(
+            {
+                name : phase(img, color) for name, img in self.captured_figs.items()
+            } for color in scheme.players
+        )
+
+        self.colored_tiles : tuple[Surface, Surface] = tuple(
+            phase(self.tiles['Tile'], color) for color in scheme.tiles
+        )
+
+        self.selected_tile = phase(self.tiles['Tile'], scheme.select)
+
+
+    def load(self, scaling : int | float | Coords | tuple[float, float] | None = None, scheme : Scheme = DefaultScheme):
+        self._load(scaling=scaling)
+        self.set_scheme(scheme=scheme)
+
+    def make_raw_plaque(self, shape : Coords, small_corners : bool = False) -> Surface:
+        w, h = shape
+
+        corner_w, corner_h = self.plaque_small_corner_shape if small_corners else self.plaque_large_corner_shape
+
+        assert w >= 3*corner_w
+        assert h >= 3*corner_h
+
+        result = new_surface(shape)
+
+        # get margins
+
+        x_margin, x_margin_step = self.plaque_horiz_margin_shape
+        y_margin_step, y_margin = self.plaque_vert_margin_shape
+
+        margin_w, margin_h = w - 2*corner_w, h - 2*corner_h
+
+        # blit the body
+
+        body_w, body_h = w - 2*x_margin, h - 2*y_margin
+
+        body = new_surface((body_w, body_h))
+
+        body_sprite = self.plaque_bases['Body']
+
+        body_step_w, body_step_h = self.plaque_body_shape
+
+        for x in range(0, body_w, body_step_w):
+            for y in range(0, body_h, body_step_h):
+                body.blit(body_sprite, (x,y))
+
+        result.blit(body, (x_margin, y_margin))
+
+        # blit the corners
+        if small_corners:
+            topleft_sprite = self.plaque_bases['TopLeftSmall']
+            topright_sprite = self.plaque_bases['TopRightSmall']
+            bottomright_sprite = self.plaque_bases['BottomRightSmall']
+            bottomleft_sprite = self.plaque_bases['BottomLeftSmall']
+        else:
+            topleft_sprite = self.plaque_bases['TopLeft']
+            topright_sprite = self.plaque_bases['TopRight']
+            bottomright_sprite = self.plaque_bases['BottomRight']
+            bottomleft_sprite = self.plaque_bases['BottomLeft']
+        
+        r = shape[0] - corner_w
+        b = shape[1] - corner_h
+
+        result.blit(topleft_sprite, (0, 0))
+        result.blit(topright_sprite, (r, 0))
+        result.blit(bottomleft_sprite, (0, b))
+        result.blit(bottomright_sprite, (r, b))
+
+
+        # blit the margins
+        left_margin = new_surface((x_margin, margin_h))
+        right_margin = left_margin.copy()
+
+        top_margin = new_surface((margin_w, y_margin))
+        bottom_margin = top_margin.copy()
+
+        left_margin_sprite = self.plaque_bases['Left']
+        right_margin_sprite = self.plaque_bases['Right']
+        top_margin_sprite = self.plaque_bases['Top']
+        bottom_margin_sprite = self.plaque_bases['Bottom']
+
+        for y in range(0, margin_h, y_margin_step):
+            left_margin.blit(left_margin_sprite, (0, y))
+            right_margin.blit(right_margin_sprite, (0, y))
+
+        for x in range(0, margin_w, x_margin_step):
+            top_margin.blit(top_margin_sprite, (x, 0))
+            bottom_margin.blit(bottom_margin_sprite, (x, 0))
+
+        r = shape[0] - x_margin
+        b = shape[1] - y_margin
+
+        result.blit(top_margin, (corner_w, 0))
+        result.blit(left_margin, (0, corner_h))
+        result.blit(bottom_margin, (corner_w, b))
+        result.blit(right_margin, (r, corner_h))
+
+        return result
+        
+    def make_plaque(self, shape : Coords, small_corners : bool = False, color : Color | str = 'translucent_plaque') -> Surface:
+        result = self.make_raw_plaque(shape=shape, small_corners=small_corners)
+        if isinstance(color, str):
+            color = getattr(self.scheme, color)
+        return phase(result, color, copy=False)
+    
+
+    def tiles_to_coords(self, tiles : Sequence[int | float] | int | float) -> Coords:
+        if isinstance(tiles, (tuple, list)):
+            return tuple(
+                int(tiles[i] * self.tile_shape[i]) for i in range(len(tiles))
+            )
+        else:
+            return tuple(
+                int(tiles * tile_side) for tile_side in self.tile_shape
+            )
+
+    def pixels_to_coords(self, pixels : Sequence[int] | int) -> Coords:
+        if isinstance(pixels, (tuple, list)):
+            return tuple(
+                int(pixels[i] * self.pixel_shape[i]) for i in range(len(pixels))
+            )
+        else:
+            return tuple(
+                int(pixels * pixel_side) for pixel_side in self.pixel_shape
+            )
+
+
+    
+    
+
+        
+
+
+
+
+
+
+
+        

@@ -7,7 +7,7 @@ import asyncio
 
 logs.init()
 
-assets = Assets((64, 64), scheme=RaymacitaScheme)
+assets = Assets(scaling=4, scheme=RaymacitaScheme)
 
 client = OnlinePlayer(assets, id='Liamcito')
 

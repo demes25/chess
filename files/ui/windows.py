@@ -8,10 +8,12 @@ from dataclasses import dataclass
 
 from netlib.serialization import serialize, deserialize, Message
 
+from applib.utils import Coords, Vector, ZERO_VEC
+from applib.objects import Environment
+
 from files.logic.game import Game, Status, Event
 from files.logic.sets import GameSet
 from files.ui.av import AVType, to_AV, new_window
-from files.media.utils import Coords
 
 RAISE = False
 
@@ -21,7 +23,7 @@ class VarSettings:
     running = True 
     click_pos = None 
 
-class GameWindow:
+class GameWindow(Environment):
     def __init__(
         self,
         
@@ -35,7 +37,7 @@ class GameWindow:
 
         default_time_s : float = 600,
 
-        topleft : Coords = (0, 0)
+        origin : Vector = ZERO_VEC
     ):
         
         self.game : Game | None = None 
@@ -43,21 +45,32 @@ class GameWindow:
 
         self.av = av = to_AV(av)
 
-        self.chatbar = av.ChatSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=topleft)
-        self.board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index, topleft=self.chatbar.rect.topright)
-        self.statbar = av.GameSideBar(player_index=player_index, env_height=game_set.dimensions[1], topleft=self.board.rect.topright)
+        board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index)
+        chatbar = av.ChatSideBar(env_height = board.shape[1], player_index=player_index)
+        statbar = av.GameSideBar(env_height = board.shape[1], player_index=player_index)
 
-        self.pixel_width = self.chatbar.pixel_width + self.board.pixel_width + self.statbar.pixel_width
-        self.pixel_height = self.board.pixel_height
-        
+        board.topleft = chatbar.topright
+        statbar.topleft = board.topright
+
+        shape = (
+            chatbar.shape[0] + board.shape[0] + statbar.shape[0],
+            board.shape[1]
+        )
+
+        super().__init__(shape, origin=origin)
+
+        self.board = self['board'] = board
+        self.chatbar = self['chatbar'] = chatbar
+        self.statbar = self['statbar'] = statbar
+
         self.times = None
         self.timeout = False 
 
         self.player_index = player_index
         self.enforce_player = enforce_player 
         
-        self.outgoing_text_color = av.assets.text_colors[player_index]
-        self.incoming_text_color = av.assets.text_colors[(player_index + 1) % 2]
+        self.outgoing_text_color = av.assets.scheme.chat_texts[player_index]
+        self.incoming_text_color = av.assets.scheme.chat_texts[(player_index + 1) % 2]
 
         self.default_time_s = default_time_s
 
@@ -67,33 +80,17 @@ class GameWindow:
         self.promotion_plaque = None 
 
         self.text_mode = False
-        
-    # blits the game over screen (if game over)
-    def status_screen(self, status : int):
-        if status == Status.UNBEGUN or status == Status.ONGOING:
-            return 
-        elif status == Status.PROMOTING:
-            if self.promotion_plaque is None:
-                piece = self.game.promoting
-                self.promotion_plaque = self.board.make_promotion_plaque(piece.promotion_list, piece.player.index, piece.position)
-            self.promotion_plaque.blit_onto(self.board)
-        else:
-            if self.game_over_plaque is None:
-                self.game_over_plaque = self.board.checkmate_plaque if status == Status.CHECKMATE else self.board.stalemate_plaque if status == Status.STALEMATE else self.board.timeout_plaque
-            self.game_over_plaque.blit_onto(self.board)
-
+    
 
     def enter_text_mode(self):
         if not self.text_mode:
             self.text_mode = True 
-            self.chatbar.entry.show_pointer()
-            self.chatbar.update_entry_view()
+            self.chatbar.entry_box.show_pointer()
 
     def exit_text_mode(self):
         if self.text_mode:
             self.text_mode = False 
-            self.chatbar.entry.hide_pointer()
-            self.chatbar.update_entry_view()
+            self.chatbar.entry_box.hide_pointer()
 
 
     # checks if the pygame event is global and executes
@@ -167,12 +164,13 @@ class GameWindow:
             self.var_settings.click_pos = event.pos
         
         if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
-            reset = self.game_over_plaque.objects[0]
-            quit = self.game_over_plaque.objects[1]
+            button = self.game_over_plaque.which_hits(event.pos, self.var_settings.click_pos)
 
-            if reset.hits(event.pos, self.var_settings.click_pos): 
+            if button == 'reset': 
                 result = Event(label='reset')
-            elif quit.hits(event.pos, self.var_settings.click_pos):
+                self.game_over_plaque = None 
+
+            elif button == 'quit':
                 result = self._quit()
         
         return result
@@ -184,7 +182,8 @@ class GameWindow:
             self.var_settings.click_pos = event.pos
         
         if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
-            promotion_index = self.promotion_plaque.hit_index(event.pos, self.var_settings.click_pos)
+            promotion_index = self.promotion_plaque.which_hits(event.pos, self.var_settings.click_pos)
+
             if promotion_index >= 0:
                 if not self.enforce_player or self.game.promoting.player.index == self.player_index:
                     result = self.game.promote(promotion_index=promotion_index)
@@ -198,29 +197,29 @@ class GameWindow:
 
         if event.type == pg.TEXTINPUT:
             text = event.text
-            self.chatbar.entry.register(text)
+            self.chatbar.entry_box.register(text)
         
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_BACKSPACE:
-                self.chatbar.entry.backspace()
+                self.chatbar.entry_box.backspace()
             
             if event.key == pg.K_RETURN:
-                text = self.chatbar.entry.reset()
+                text = self.chatbar.entry_box.clear()
+
                 if text != '':
                     result = Event(
                         label='text',
                         text=text
                     )
-                    self.chatbar.chat.register(text, color=self.outgoing_text_color)
-                    self.chatbar.update_chat_view()
+
+                    self.chatbar.chat_box.register(text, color=self.outgoing_text_color)
 
             if event.key == pg.K_LEFT:
-                self.chatbar.entry.move_ptr_left()
+                self.chatbar.entry_box.move_ptr_left()
             
             if event.key == pg.K_RIGHT:
-                self.chatbar.entry.move_ptr_right()
+                self.chatbar.entry_box.move_ptr_right()
         
-        self.chatbar.update_entry_view()
     
         return result
 
@@ -270,6 +269,25 @@ class GameWindow:
             if any(i <= 0 for i in self.times):
                 self.game.status = Status.TIMEOUT
 
+    def blit_onto(self, dest):
+        super().blit_onto(dest)
+
+        status = self.game.status
+
+        if status == Status.UNBEGUN or status == Status.ONGOING:
+            return 
+        elif status == Status.PROMOTING:
+            if self.promotion_plaque is None:
+                piece = self.game.promoting
+                self.promotion_plaque = self.board.make_promotion_plaque(piece.promotion_list, piece.player.index, piece.position)
+            self.promotion_plaque.blit_onto(dest)
+        else:
+            if self.game_over_plaque is None:
+                label = 'checkmate' if status == Status.CHECKMATE else 'stalemate' if status == Status.STALEMATE else 'timeout'
+                self.game_over_plaque = self.av.GameOverPlaque(label=label)
+                self.game_over_plaque.center = self.board.center
+            self.game_over_plaque.blit_onto(dest)
+
         
     def clear(self):
         self.board.selected_piece = None 
@@ -289,13 +307,13 @@ class GameWindow:
         self.var_settings.running = False 
         return Event('quit')
 
+    # fetches the current event, updates the audiovisual state, and blits onto the given screen
+    # returns the fetched event
+    def frame(self, screen : pg.Surface) -> Event:
+        event = self.fetch_event()
 
-    # updates the audio-visual state:
-    # draws the current surface and plays all sounds in the given event.
-    def update_state(self, event : Event):
         self.update_times()
-        self.chatbar.draw()
-        self.board.draw(self.game.pieces, pg.mouse.get_pos())
+        self.board.draw(self.game.pieces)
         self.statbar.draw(self.times, self.game.captured_pieces)
 
         if self.game.status == Status.TIMEOUT and not self.timeout:
@@ -305,19 +323,12 @@ class GameWindow:
         else:
             for sound in event.sounds:
                 self.board.play(sound)
-        
-        # blits a game over screen if the game over value is 1 or 2 (checkmate or stalemate)
-        self.status_screen(self.game.status)
 
-    # fetches the current event, updates the audiovisual state, and blits onto the given screen
-    # returns the fetched event
-    def frame(self, screen : pg.Surface) -> Event:
-        event = self.fetch_event()
-        self.update_state(event=event)
+        self.blit_onto(screen)
 
-        self.chatbar.blit_onto(screen)
-        self.board.blit_onto(screen)
-        self.statbar.blit_onto(screen)
+        if self.board.selected_piece is not None and self.board.hold_selected:
+            self.board.selected_sprite.center = pg.mouse.get_pos()
+            self.board.selected_sprite.blit_onto(screen)
 
         return event
 
@@ -337,7 +348,7 @@ class GameWindow:
             self.times = event.action.times.copy()
         
         elif event.label == 'text':
-            self.chatbar.chat.register(event.text, color=self.incoming_text_color)
+            self.chatbar.chat_box.register(event.text, color=self.incoming_text_color)
         
         return event
         
@@ -352,7 +363,7 @@ class GameWindow:
         icon = self.av.assets.colored_figures[0]['King']
         caption = 'OBCHESSED'
 
-        screen = new_window((self.pixel_width, self.pixel_height), icon=icon, caption=caption)
+        screen = new_window(self.shape, icon=icon, caption=caption)
 
         while self.var_settings.running:
             event = self.frame(screen)

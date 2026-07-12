@@ -2,6 +2,8 @@
 # Chess
 # Moves and Figures
 
+# TODO: MAKE INTO C++ 
+
 from typing import Type, List, Tuple
 from abc import abstractmethod
 import numpy as np  

@@ -8,6 +8,8 @@ logs.init()
 
 server = OnlineGame(Chess, default_time_s=1200)
 
-asyncio.run(server.run(Address('0.0.0.0', 8888)))
+asyncio.run(server.run(
+    #Address('0.0.0.0', 8888)
+    ))
 
 

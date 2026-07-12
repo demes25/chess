@@ -136,7 +136,7 @@ class OnlineGame(Server):
             
 
 
-from files.ui.environment import GameWindow
+from files.ui.windows import GameWindow
 from files.logic.game import Event, Game
 from files.ui.av import AVType, to_AV, new_window
 import pygame as pg
@@ -159,8 +159,8 @@ class OnlinePlayer(SenderClient):
 
     async def prime(self):
         async with self.instance_lock:
-            w = self.instance.pixel_width
-            h = self.instance.pixel_height
+            w = self.instance.width
+            h = self.instance.height
             board=self.instance.board
         
         icon = self.av.assets.colored_figures[0]['King']

@@ -2,34 +2,47 @@
 # Chess
 # AudioVisuals
 
-from typing import List, Tuple, Dict
-from files.media.assets import Object, Assets
-from files.media.fonts import TextEntry, TextRecord
-from files.media.utils import Color, Coords, TileIntCoords, Surface, new_surface, tint, isolate_alpha_blend
+from typing import List, Tuple, Dict, Sequence
+
+
+from files.media.assets import Assets
+
+from applib import objects
+from applib.text import TextEntry, TextRecord
+from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
+
 from files.logic.game import Piece 
 
 import pygame as pg
 
 
+Dimensions = tuple[int | float, int | float]
+IntPair = tuple[int, int]
+
 # ALL DIMENSIONS ARE IN TERMS OF TILES!!
 # TODO: GENERALIZE
 
 # a wrapper class for audiovisuals given the necessary assets (see Assets).
+
+# BY DEFAULT: the argument 'dims' is in terms of TILES. so dims (5, 4) corresponds to shape (5*tile_width, 4*tile_height)
+#             margins are in terms of PIXELS. so margin 5 corresponds to shape (5*pixel_width, 5*pixel_height)
 class AudioVisuals:
     def __init__(
         this,
         assets : Assets 
     ):  
+        this.assets = assets
+        tile_width, tile_height = assets.tile_shape
         
         # The Game Board -- takes care of drawing the board and plaques.
-        class GameBoard(Object):
+        class GameBoard(objects.Object):
             def __init__(
                 self, 
-                dims : List[int] = [8, 8], # dimensions of the game board, in tiles
+                dims : Sequence[int] = (8, 8), # dimensions of the game board, in tiles
                 num_players : int = 2,
 
                 player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black),
-                topleft : Coords = (0, 0) # gives the position of the topleft corner of the board
+                origin : Vector = ZERO_VEC # gives the position of the topleft corner of the board
             ):
                 self.rank = len(dims)
                 self.num_players = num_players
@@ -41,92 +54,81 @@ class AudioVisuals:
                 assert self.num_players == 2
 
                 self.COLS, self.ROWS = self.dims = dims
-                self.pixel_width, self.pixel_height = self.pixels = assets.tiles_to_pixels(dims)
+                super().__init__(assets.tiles_to_coords(dims), origin)
 
-                self.board = new_surface(self.pixels)
-                
-                super().__init__(new_surface(self.pixels))
-                self.rect.topleft = topleft
-            
-                W = assets.tile_width
-                H = assets.tile_height
+                self.board = self.surface.copy()
 
                 for i in range(self.ROWS):
                     for j in range(self.COLS):
                         # Alternate color based on position
                         tile = assets.colored_tiles[(i+j + player_index) % 2]
 
-                        self.board.blit(tile, (j * W, i * H))
+                        self.board.blit(tile, assets.tiles_to_coords((j, i)))
 
                 self.selected_piece : Piece | None = None 
                 self.hold_selected : bool = False 
-                self.selected_squares : List[Object] = [] 
+                self.selected_squares : List[objects.Object] = [] 
 
-                self.checkmate_plaque = assets.make_end_plaque('Checkmate', center=self.rect.center)
-                self.stalemate_plaque = assets.make_end_plaque('Stalemate', center=self.rect.center)
-                self.timeout_plaque = assets.make_end_plaque('Timeout', color = assets.scheme.stalemate, center=self.rect.center)
 
-                class PromotionPlaque(assets.ObjectPlaque):
-
+                class PromotionPlaque(objects.Array):
                     from files.logic.figures import Figure 
-                    def __init__(plq, figures : List[Figure], player_index : int, board_pos : Coords):
+                    def __init__(plq, figures : List[Figure], player_index : int, board_pos : IntPair, origin : Vector = ZERO_VEC):
                         plq.figures = figures
-                    
+
                         # rudimentary: for now, the default is that the promotion plaque 
                         # extends rightwards from the promotion square, unless that clashes with 
                         # board dimensions, in which case we go leftwards.
                         # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
                         if (self.dims[0]-board_pos[0]) < len(figures):
-                            disp = -assets.tile_width
+                            disp = -tile_width
+                            left = self.topleft[0] + tile_width * (board_pos[0] - len(figures))
                         else:
-                            disp = assets.tile_width
-                        
-                        x, y = self.coords(board_pos, offset=False)
-                        fx = x
-                        
-                        sprites = assets.colored_figures[player_index]
-                        objects = []
-                        for fig in figures:
-                            sprite = sprites[fig.name]
-                            objects.append(Object(sprite, (fx, y)))
-                            fx += disp
+                            disp = tile_width
+                            left = self.topleft[0] + tile_width * board_pos[0]
 
-                        plq.width = width = len(figures)
-                        super().__init__(
-                            dims=(width, 1), 
-                            objects=objects,
-                            center = (x + int(disp*(width -1)/2.0), y)
+                        plaque = assets.make_plaque(
+                            shape=(len(figures) * tile_width, tile_height),
+                            small_corners=True
                         )
 
-                    # returns the index in plq.objects of the object that has been hit
-                    # adjusts for the topleft coordinate of the game board
-                    def hit_index(plq, coords : Coords, prev_coords : Coords | None = None) -> int:
-                        TL_X, TL_Y, = self.rect.topleft
+                        super().__init__(
+                            plaque, 
+                            origin = origin
+                        )
                         
-                        coords = (coords[0] - TL_X, coords[1] - TL_Y)
+                        sprites = assets.colored_figures[player_index]
+                        
+                        x = 0
+                        for fig in figures:
+                            sprite = sprites[fig.name]
+                            
+                            object = objects.Object(sprite)
+                            plq.append(object)
 
-                        if prev_coords is not None:
-                            prev_coords = (prev_coords[0] - TL_X, prev_coords[1] - TL_Y)
+                            object.topleft = (x, 0)
+                            x += disp
+                        
+                        plq.topleft = (
+                            left,
+                            self.topleft[1]
+                        )
 
-                        return super().hit_index(coords, prev_coords)
-                    
-                    
+
                 self.make_promotion_plaque = PromotionPlaque
-
+                
             # translates a point on the screen to a square on the board
             # if offset is true, takes into account that topleft may not be (0, 0).
             # otherwise treats as if topleft if (0, 0)
             #
             # usually we'd use offset = False for internal operations, offset = True for external ones
-            def board_pos(self, coords : tuple, offset = True) -> tuple:
+            def board_pos(self, coords : Coords, offset = True) -> Sequence[int]:
                 i, j = coords 
                 
                 if offset:
-                    x, y = self.rect.topleft
-                    i -= x
-                    j -= y
+                    i -= (self.origin[0] + self.topleft[0])
+                    j -= (self.origin[1] + self.topleft[1])
 
-                I, J = i // assets.tile_width, (self.pixel_height - j) // assets.tile_height
+                I, J = i // tile_width, (self.height - j) // tile_height
 
                 if self.player_index == 1:
                     J = self.dims[1] - J - 1
@@ -138,37 +140,43 @@ class AudioVisuals:
             # otherwise treats as if topleft if (0, 0)
             #
             # usually we'd use offset = False for internal operations, offset = True for external ones
-            def coords(self, board_pos : tuple, offset = True) -> tuple:
+            def coords(self, board_pos : Sequence[int], offset = True, center_point = False) -> Coords:
                 I, J = board_pos
-                x, y = self.rect.topleft
 
                 if self.player_index == 1:
                     J = self.dims[1] - J - 1
 
-                i = int(assets.tile_width * (I + 0.5))
-                j = int(self.pixel_height - (J + 0.5)*assets.tile_height)
+                if center_point:
+                    I += 0.5
+                    J += 0.5
+                else:
+                    J += 1.0
+
+                i = int(tile_width * I)
+                j = int(self.height - J*tile_height)
 
                 if offset:
-                    x, y = self.rect.topleft
-                    i += x
-                    y += j 
+                    i += (self.origin[0] + self.topleft[0])
+                    j += (self.origin[1] + self.topleft[1])
 
                 return i, j 
             
 
-            def select_piece(self, piece : Piece):
-                self.selected_piece = piece
-                self.hold_selected = True
-                if piece is None:
-                    self.deselect_squares()
-                else:
+            def select_piece(self, piece : Piece | None):
+                if piece is not None:
+                    self.selected_piece = piece
+                    self.selected_sprite = objects.Object(assets.colored_figures[piece.player.index][piece.figure.name])
+                    
                     self.select_square(piece.position)
+                    self.hold_selected = True
+                else:
+                    self.deselect_squares()
             
-            def select_square(self, position : tuple):
+            def select_square(self, position : Sequence[int]):
                 j, i = position
-                w, h = assets.tile_dims
+                w, h = assets.tile_shape 
 
-                obj = Object(assets.selected_tile) 
+                obj = objects.Object(assets.selected_tile) 
 
                 if self.player_index == 0:
                     i = self.dims[1] - i - 1 
@@ -178,18 +186,18 @@ class AudioVisuals:
 
             def deselect_piece(self):
                 self.selected_piece = None
+                self.selected_sprite = None
                 self.hold_selected = False 
 
             def deselect_squares(self):
                 self.selected_squares = []
 
-
             def play(self, sound_name : str):
                 assets.sounds[sound_name].play()
 
             # draws the given game to a surface
-            def draw(self, pieces : List[Dict[int, Piece]], held_coords : Coords) -> Surface:
-                self.surface.blit(self.board, (0, 0))
+            def draw(self, pieces : List[Dict[int, Piece]]) -> Surface:
+                self.surface.blit(self.board.copy(), (0, 0))
 
                 for square in self.selected_squares:
                     square.blit_onto(self.surface)
@@ -198,42 +206,40 @@ class AudioVisuals:
                     for piece in piece_dict.values():
                         sprite = sprite_dict[piece.figure.name]
                         if not (piece is self.selected_piece and self.hold_selected):
-                            Object(sprite, self.coords(piece.position, offset=False)).blit_onto(self.surface)
-
-                if self.selected_piece is not None and self.hold_selected:
-                    piece = self.selected_piece
-                    sprite = assets.colored_figures[piece.player.index][piece.figure.name]
-                    
-                    held_x, held_y = held_coords 
-                    x, y = self.rect.topleft 
-
-                    Object(sprite, (held_x-x, held_y-y)).blit_onto(self.surface)
+                            self.surface.blit(sprite, self.coords(piece.position, offset=False, center_point=False))
                 
                 return self.surface
+                           
 
         # The Timer -- a clock, basically
-        class Timer(assets.Plaque):
+        class Timer(objects.Object):
             def __init__(
                 self,
-                dims : TileIntCoords = (3, 1),
-                center : Coords = (0,0),
-                player_index : int = 0
+                margin : int = 3,
+                player_index : int = 0,
+
+                origin : Vector = ZERO_VEC
             ):
+                clock_color = assets.scheme.tiles[player_index]
+                num_color = assets.scheme.chat_texts[1-player_index]
 
-                clock_color = assets.tile_colors[player_index]
-                num_color = assets.text_colors[1-player_index]
+                self.margins = margins = assets.pixels_to_coords(margin)
 
-                super().__init__(dims=dims, center=None, color=clock_color, opacity=255)
+                text_shape = (5 * assets.text_font.glyph_width + 4*assets.text_font.gap_size, assets.text_font.glyph_height)
+                shape = (
+                    text_shape[0] + margins[0] * 2,
+                    text_shape[1] + margins[1] * 2
+                )
 
-                self._center = self.rect.center 
+                self.background = assets.make_plaque(shape, small_corners=True, color=clock_color)
+                self.margins = margins
 
-                self.background = self.surface
                 self.num_color = num_color
 
-                if center is not None:
-                    self.center_at(center)
-
                 self.previous_time = 0
+
+                super().__init__(self.background, origin=origin)
+
 
             def draw(self, time_s : float) -> Surface:
                 # check if we already printed this time:
@@ -250,250 +256,297 @@ class AudioVisuals:
 
                 time_str = f'{minute_str}:{second_str}'
                 
-                time_surface = assets.clock_font.render(time_str, self.num_color)
-                time_rect = time_surface.get_rect()
-                time_rect.center = self._center 
+                time_surface = assets.text_font.render(time_str, self.num_color)
 
                 self.surface = self.background.copy()
-                self.surface.blit(time_surface, time_rect)
+                self.surface.blit(time_surface, self.margins)
 
                 return self.surface 
         
 
         # An array of figures:
         # to represent captured figures.
-        class FigureArray(assets.Plaque):
+        class FigureArray(objects.Object):
             def __init__(
                 self, 
                 
-                dims : TileIntCoords,
-                center : Coords = (0, 0),
+                figures_per_row : int,
+                figures_per_col : int,
 
-                margin : float = 0.25,
+                margin : int = 4,
 
                 player_index : int = 0,
 
                 plaque_opacity : int = 64,
-                player_opacity : int = 196
+                player_opacity : int = 196,
+
+                origin : Vector = ZERO_VEC
             ):
-                self.x_pixel_margin, self.y_pixel_margin = assets.tiles_to_pixels((margin, margin))
+                self.margins = assets.pixels_to_coords(margin)
 
-                super().__init__(dims=dims, center=center, color=None, opacity=255)
-    
-                self.background = self.surface
+                self.FIGURES_PER_ROW = figures_per_row
+                self.FIGURES_PER_COL = figures_per_col
 
-                plaque_tint = tint(self.surface.copy(), color=assets.scheme.plaque, opacity=plaque_opacity)
+                shape = (
+                    int(self.margins[0] * 2 + figures_per_row*assets.captured_fig_shape[0]), 
+                    int(self.margins[1] * 2 + figures_per_col*assets.captured_fig_shape[1])
+                )
+
+                self.background = assets.make_raw_plaque(shape=shape)
+
+                plaque_tint = phase(self.background, color=assets.scheme.plaque.new_opacity(plaque_opacity))
+                player_tint = phase(self.background, color=assets.scheme.players[player_index].new_opacity(player_opacity))
+                
                 self.background.blit(plaque_tint, (0,0))
-                player_tint = tint(self.surface.copy(), color=assets.player_colors[player_index], opacity=player_opacity)
                 self.background.blit(player_tint, (0,0))
 
-                self.pixel_width, self.pixel_height = self.pixels = assets.tiles_to_pixels(dims)
+                self.INIT_X = self.margins[0]
+                self.MAX_X = self.INIT_X + (figures_per_row-1)*assets.captured_fig_shape[0]
 
-                self.FIGURES_PER_ROW = int((self.pixel_width - 2*self.x_pixel_margin)/assets.captured_figure_width)
-
-                self.INIT_X = self.x_pixel_margin + assets.captured_figure_width // 2
-                self.MAX_X = self.INIT_X + (self.FIGURES_PER_ROW-1)*assets.captured_figure_width
+                super().__init__(self.background, origin)
 
 
             # pieces: list of [player_index, piece_name]
             def draw(self, pieces : List[Tuple[int, str]] | None = None):
                 self.surface = self.background.copy()
 
-                CURR_Y = self.y_pixel_margin + assets.captured_figure_height // 2
+                CURR_Y = self.margins[1]
                 CURR_X = self.INIT_X
                 
                 if pieces:
                     for player, piece_name in pieces:
-                        obj = Object(assets.captured_colored_figures[player][piece_name], (CURR_X, CURR_Y))
-                        obj.blit_onto(self.surface)
+                        obj = assets.colored_capt_figs[player][piece_name]
+                        self.surface.blit(obj, (CURR_X, CURR_Y))
 
-                        CURR_X += assets.captured_figure_width
+                        CURR_X += (assets.captured_fig_shape[0])
                         
                         if CURR_X > self.MAX_X:
                             CURR_X = self.INIT_X
-                            CURR_Y += assets.captured_figure_height
+                            CURR_Y += (assets.captured_fig_shape[1])
                 
                 return self.surface
 
 
-        class GameSideBar(Object):
+        class GameOverPlaque(objects.Environment):
             def __init__(
                 self,
-                arr_dims : TileIntCoords = (5, 2),
-                clock_dims : TileIntCoords = (3, 1),
+                dims : Dimensions = (5, 3),
+                label : str = 'checkmate',
+                
+                label_color : Color | None = None,
 
-                env_height : float = 8,
-                margin : float = 0.25,
+                origin : Vector = ZERO_VEC
+            ):
+                
+                plaque = assets.make_plaque(shape=assets.tiles_to_coords(dims))
+
+                super().__init__(plaque, origin=origin)
+
+                if label_color is None:
+                    label_color = assets.scheme.__getattribute__(label.lower()) 
+
+                dx_r = self.width // 5
+                dx_q = self.width // 4
+                dy = self.height // 7
+
+                x, y = self.midpoint
+
+                label_object = objects.Object(assets.title_font.render(label.upper(), label_color))
+                label_object.center = (x, y - dy)
+                self['label'] = label_object
+
+                reset_button = objects.Object(assets.half_title_font.render('RESET', assets.scheme.text))
+                reset_button.rect.center = (x + dx_r, y + dy)
+                self['reset'] = reset_button
+
+                quit_button = objects.Object(assets.half_title_font.render('QUIT', assets.scheme.text))
+                quit_button.rect.center = (x-dx_q, y + dy)
+                self['quit'] = quit_button
+
+
+        class GameSideBar(objects.Environment):
+            def __init__(
+                self,
+                
+                env_height : int,
+
+                figures_per_row : int = 8,
+                figures_per_col : int = 2,
+
+                arr_margin : int = 4,
+                clock_margin : int = 3,
+
+                margin : int = 4,
 
                 color : Color = assets.scheme.plaque,
 
                 player_index : int = 0, # the player whose perspective we are on
                 
-                topleft : Coords = (0, 0)
+                origin : Vector = ZERO_VEC
             ):  
-                arr_w, arr_h = arr_dims
-                clock_w, clock_h = clock_dims 
 
-                env_w = arr_w + 2 * margin
+                self.arrs = tuple( 
+                    FigureArray(
+                        figures_per_row=figures_per_row,
+                        figures_per_col=figures_per_col,
+                        margin=arr_margin,
+                        player_index = i
+                    ) for i in range(2)
+                )
+
+                self.clocks = tuple(
+                    Timer(clock_margin, player_index=i) for i in range(2)
+                )
+
+
+                self.margins = assets.pixels_to_coords(margin)
+
+                arr_shape = self.arrs[0].shape 
+                clock_shape = self.clocks[0].shape 
+
+                env_w = arr_shape[0] + 2 * self.margins[0]
                 env_h = env_height
 
-                self.dims = env_w, env_h
+                assert (env_h >= 2 * (3*self.margins[1] + arr_shape[1] + clock_shape[1]))
+                assert (env_w >= (clock_shape[0] + 2*self.margins[0]))
 
-                assert (env_height >= 2 * (margin + arr_h + margin + clock_h + margin))
-                assert (env_w >= (clock_w + 2*margin))
+                surface = new_surface((env_w, env_h))
+                surface.fill(color.rgb)
 
-                self.pixel_width, self.pixel_height = pixel_dims = (env_w*assets.tile_width, env_h*assets.tile_height)
+                super().__init__(surface, origin=origin)
 
-                surface = new_surface(pixel_dims)
-                surface.fill(color)
-
-                super().__init__(surface)
                 self.background = surface
-                
-                X, Y = self.rect.center # take local center
-                self.rect.topleft = topleft # THEN shift the rectangle
 
-                pixel_margin_y = int(margin * assets.tile_height)
-                clock_midpt_y = int(clock_h * assets.tile_height/ 2)
+                X, Y = self.midpoint
 
-                clock_center_disp = pixel_margin_y + clock_midpt_y
+                margin_y = self.margins[1]
+                clock_midpt_y = self.clocks[0].midpoint[1]
+
+                clock_center_disp = margin_y + clock_midpt_y
                 sign = 1 if player_index == 0 else -1
 
                 signed_clock_disp = sign * clock_center_disp 
                 
-                clock_centers = [(X, Y + signed_clock_disp), (X, Y - signed_clock_disp)]
-
-                arr_center_disp = 2* pixel_margin_y + int((arr_h/2 + clock_h) * assets.tile_height)
+                arr_center_disp = 2* margin_y + arr_shape[1]//2 + clock_shape[1]
                 signed_arr_disp = sign * arr_center_disp
 
-                arr_centers = [(X, Y + signed_arr_disp), (X, Y - signed_arr_disp)]
-                
-                self.clocks = [Timer(clock_dims, center=center, player_index=i) for center, i in zip(clock_centers, range(2))] 
-                self.arrs = [FigureArray((arr_w, arr_h), center=center,margin=margin,player_index=i) for center, i in zip(arr_centers, range(2))]
+                self.clocks[0].center = (X, Y + signed_clock_disp)
+                self.clocks[1].center = (X, Y - signed_clock_disp)
+
+                self.arrs[0].center = (X, Y + signed_arr_disp)
+                self.arrs[1].center = (X, Y - signed_arr_disp)
+
+                self['white_clock'] = self.clocks[0]
+                self['black_clock'] = self.clocks[1]
+                self['white_array'] = self.arrs[0]
+                self['black_array'] = self.arrs[1]
 
             
             def draw(self, times_s : List[int], captured_pieces : List[List[Tuple[int, str]]]):
-                self.surface = self.background.copy()
-                
                 assert len(times_s) == len(captured_pieces), 'player numbers must match'
                 for clock, time_s in zip(self.clocks, times_s):
                     clock.draw(time_s=time_s)
-                    clock.blit_onto(self.surface)
                 
                 for arr, pieces in zip(self.arrs, captured_pieces):
                     arr.draw(pieces=pieces)
-                    arr.blit_onto(self.surface)
-                
-                return self.surface 
 
-
-        class ChatSideBar(Object):
+        
+        class ChatSideBar(objects.Environment):
             def __init__(
                 self,
-                chat_dims : TileIntCoords = (5, 4),
-                entry_dims : TileIntCoords = (5, 2),
+                
+                env_height : int,
 
-                env_height : float = 8,
-                margin : float = 0.32,
+                chat_dims : Dimensions = (5, 4),
+                entry_dims : Dimensions = (5, 2),
+
+                margin : int = 5,
+                text_margin : int = 4,
 
                 color : Color = assets.scheme.plaque,
 
                 player_index : int = 0, # the player whose perspective we are on
                 
-                topleft : Coords = (0, 0)
+                origin : Vector = ZERO_VEC
             ):  
-                chat_w, chat_h = chat_dims
-                entry_w, entry_h = entry_dims
+                
+                self.margins = assets.pixels_to_coords(margin)
 
-                env_w = max(chat_w, entry_w) + 2 * margin
+                chat_w, chat_h = chat_shape = assets.tiles_to_coords(chat_dims) 
+                entry_w, entry_h = entry_shape = assets.tiles_to_coords(entry_dims)
+
+                env_w = max(chat_w, entry_w) + 2 * self.margins[0]
                 env_h = env_height
 
-                self.dims = env_w, env_h
+                assert (env_h >= (3 * self.margins[1] + chat_h + entry_h))
+                assert (env_w >= (entry_w + 2 * self.margins[0]))
 
-                assert (env_height >= (margin + chat_h + margin + entry_h + margin))
-                assert (env_w >= (entry_w + 2*margin))
+                surface = new_surface((env_w, env_h))
+                surface.fill(color.rgba)
 
-                self.pixel_width, self.pixel_height = pixel_dims = assets.tiles_to_pixels((env_w, env_h))
+                super().__init__(surface, origin=origin)
                 
-                surface = new_surface(pixel_dims)
-                surface.fill(color)
-
-                super().__init__(surface)
-                
-                self.rect.topleft = topleft # THEN shift the rectangle
-                
-                collective_height = chat_h + margin + entry_h 
+                collective_height = chat_h + self.margins[1] + entry_h 
                 top_margin = (env_height - collective_height)/2
-                left_margin = margin
+                left_margin = self.margins[0]
 
-                chat_topleft = assets.tiles_to_pixels((left_margin, top_margin))
-                entry_topleft = assets.tiles_to_pixels((left_margin, top_margin + chat_h + margin))
+                chat_topleft = (left_margin, top_margin)
+                entry_topleft = (left_margin, top_margin + chat_h + self.margins[1])
 
                 # generalize this
-                self.chat_plaque = assets.Plaque(dims=chat_dims, opacity=100)
-                self.chat_plaque.rect.topleft = chat_topleft
+                chat_plaque = assets.make_plaque(shape = chat_shape)
+                entry_plaque = assets.make_plaque(shape = entry_shape)
 
-                self.entry_plaque = assets.Plaque(dims=entry_dims, opacity=128)
-                self.entry_plaque.rect.topleft = entry_topleft
+                font = assets.quarter_text_font
+                
+                self.text_color = assets.scheme.chat_texts[player_index]
 
-                self.chat_plaque.blit_onto(self)
-                self.entry_plaque.blit_onto(self)
+                self.text_margins = assets.pixels_to_coords(text_margin)
 
-                self.background = self.surface
+                chat_view_shape = (chat_shape[0] - 2 * self.text_margins[0], chat_shape[1] - 2*self.text_margins[1])
+                entry_view_shape = (entry_shape[0] - 2 * self.text_margins[0], entry_shape[1] - 2*self.text_margins[1])
+                
+                chat_box = TextRecord(font=font, width=chat_view_shape[0])
+                entry_box = TextEntry(font=font, width=entry_view_shape[0], color=self.text_color)
+                
+                chat_view = objects.View(chat_plaque, chat_box)
+                chat_box.topleft = self.text_margins
+                chat_view.topleft = chat_topleft
 
-                chat_view_dims = (chat_dims[0] - 2 * margin, chat_dims[1] - 2*margin)
-                entry_view_dims = (entry_dims[0] - 2 * margin, entry_dims[1] - 2*margin)
+                entry_view = objects.View(entry_plaque, entry_box)
+                entry_box.topleft = self.text_margins
+                entry_view.topleft = entry_topleft
 
-                chat_pixel_width = int(chat_view_dims[0] * assets.tile_width)
-                entry_pixel_width = int(entry_view_dims[0] * assets.tile_width)
+                self.chat_box = chat_box
+                self.entry_box = entry_box
 
-                font = assets.text_font
+                self['chat'] = chat_view
+                self['entry'] = entry_view
 
-                self.chat = TextRecord(font=font, pixel_width=chat_pixel_width)
-                self.entry = TextEntry(font=font, pixel_width=entry_pixel_width, color=assets.text_colors[player_index])
-
-                self.chat_view = assets.View(chat_view_dims, center=self.chat_plaque.rect.center)
-                self.entry_view = assets.View(entry_view_dims, center=self.entry_plaque.rect.center)
-            
-            
-            def update_chat_view(self):
-                self.chat_view.set_reference(self.chat.surface)
-            
-            def update_entry_view(self):
-                self.entry_view.set_reference(self.entry.surface)
-
-
-            def draw(self):
-                self.surface = self.background.copy()
-                self.entry_view.blit_onto(self.surface)
-                self.chat_view.blit_onto(self.surface)
-
-        
-        this.assets = assets 
-
-        #this.GameSideBar = GameSideBar
         this.GameBoard = GameBoard
 
         this.Timer = Timer 
         this.FigureArray = FigureArray
-        this.GameSideBar = GameSideBar
 
+        this.GameSideBar = GameSideBar
+        this.GameOverPlaque = GameOverPlaque
         this.ChatSideBar = ChatSideBar
 
 
-def new_window(size : Coords, caption : str | None = None, icon : Surface | Object | None = None):
+def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):
+
     pg.display.init()
     if caption is not None:
         pg.display.set_caption(caption)
     if icon is not None:
-        if isinstance(icon, Object):
+        if isinstance(icon, objects.Object):
             icon = icon.surface
         pg.display.set_icon(icon)
     return pg.display.set_mode(size=size)
         
 
 
-AVType = AudioVisuals | Assets | Coords
+AVType = AudioVisuals | Assets | Coords | tuple[float, float] | Dimensions | int | float
 
 def to_AV(obj : AVType):
     if isinstance(obj, AudioVisuals):
@@ -501,5 +554,4 @@ def to_AV(obj : AVType):
     if isinstance(obj, Assets):
         return AudioVisuals(assets=obj)
     else:
-        return AudioVisuals(assets=Assets(obj))
-
+        return AudioVisuals(assets=Assets(scaling=obj))

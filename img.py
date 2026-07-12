@@ -1,5 +1,5 @@
 from files.media.schemes import CristiancitoScheme
-from files.media.assets import Assets, new_surface, Path
+from files.media.old_assets import Assets, new_surface, Path
 import pygame as pg 
 
 H = W = 384

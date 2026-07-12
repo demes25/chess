@@ -2,106 +2,141 @@
 # Chess
 # Assets
 
-from typing import Tuple, Dict
-from dataclasses import dataclass
-from files.media.utils import Color
+from typing import Tuple
+from dataclasses import dataclass, field
+from applib.colors import Color
 
-GRAYSCALE : Tuple[Color] = (
-    (255, 255, 255), # light
-    (191, 191, 191), # standard
-    (127, 127, 127), # shade
-    (64, 64, 64)     # border
+GRAYSCALE : Tuple[Color, Color, Color, Color] = (
+    Color.from_hex('#FFFFFF'), # light
+    Color.from_hex('#BFBFBF'), # standard
+    Color.from_hex('#7F7F7F'), # shade
+    Color.from_hex('#404040')  # border
 )
 
 @dataclass
 class Scheme:
-    tile_white : Color = (250, 242, 210)
-    tile_black : Color = (90, 60, 50)
+    tiles : Tuple[Color, Color] = (
+        Color.from_hex('#FAF2D2'),
+        Color.from_hex('#5A3C32')
+    )
 
-    player_white : Color = (220, 192, 180)
-    player_black : Color = (130, 100, 90)
+    players : Tuple[Color, Color] = (
+        Color.from_hex('#DCC0B4'),
+        Color.from_hex('#82645A')
+    )
 
-    text_white : Color = (255, 248, 220)
-    text_black : Color = (50, 35, 25)
+    chat_texts : Tuple[Color, Color] = (
+        Color.from_hex('#FAF2D2'),
+        Color.from_hex('#322319')
+    )
 
-    checkmate : Color = (255, 25, 15)
-    stalemate : Color = (200, 180, 150)
+    checkmate : Color = Color.from_hex("#DE170C")
+    stalemate : Color = Color.from_hex('#C8B496')
+    timeout : Color = Color.from_hex('#DCC0B4')
+    
+    plaque : Color = Color.from_hex('#8C7864')
+    text : Color = Color.from_hex('#DCC0B4')
 
-    plaque: Color = (140, 120, 100)
-    text : Color = (220, 192, 180)
+    select : Color = Color.from_hex('#CD643288')
 
-    select : Color = (128, 45, 25)
-    see : Color = (230, 100, 50)
+    translucent_plaque : Color | None = None
+
+    plaque_opacity : int = 200
+
+    def __post_init__(self):
+        self.translucent_plaque : Color = self.plaque.new_opacity(self.plaque_opacity)
+
 
 
 # Color Schemes
 DefaultScheme = Scheme()
 
 IndianScheme = Scheme(
-    tile_black = (70, 60, 50),
+    tiles = (
+        Color.from_hex('#FAF2D2'),
+        Color.from_hex('#463C32')
+    ),
 
-    player_white = (240, 90, 50),
-    player_black = (90, 190, 50)
+    players = (
+        Color.from_hex('#F05A32'),
+        Color.from_hex('#5ABE32')
+    ),
 )
-
 
 
 # The GANG
 
 DaniacitaScheme = Scheme(
-    tile_white = (179, 235, 242),
-    tile_black = (255, 150, 255),
+    tiles = (
+        Color.from_hex('#B3EBF2'),
+        Color.from_hex('#FF96FF')
+    ),
+    players = (
+        Color.from_hex('#40E0D0'),
+        Color.from_hex('#CC00CC')
+    ),
 
-    player_white = (64, 224, 208),
-    player_black = (204, 0, 204),
-
-    plaque = (60, 120, 100)
+    plaque=Color.from_hex('#3C7864')
 )
 
 CristiancitoScheme = Scheme(
-    tile_white = (145, 55, 127),
-    tile_black = (255, 150, 84),
+    tiles = (
+        Color.from_hex('#91377F'),
+        Color.from_hex('#FF9654')
+    ),
+    players=(
+        Color.from_hex('#EA51C6'),
+        Color.from_hex('#FF641A')
+    ),
 
-    player_white = (234, 81, 198),
-    player_black = (255, 100, 26),
-
-    plaque = (120, 70, 60),
+    plaque=Color.from_hex('#78463C')
 )
 
 # don't torture Raymah :(
 RaymacitaScheme = Scheme(
-    tile_white = (255, 176, 212),
-    tile_black = (7, 51, 99),
+    tiles=(
+        Color.from_hex('#FFB0D4'),
+        Color.from_hex('#073363')
+    ),
 
-    player_white = (252, 164, 204),
-    player_black = (49, 111, 176),
+    players=(
+        Color.from_hex('#FCA4CC'),
+        Color.from_hex('#316FB0')
+    ),
 
-    checkmate = (252, 164, 204),
-
-    plaque = (53, 97, 143)
+    checkmate=Color.from_hex('#FCA4CC'),
+    plaque=Color.from_hex('#35618F')
 )
 
 
 JoaquitoScheme = Scheme(
-    tile_white = (55, 242, 255),
-    tile_black = (70, 60, 50),
+    tiles = (
+        Color.from_hex('#37F2FF'),
+        Color.from_hex('#463C32')
+    ),
 
-    player_white = (190, 90, 50),
-    player_black = (90, 190, 50),
-
-    plaque = (120, 70, 60)
+    players = (
+        Color.from_hex('#BE5A32'),
+        Color.from_hex('#5ABE32')
+    ),
+    
+    plaque = Color.from_hex('#78463C')
 )
 
 LiamcitoScheme = Scheme(
-    tile_white = (250, 242, 210),
-    tile_black = (80, 120, 200),
+    tiles = (
+        Color.from_hex('#FAF2D2'),
+        Color.from_hex('#5078C8')
+    ),
 
-    player_white = (255, 255, 240),
-    player_black = (100, 149, 237),
+    players = (
+        Color.from_hex('#FFFFF0'),
+        Color.from_hex('#6495ED')
+    ),
 
-    checkmate = (100, 180, 255),
-    stalemate = (200, 180, 150),
+    checkmate = Color.from_hex('#64B4FF'),
+    stalemate = Color.from_hex('#C8B496'),
 
-    plaque = (60, 70, 120)
+    plaque = Color.from_hex('#C8B496')
 )
 
