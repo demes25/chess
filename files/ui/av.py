@@ -80,10 +80,12 @@ class AudioVisuals:
                         # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
                         if (self.dims[0]-board_pos[0]) < len(figures):
                             disp = -tile_width
-                            left = self.topleft[0] + tile_width * (board_pos[0] - len(figures))
+                            left = self.topleft[0] + tile_width * (board_pos[0] - len(figures) + 1)
+                            x_init = tile_width * (len(figures)-1)
                         else:
                             disp = tile_width
                             left = self.topleft[0] + tile_width * board_pos[0]
+                            x_init = 0
 
                         plaque = assets.make_plaque(
                             shape=(len(figures) * tile_width, tile_height),
@@ -97,7 +99,8 @@ class AudioVisuals:
                         
                         sprites = assets.colored_figures[player_index]
                         
-                        x = 0
+                        x = x_init
+                        
                         for fig in figures:
                             sprite = sprites[fig.name]
                             
@@ -106,10 +109,12 @@ class AudioVisuals:
 
                             object.topleft = (x, 0)
                             x += disp
+
+                        top = self.top if player_index==self.player_index else self.bottom - tile_height
                         
                         plq.topleft = (
                             left,
-                            self.topleft[1]
+                            top
                         )
 
 
