@@ -42,14 +42,29 @@ struct moves::Move{
             } 
         }
 
+        template<size_t k>
+        Move(Tuple<Vector<n>, k> directions, bool captures, bool moves) : directions(std::make_unique<Vector<n>[]>(k)), num_directions(k), captures(captures), moves(moves), capture_displacement(0) {
+            for (index_t i = 0; i < k; i++){
+                this -> directions[i] = std::move(moves[i]);
+            } 
+        }
+
+        
         Move(Vector<n>* directions, size_t num_directions, bool captures, bool moves, Vector<n>&& capture_displacement) : directions(directions), num_directions(num_directions), captures(captures), moves(moves), capture_displacement(capture_displacement) {}
 
         virtual bool valid_occupancy(const game::Board& board, const Index<n>& target, index_t player_index) const {
             std::shared_ptr<game::Piece> piece_at = board.map[target];
+            std::shared_ptr<game::Piece> takes_at = board.map[target + this -> capture_displacement]
 
-            if piece_at == nullptr return this -> moves;
-            else if !(this -> captures) return false;
-            else return piece_at -> player_index != player_index;
+            if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
+
+            else if (this -> captures && takes_at != nullptr) {
+                if (piece_at == takes_at || piece_at == nullptr) {
+                    return takes_at -> player_index != player_index;
+                }
+            }
+
+            else return false;
         }
 
         virtual bool valid_square(const game::Board& board, const Index<n>& position, const Index<n>& target) const = 0;

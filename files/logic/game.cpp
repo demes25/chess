@@ -41,6 +41,10 @@ struct game::Piece{
     }
 
     bool sees(const Index<n>& target) const {
+        if (this -> dead) {
+            return false;
+        }
+
         if (!this -> has_moved){
             index_t num_openers = this -> figure -> num_openers;
             std::shared_ptr<moves::Move[]> opener_list = this -> figure -> opener_list;
@@ -67,7 +71,40 @@ struct game::Piece{
 
         return false;
     }
+
+    const moves::Move* which_sees(const Index<n>& target) const {
+        if (this -> dead) {
+            return nullptr;
+        }
+
+        if (!this -> has_moved){
+            index_t num_openers = this -> figure -> num_openers;
+            std::shared_ptr<moves::Move[]> opener_list = this -> figure -> opener_list;
+
+            for (index_t i = 0; i < num_openers; i++){
+                if (opener_list[i].sees(*(this -> board), this -> position, target, this -> player_index)){
+                    return &opener_list[i];
+                }
+            }
+
+            if (this -> figure -> open_exclusive){
+                return nullptr;
+            }
+        }
+
+        index_t num_moves = this -> figure -> num_moves;
+        std::shared_ptr<moves::Move[]> move_list = this -> figure -> move_list;
+
+        for (index_t i = 0; i < num_moves; i++){
+            if (move_list[i].sees(*(this -> board), this -> position, target, this -> player_index)){
+                return &move_list[i];
+            }
+        }
+
+        return nullptr;
+    }
 };
+
 
 template<index_t n>
 struct game::Player{
@@ -109,13 +146,16 @@ struct game::Player{
 };
 
 
-
 template <index_t n, index_t p>
 struct game::Game{
     structs::Grid<std::shared_ptr<game::Piece>, n> board;
     structs::Tuple<std::shared_ptr<game::Player>, p> players;
+    index_t turn;
 
-    Game(structs::Grid<std::shared_ptr<game::Piece>, n>&& board, structs::Tuple<std::shared_ptr<game::Player>, p>&& players) : board(board), players(players) {}
+    std::vector<MoveRecord> history;
+
+
+    Game(structs::Grid<std::shared_ptr<game::Piece>, n>&& board, structs::Tuple<std::shared_ptr<game::Player>, p>&& players) : board(board), turn(0), players(players), history() {}
 
     Game(const Game&) = default;
     Game(Game&&) = default;
@@ -123,25 +163,69 @@ struct game::Game{
     ~Game() = default;
 
 
-    private:
-        bool in_check(index_t player_index) const {
-            std::shared_ptr<game::Player> player = this -> players[player_index];
 
-            if (player -> monarchs.size() == 1){
-                const game::Piece& king = player -> monarchs[0];
+    bool move(const Index<n>& start, const Index<n>& end) const {
+        std::shared_ptr<game::Piece> piece = this -> board[start];
 
-                for (index_t i = 0; i < p; i++){
-                    if (i != player_index){
-                        std::shared_ptr<game::Player> opponent = this -> players[i];
-                        if (opponent -> army_sees(king.position)){
-                            return true;
-                        }
+        if (piece == nullptr) {
+            return false;
+        } 
+
+        const moves::Move* move = piece -> which_sees(end);
+
+        if (move == nullptr){
+            return false;
+        } else {
+            std::shared_ptr<game::Piece> target_piece = this -> board[end + piece -> capture_displacement];
+
+            if (target_piece != nullptr){
+                target_piece -> dead = true;
+            }
+
+            piece -> position = end;
+            this -> board[start] = nullptr;
+            this -> board[end] = piece;
+
+            if (this -> in_check(piece -> player_index)) {
+                piece -> position = start;
+                this -> board[start] = piece;
+                this -> board[end] = target_piece;
+
+                if (target_piece != nullptr){
+                    target_piece -> dead = false;
+                }
+
+                return false;
+            } else {
+                this -> history.emplace_back(start, end);
+                return true;
+            }
+        }
+    }
+
+
+    bool in_check(index_t player_index) const {
+        std::shared_ptr<game::Player> player = this -> players[player_index];
+
+        if (player -> monarchs.size() == 1){
+            const game::Piece& king = player -> monarchs[0];
+
+            for (index_t i = 0; i < p; i++){
+                if (i != player_index){
+                    std::shared_ptr<game::Player> opponent = this -> players[i];
+                    if (opponent -> army_sees(king.position)){
+                        return true;
                     }
                 }
             }
-
-            return false;
         }
-    
 
+        return false;
+    }
+
+    private:
+
+
+        
 };
+

@@ -8,6 +8,7 @@
 #include<memory>
 #include<stdexcept>
 #include<set>
+#include<vector>
 
 typedef unsigned short index_t;
 typedef signed short arith_t;
@@ -60,6 +61,9 @@ namespace game {
 
     template<index_t n>
     struct Player;
+
+    template<index_t n>
+    using MoveRecord = structs::Tuple<structs::Index<n>, 2>;
 
     template<index_t n, index_t p>
     struct Game;
