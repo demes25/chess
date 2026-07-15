@@ -7,23 +7,25 @@
 #include<iostream>
 #include<memory>
 #include<stdexcept>
+#include<set>
 
 typedef unsigned short index_t;
-typedef unsigned long size_t;
+typedef signed short arith_t;
+typedef float value_t;
 
 namespace structs {
     template<typename T, index_t n>
     struct Tuple;
 
-    template<index_t n> 
-    using Index = Tuple<index_t, n>;
-
-    template<index_t n>
-    using Vector = Tuple<index_t, n>;
-
-
     template <typename T, index_t n>
     struct Grid;
+
+    template<index_t n>
+    struct Index;
+
+    template<index_t n>
+    struct Vector;
+
 
     template <index_t n>
     struct BitMap;
@@ -59,6 +61,9 @@ namespace game {
     template<index_t n>
     struct Player;
 
-    template<index_t n>
-    struct Board;
+    template<index_t n, index_t p>
+    struct Game;
+
+    template<index_t n, index_t p>
+    struct Set;
 }
