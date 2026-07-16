@@ -43,10 +43,10 @@ struct game::Piece{
 
         if (!this -> has_moved){
             index_t num_openers = this -> figure -> num_openers;
-            std::shared_ptr<moves::Move[]> opener_list = this -> figure -> opener_list;
+            const std::vector<moves::Move>& opener_list = this -> figure -> opener_list;
 
-            for (index_t i = 0; i < num_openers; i++){
-                if (opener_list[i].sees(*(this -> board), this -> position, target, this -> player_index)){
+            for (const moves::Move& opener : opener_list){
+                if (opener.sees(*(this -> board), this -> position, target, this -> player_index)){
                     return true;
                 }
             }
@@ -56,11 +56,10 @@ struct game::Piece{
             }
         }
 
-        index_t num_moves = this -> figure -> num_moves;
-        std::shared_ptr<moves::Move[]> move_list = this -> figure -> move_list;
+        const std::vector<moves::Move>& move_list = this -> figure -> move_list;
 
-        for (index_t i = 0; i < num_moves; i++){
-            if (move_list[i].sees(*(this -> board), this -> position, target, this -> player_index)){
+        for (const moves::Move& move : move_list){
+            if (move.sees(*(this -> board), this -> position, target, this -> player_index)){
                 return true;
             }
         }
@@ -150,6 +149,13 @@ struct game::Instance{
     Instance& operator=(Instance&&) = default;
     ~Instance() = default;
 
+    Piece* operator[](const Index<n>& i) {
+        return this -> board[i];
+    }
+
+    const Piece* operator[](const Index<n>& i) const {
+        return this -> board[i];
+    }
 
     json execute(const Index<n>& start, const Index<n>& end) const {
         try{
@@ -210,7 +216,7 @@ struct game::Instance{
             json&& move_json
         ) : board(board), players(players), round(round), turn(turn), history(history), status(status), promoting(promoting), move_json(move_json) {}
 
-        
+
         json move(const Index<n>& start, const Index<n>& end) const {
             Piece* piece = this -> board[start];
 

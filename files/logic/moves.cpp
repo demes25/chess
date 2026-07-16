@@ -42,8 +42,8 @@ struct moves::Move{
     
     protected:
         virtual bool valid_occupancy(const game::Instance& board, const Index<n>& target, index_t player_index) const {
-            std::shared_ptr<game::Piece> piece_at = board.map[target];
-            std::shared_ptr<game::Piece> takes_at = board.map[target + this -> capture_displacement]
+            const game::Piece* piece_at = board[target];
+            const game::Piece* takes_at = board[target + this -> capture_displacement]
 
             if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
