@@ -457,21 +457,26 @@ struct structs::Grid{
 // stores a reference to the shape of the grid and checks updates validity upon every increment/decrement.
 // (throws error if incrementing/decrementing invalid indices).
 template<index_t n>
-struct structs::Index : public Tuple<index_t, n> {
+struct structs::Index {
     const Tuple<index_t, n>& limits;
     const Tuple<index_t, n>& sizes;
 
     template<typename T>
-    Index(const Grid<T, n>& grid) : Tuple<index_t, n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
-    
-    template<typename T>
-    Index(const Grid<T, n>& grid, const Tuple<index_t, n>& value) : Tuple<index_t, n>(value), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {
+    Index(Tuple<index_t, n>&& value, const Tuple<index_t, n>& limits, const Tuple<index_t, n>& sizes) : Tuple<index_t, n>(value), limits(limits), sizes(sizes), collapsed(0), valid(true) {
         try {
             this -> collapsed = this -> collapse(value);
         } catch(...) {
             this -> valid = false;
         }
     }
+    
+    template<typename T>
+    Index(const Grid<T, n>& grid) : Tuple<index_t, n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
+    
+    template<typename T>
+    Index(const Grid<T, n>& grid, Tuple<index_t, n>&& value) : Index(value, grid.get_shape(), grid.get_sizes()) {}
+
+
     
     template<typename T>
     static Index begin(const Grid<T, n>& grid) {
@@ -527,6 +532,8 @@ struct structs::Index : public Tuple<index_t, n> {
 
         return *this;
     }
+
+    index_t& operator[](index_t i) = delete;
 
 
     Index& operator++() {

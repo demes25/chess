@@ -1,24 +1,25 @@
 // Demetre Seturidze
 // Chess
-// Game
+// Instances
 
 #include"logic.hpp"
-#include"moves.cpp"
 
 using namespace structs;
 
 template <index_t n>
 struct game::Piece{
-    const char* name;
+    const std::string name;
     const index_t index;
     mutable Index<n> position;
 
     const std::shared_ptr<moves::Figure<n>> figure;
-    mutable std::shared_ptr<game::Board> board;
+    mutable std::shared_ptr<Instance> board;
 
     const index_t player_index;
 
     const std::shared_ptr<index_t[]> promotion_list;
+    const index_t num_promotions;
+
     const index_t promotion_axis;
 
     mutable bool dead;
@@ -26,8 +27,8 @@ struct game::Piece{
     mutable bool has_moved;
     mutable bool just_opened;
 
-    Piece(const char* name, index_t index, Tuple<index_t, n>&& position, std::shared_ptr<moves::Figure<n>> figure, index_t player_index, std::shared_ptr<index_t[]> promotion_list, index_t promotion_axis) : name(name), index(index), position(position), figure(figure), player_index(player_index), promotion_list(promotion_list), promotion_axis(promotion_axis){}
-    
+    Piece(const std::string& name, index_t index, Tuple<index_t, n>&& position, std::shared_ptr<moves::Figure<n>> figure, std::shared_ptr<Instance> board, index_t player_index, std::shared_ptr<index_t[]> promotion_list, index_t num_promotions, index_t promotion_axis, bool dead, bool has_moved, bool just_opened) : name(name), index(index), position(position), figure(figure), board(board), player_index(player_index), promotion_list(promotion_list), num_promotions(num_promotions), promotion_axis(promotion_axis), dead(dead), has_moved(has_moved), just_opened(just_opened){}
+
     Piece(const Piece&) = default;
     Piece(Piece&&) = default;
 
@@ -112,20 +113,20 @@ struct game::Player{
 
     value_t material;
 
-    std::set<game::Piece> pawns;
-    std::set<game::Piece> pieces;
-    std::set<game::Piece> monarchs;
+    std::set<Piece> pawns;
+    std::set<Piece> pieces;
+    std::set<Piece> monarchs;
 
-    Player(index_t index, std::set<game::Piece>&& pawns, std::set<game::Piece>&& pieces, std::unique_ptr<game::Piece>&& monarchs) : index(index), pawns(pawns), pieces(pieces), monarchs(monarchs) {}
+    Player(index_t index, value_t material, std::set<Piece>&& pawns, std::set<Piece>&& pieces, std::set<Piece>&& monarchs) : index(index), material(material), pawns(pawns), pieces(pieces), monarchs(monarchs) {}
     
     bool army_sees(const Index<n>& target) const {
-        for (game::Piece& piece : this -> pieces){
+        for (const Piece& piece : this -> pieces){
             if (piece.sees(target)){
                 return true;
             }
         }
 
-        for (const game::Piece& pawn : this -> pawns){
+        for (const Piece& pawn : this -> pawns){
             if (pawn.sees(target)){
                 return true;
             }
@@ -135,7 +136,7 @@ struct game::Player{
     }
 
     bool monarchs_see(const Index<n>& target) const {
-        for (const game::Piece& monarch : this -> monarchs){
+        for (const Piece& monarch : this -> monarchs){
             if (monarch.sees(target)){
                 return true;
             }
@@ -147,25 +148,26 @@ struct game::Player{
 
 
 template <index_t n, index_t p>
-struct game::Game{
-    structs::Grid<std::shared_ptr<game::Piece>, n> board;
-    structs::Tuple<std::shared_ptr<game::Player>, p> players;
+struct game::Instance{
+    Grid<Piece*, n> board;
+    Tuple<Player, p> players;
+    
+    Tuple<Action<n>, p> round;
     index_t turn;
 
-    std::vector<MoveRecord> history;
+    std::vector<Tuple<Action<n>, p>> history;
 
 
-    Game(structs::Grid<std::shared_ptr<game::Piece>, n>&& board, structs::Tuple<std::shared_ptr<game::Player>, p>&& players) : board(board), turn(0), players(players), history() {}
+    Instance(Grid<Piece*, n>&& board, Tuple<Player, p>&& players) : board(board), turn(0), players(players), history() {}
 
-    Game(const Game&) = default;
-    Game(Game&&) = default;
+    Instance(const Instance&) = default;
+    Instance(Instance&&) = default;
     
-    ~Game() = default;
-
+    ~Instance() = default;
 
 
     bool move(const Index<n>& start, const Index<n>& end) const {
-        std::shared_ptr<game::Piece> piece = this -> board[start];
+        Piece* piece = this -> board[start];
 
         if (piece == nullptr) {
             return false;
@@ -176,7 +178,7 @@ struct game::Game{
         if (move == nullptr){
             return false;
         } else {
-            std::shared_ptr<game::Piece> target_piece = this -> board[end + piece -> capture_displacement];
+            Piece* target_piece = this -> board[end + piece -> capture_displacement];
 
             if (target_piece != nullptr){
                 target_piece -> dead = true;
@@ -205,15 +207,15 @@ struct game::Game{
 
 
     bool in_check(index_t player_index) const {
-        std::shared_ptr<game::Player> player = this -> players[player_index];
+        const Player<n>& player = this -> players[player_index];
 
         if (player -> monarchs.size() == 1){
-            const game::Piece& king = player -> monarchs[0];
+            const Piece& king = player -> monarchs[0];
 
             for (index_t i = 0; i < p; i++){
                 if (i != player_index){
-                    std::shared_ptr<game::Player> opponent = this -> players[i];
-                    if (opponent -> army_sees(king.position)){
+                    const Player<n>& opponent = this -> players[i];
+                    if (opponent.army_sees(king.position)){
                         return true;
                     }
                 }
@@ -223,9 +225,224 @@ struct game::Game{
         return false;
     }
 
+
+    json serialize() const {
+        json _board = this -> tuple_to_json(this -> board.get_shape());
+        json _history = this -> history_to_json(this -> history);
+        json _round = this -> round_to_json(this -> round);
+        json _players = this -> players_to_json(this -> players);
+
+        return {
+            {"board", _board},
+            {"players", _players},
+            {"round", _round},
+            {"turn", this -> turn},
+            {"history", _history}
+        }
+    }
+
+
     private:
+        json tuple_to_json(const Tuple<index_t, n>& i) const{
+            json j = json::array();
+
+            for (index_t k; k < n; k++){
+                j.push_back(i[k]);
+            }
+
+            return j;
+        }
+
+        Tuple<index_t, n> tuple_from_json(const json& j) const {
+            Tuple<index_t, n> temp;
+
+            for (index_t k; k < n; k++){
+                temp[k] = j[k];
+            }
+
+            return temp;
+        }
+
+        Index<n> index_from_json(const json& j) const{
+            Tuple<index_t, n> temp;
+
+            for (index_t k; k < n; k++){
+                temp[k] = j[k];
+            }
+
+            return Index<n>(*this, std::move(temp));
+        }
 
 
-        
+        json round_to_json(const Tuple<Action<n>, p>& r) const{
+            json j = json::array();
+
+            for (index_t k; k < n; k++){
+                j.push_back(std::move(this -> tuple_to_json(r[k])));
+            }
+
+            return j;
+        }
+
+        Tuple<Action<n>, p> round_from_json(const json& j) const{
+            
+            Tuple<Action<n>, p> r;
+
+            for (index_t k; k < j.size(); k++){
+                r[k] = std::move(this -> index_from_json(json[k]));
+            }
+
+            return r;
+        }
+
+
+        json history_to_json(const std::vector<Tuple<Action<n>, p>>& h) const{
+            json j = json::array();
+
+            for (index_t k; k < h.size(); k++){
+                j.push_back(std::move(this -> round_to_json(h[k])));
+            }
+
+            return j;
+        }
+
+        std::vector<Tuple<Action<n>, p>> history_from_json(const json& j) const{
+            
+            std::vector<Tuple<Action<n>, p>> h;
+
+            for (index_t k; k < j.size(); k++){
+                h.push_back(std::move(this -> round_from_json(j[k])));
+            }
+
+            return h;
+        }
+
+
+        //TODO: fix the promotion_list paradigm.
+        json piece_to_json(const Piece<n>& pi) const {
+            json promotion_list = json::array();
+            for (index_t i = 0; i < pi.num_promotions; i++){
+                promotion_list.push_back(pi.promotion_list[i]); 
+            }
+
+            return {
+                {"name", pi.name},
+                {"index", pi.index},
+                {"position", this -> tuple_to_json(pi.position)},
+                {"figure", figure -> name},
+                {"player_index", pi.player_index},
+                {"promotion_list", std::move(promotion_list)},
+                {"num_promotions", pi.num_promotions},
+                {"dead", pi.dead},
+                {"has_moved", pi.has_moved},
+                {"just_opened", pi.just_opened}
+            };
+        }
+
+        Piece piece_from_json(const json& j, std::shared_ptr<Instance> board_ptr) const {
+            index_t num_promotions = j["num_promotions"];
+            const json& json_promotion_list = j["promotion_list"];
+
+            std::shared_ptr<index_t[]> promotion_list = std::make_shared<index_t[]>(num_promotions);
+
+            for (index_t i = 0; i < num_promotions; i++){
+                promotion_list[i] = json_promotion_list[i]; 
+            }
+
+            return Piece<n>(
+                j["name"], 
+                j["index"], 
+                this -> index_from_json(j["position"]),
+                moves::Figure::resolve(j["figure"]),
+                board_ptr,
+                j["player_index"],
+                promotion_list,
+                num_promotions,
+                j["promotion_axis"],
+                j["dead"],
+                j["has_moved"],
+                j["just_opened"]
+            );
+        }
+
+
+        json player_to_json(const Player<n>& pl) const {
+            json pieces = json::array();
+            json pawns = json::array();
+            json monarchs = json::array();
+
+            for (const Piece& piece : pl.pieces){
+                pieces.push_back(this -> piece_to_json(piece));
+            }
+
+            for (const Piece& pawn : pl.pawns){
+                pawns.push_back(this -> piece_to_json(pawn));
+            }
+
+            for (const Piece& monarch : pl.monarchs){
+                monarchs.push_back(this -> piece_to_json(monarch));
+            }
+
+            return {
+                {"index", pl.index},
+                {"material", pl.material},
+                {"pawns", pawns},
+                {"pieces", pieces},
+                {"monarchs", monarchs}
+            }
+        }
+
+        Player<n> player_from_json(const json& j) const {
+            std::set<Piece<n>> pieces;
+            std::set<Piece<n>> pawns;
+            std::set<Piece<n>> monarchs;
+
+            const json& jpieces = j["pieces"];
+            const json& jpawns = j["pawns"];
+            const json& jmonarchs = j["monarchs"];
+
+            for (const auto& piece : jpieces){
+                pieces.insert(std::move(this -> piece_from_json(piece)));
+            }
+
+            for (const auto& pawn : jpawns){
+                pawns.insert(std::move(this -> piece_from_json(pawn)));
+            }
+
+            for (const auto& monarch : jmonarchs){
+                monarchs.insert(std::move(this -> piece_from_json(monarch)));
+            }
+
+            return Player<n>(
+                j["index"],
+                j["material"],
+                std::move(pawns),
+                std::move(pieces),
+                std::move(monarchs)
+            ) 
+        }
+
+
+        json players_to_json(const Tuple<Player<n>, p>& ps) const{
+            json j = json::array();
+
+            for (index_t k; k < p; k++){
+                j.push_back(std::move(this -> player_to_json(ps[k])));
+            }
+
+            return j;
+        }
+
+        Tuple<Player<n>, p> players_from_json(const json& j) const{
+            
+            Tuple<Player<n>, p> ps;
+
+            for (index_t k; k < p; k++){
+                ps[k] = std::move(this -> player_from_json(j[k]));
+            }
+
+            return ps;
+        }
+
 };
 

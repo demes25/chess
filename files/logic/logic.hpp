@@ -8,11 +8,14 @@
 #include<memory>
 #include<stdexcept>
 #include<set>
+#include<unordered_map>
 #include<vector>
+#include"json.hpp"
 
 typedef unsigned short index_t;
 typedef signed short arith_t;
 typedef float value_t;
+using json = nlohmann::json;
 
 namespace structs {
     template<typename T, index_t n>
@@ -23,10 +26,9 @@ namespace structs {
 
     template<index_t n>
     struct Index;
-
+    
     template<index_t n>
     struct Vector;
-
 
     template <index_t n>
     struct BitMap;
@@ -35,15 +37,9 @@ namespace structs {
 namespace moves {
     template<index_t n>
     struct Move;
-    
-    template<index_t n>
-    struct Discrete;
 
     template<index_t n>
-    struct Leap;
-
-    template<index_t n>
-    struct Spanning;
+    struct Span;
 
     template<index_t n>
     struct Compound;
@@ -63,11 +59,46 @@ namespace game {
     struct Player;
 
     template<index_t n>
-    using MoveRecord = structs::Tuple<structs::Index<n>, 2>;
+    using Action = structs::Tuple<structs::Index<n>, 2>;
+
+    template<index_t n>
+    struct Event{
+        const char* label;
+        Action<n> move;
+        std::vector<const char*> sounds;
+        arith_t promotion_axis;
+    };
 
     template<index_t n, index_t p>
-    struct Game;
+    struct Instance;
 
     template<index_t n, index_t p>
     struct Set;
 }
+
+template<index_t n>
+void to_json(json& j, const structs::Vector<n>& v);
+
+template<index_t n>
+void from_json(const json& j, structs::Vector<n>& v);
+
+
+template<index_t n>
+void to_json(json& j, const moves::Move<n>& m);
+
+template<index_t n>
+void from_json(const json& j, moves::Move<n>& m);
+
+
+template<index_t n>
+void to_json(json& j, const moves::Figure<n>& f);
+
+template<index_t n>
+void from_json(const json& j, moves::Figure<n>& f);
+
+
+template<index_t n, index_t p>
+void to_json(json& j, const game::Instance<n, p>& g);
+
+template<index_t n, index_t p>
+void from_json(json& j, game::Instance<n, p>& g);
