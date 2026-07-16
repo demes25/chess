@@ -33,17 +33,17 @@ struct moves::Move{
         return this -> directions[i];
     }
 
-    bool sees(const game::Instance& instance, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+    bool sees(const Grid<game::Piece<n>, n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         return (
-            this -> valid_occupancy(instance, target, player_index) && this -> valid_square(instance, position, target);
+            this -> valid_occupancy(board, target, player_index) && this -> valid_square(instance, position, target);
         )
     }
 
     
     protected:
-        virtual bool valid_occupancy(const game::Instance& instance, const Index<n>& target, index_t player_index) const {
-            const game::Piece* piece_at = instance[target];
-            const game::Piece* takes_at = instance[target + this -> capture_displacement]
+        virtual bool valid_occupancy(const Grid<game::Piece<n>, n>& board, const Index<n>& target, index_t player_index) const {
+            const game::Piece* piece_at = board[target];
+            const game::Piece* takes_at = board[target + this -> capture_displacement]
 
             if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
@@ -56,7 +56,7 @@ struct moves::Move{
             else return false;
         }
 
-        virtual bool valid_square(const game::Instance& instance, const Index<n>& position, const Index<n>& target) const = 0;
+        virtual bool valid_square(const Grid<game::Piece<n>, n>& board, const Index<n>& position, const Index<n>& target) const = 0;
 };
 
 
