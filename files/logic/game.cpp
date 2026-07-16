@@ -17,8 +17,7 @@ struct game::Piece{
 
     const index_t player_index;
 
-    const std::shared_ptr<index_t[]> promotion_list;
-    const index_t num_promotions;
+    const std::vector<index_t> promotion_list;
 
     const index_t promotion_axis;
 
@@ -27,14 +26,10 @@ struct game::Piece{
     mutable bool has_moved;
     mutable bool just_opened;
 
-    Piece(const std::string& name, index_t index, Tuple<index_t, n>&& position, std::shared_ptr<moves::Figure<n>> figure, std::shared_ptr<Instance> board, index_t player_index, std::shared_ptr<index_t[]> promotion_list, index_t num_promotions, index_t promotion_axis, bool dead, bool has_moved, bool just_opened) : name(name), index(index), position(position), figure(figure), board(board), player_index(player_index), promotion_list(promotion_list), num_promotions(num_promotions), promotion_axis(promotion_axis), dead(dead), has_moved(has_moved), just_opened(just_opened){}
-
-    Piece(const Piece&) = default;
+    Piece(std::string&& name, index_t index, Tuple<index_t, n>&& position, std::shared_ptr<moves::Figure<n>> figure, std::shared_ptr<Instance> board, index_t player_index, std::vector<index_t>&& promotion_list, index_t promotion_axis, bool dead, bool has_moved, bool just_opened) : name(name), index(index), position(position), figure(figure), board(board), player_index(player_index), promotion_list(promotion_list), promotion_axis(promotion_axis), dead(dead), has_moved(has_moved), just_opened(just_opened){}
     Piece(Piece&&) = default;
 
     ~Piece() = default;
-
-    Piece& operator=(const Piece&) = default;
     Piece&& operator=(Piece&&) = default;
 
     bool operator<(const Piece& p) const {
@@ -149,20 +144,10 @@ struct game::Player{
 
 template <index_t n, index_t p>
 struct game::Instance{
-    Grid<Piece*, n> board;
-    Tuple<Player, p> players;
-    
-    Tuple<Action<n>, p> round;
-    index_t turn;
+    Instance(Grid<Piece*, n>&& board, Tuple<Player, p>&& players) : board(board), turn(0), players(players), promoting(nullptr){} 
 
-    std::vector<Tuple<Action<n>, p>> history;
-
-
-    Instance(Grid<Piece*, n>&& board, Tuple<Player, p>&& players) : board(board), turn(0), players(players), history() {}
-
-    Instance(const Instance&) = default;
     Instance(Instance&&) = default;
-    
+    Instance& operator=(Instance&&) = default;
     ~Instance() = default;
 
 
@@ -186,25 +171,46 @@ struct game::Instance{
 
 
     json serialize() const {
-        json _board = this -> tuple_to_json(this -> board.get_shape());
-        json _history = this -> history_to_json(this -> history);
-        json _round = this -> round_to_json(this -> round);
-        json _players = this -> players_to_json(this -> players);
-
         return {
-            {"board", _board},
-            {"players", _players},
-            {"round", _round},
+            {"board", this -> board.get_shape()},
+            {"players", this -> history},
+            {"round", this -> round},
             {"turn", this -> turn},
-            {"history", _history}
+            {"history", this -> players_to_json(this -> players)}
         }
     }
 
 
     private:
+        Grid<Piece*, n> board;
+        Tuple<Player, p> players;
+        
+        Tuple<Action<n>, p> round;
+        index_t turn;
+
+        std::vector<Tuple<Action<n>, p>> history;
+
+        Status status;
+        Piece* promoting;
 
         json move_json;
 
+        Instance(
+            Grid<Piece*, n>&& board,
+            Tuple<Player, p>&& players,
+            
+            Tuple<Action<n>, p>&& round,
+            index_t turn,
+
+            std::vector<Tuple<Action<n>, p>>&& history,
+
+            Status status,
+            Piece* promoting,
+
+            json&& move_json
+        ) : board(board), players(players), round(round), turn(turn), history(history), status(status), promoting(promoting), move_json(move_json) {}
+
+        
         json move(const Index<n>& start, const Index<n>& end) const {
             Piece* piece = this -> board[start];
 
@@ -258,7 +264,6 @@ struct game::Instance{
         bool post_move_and_vet() const {}
 
 
-
         bool in_check(index_t player_index) const {
             const Player<n>& player = this -> players[player_index];
 
@@ -278,110 +283,16 @@ struct game::Instance{
             return false;
         }
 
-        json tuple_to_json(const Tuple<index_t, n>& i) const{
-            json j = json::array();
-
-            for (index_t k; k < n; k++){
-                j.push_back(i[k]);
-            }
-
-            return j;
-        }
-
-        Tuple<index_t, n> tuple_from_json(const json& j) const {
-            Tuple<index_t, n> temp;
-
-            for (index_t k; k < n; k++){
-                temp[k] = j[k];
-            }
-
-            return temp;
-        }
-
-        Index<n> index_from_json(const json& j) const{
-            Tuple<index_t, n> temp;
-
-            for (index_t k; k < n; k++){
-                temp[k] = j[k];
-            }
-
-            return Index<n>(*this, std::move(temp));
-        }
-
-        json action_to_json(const Action<n>& a) const {
-            json j = json::array();
-            j.push_back(this -> tuple_to_json(a[0]));
-            j.push_back(this -> tuple_to_json(a[1]));
-            return j;
-        }
-
-        Action<n> action_from_json(const json& j) const {
-            return Action<n>(
-                this -> index_from_json(j[0]),
-                this -> index_from_json(j[1])
-            )
-        }
 
 
-        json round_to_json(const Tuple<Action<n>, p>& r) const{
-            json j = json::array();
-
-            for (index_t k; k < n; k++){
-                j.push_back(std::move(this -> action_to_json(r[k])));
-            }
-
-            return j;
-        }
-
-        Tuple<Action<n>, p> round_from_json(const json& j) const{
-            
-            Tuple<Action<n>, p> r;
-
-            for (index_t k; k < j.size(); k++){
-                r[k] = std::move(this -> action_from_json(j[k]));
-            }
-
-            return r;
-        }
-
-
-        json history_to_json(const std::vector<Tuple<Action<n>, p>>& h) const{
-            json j = json::array();
-
-            for (index_t k; k < h.size(); k++){
-                j.push_back(std::move(this -> round_to_json(h[k])));
-            }
-
-            return j;
-        }
-
-        std::vector<Tuple<Action<n>, p>> history_from_json(const json& j) const{
-            
-            std::vector<Tuple<Action<n>, p>> h;
-
-            for (index_t k; k < j.size(); k++){
-                h.push_back(std::move(this -> round_from_json(j[k])));
-            }
-
-            return h;
-        }
-
-
-        //TODO: fix the promotion_list paradigm.
         json piece_to_json(const Piece<n>& pi) const {
-            json promotion_list = json::array();
-            for (index_t i = 0; i < pi.num_promotions; i++){
-                promotion_list.push_back(pi.promotion_list[i]); 
-            }
-
             return {
                 {"name", pi.name},
                 {"index", pi.index},
-                {"position", this -> tuple_to_json(pi.position)},
-                {"figure", figure -> name},
+                {"position", pi.position},
+                {"figure", pi.figure -> name},
                 {"player_index", pi.player_index},
-                {"promotion_list", std::move(promotion_list)},
-                {"num_promotions", pi.num_promotions},
+                {"promotion_list", pi.promotion_list},
                 {"dead", pi.dead},
                 {"has_moved", pi.has_moved},
                 {"just_opened", pi.just_opened}
@@ -389,28 +300,21 @@ struct game::Instance{
         }
 
         Piece piece_from_json(const json& j, std::shared_ptr<Instance> board_ptr) const {
-            index_t num_promotions = j["num_promotions"];
-            const json& json_promotion_list = j["promotion_list"];
-
-            std::shared_ptr<index_t[]> promotion_list = std::make_shared<index_t[]>(num_promotions);
-
-            for (index_t i = 0; i < num_promotions; i++){
-                promotion_list[i] = json_promotion_list[i]; 
-            }
-
             return Piece<n>(
-                j["name"], 
-                j["index"], 
-                this -> index_from_json(j["position"]),
-                moves::Figure::resolve(j["figure"]),
+                std::move(j.at("name").get<std::string>()), 
+                j.at("index").get<index_t>(), 
+
+                Index<n>(std::move(j.at("position").get<Tuple<index_t, n>>()), *this),
+                moves::Figure::resolve(j.at("figure").get<std::string>()),
+
                 board_ptr,
-                j["player_index"],
-                promotion_list,
-                num_promotions,
-                j["promotion_axis"],
-                j["dead"],
-                j["has_moved"],
-                j["just_opened"]
+
+                j.at("player_index").get<index_t>(),
+                j.at("promotion_list").get<std::vector<index_t>>(),
+
+                j.at("dead").get<bool>(),
+                j.at("has_moved").get<bool>(),
+                j.at("just_opened").get<bool>()
             );
         }
 
@@ -494,4 +398,3 @@ struct game::Instance{
         }
 
 };
-

@@ -68,13 +68,14 @@ namespace game {
     struct Set;
 }
 
-template<index_t n>
-void to_json(json& j, const structs::Vector<n>& v);
+template<typename T, index_t n>
+void to_json(json& j, const structs::Tuple<T, n>& v);
 
-template<index_t n>
-void from_json(const json& j, structs::Vector<n>& v);
+template<typename T, index_t n>
+void from_json(const json& j, structs::Tuple<T, n>& v);
 
 
+/*
 template<index_t n>
 void to_json(json& j, const moves::Move<n>& m);
 
@@ -87,7 +88,7 @@ void to_json(json& j, const moves::Figure<n>& f);
 
 template<index_t n>
 void from_json(const json& j, moves::Figure<n>& f);
-
+*/
 
 template<index_t n, index_t p>
 void to_json(json& j, const game::Instance<n, p>& g);

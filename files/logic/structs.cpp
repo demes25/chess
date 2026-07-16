@@ -23,6 +23,9 @@ struct structs::Tuple{
 
     ~Tuple() = default;
 
+    Tuple& operator=(const Tuple&) = default;
+    Tuple& operator=(Tuple&&) = default;
+
     void fill(const T& t) {
         for (index_t i = 0; i < n; ++i){
             this -> at(i) = t;
@@ -81,11 +84,31 @@ struct structs::Tuple{
         }
 };
 
+template <typename T, index_t n>
+void to_json(json& j, const structs::Tuple<T, n>& v){
+    for (index_t i = 0; i < n; i++){
+        json j;
+        to_json(j, v[i]);
+        j.push_back(std::move(j));
+    }
+}
+
+template <typename T, index_t n>
+void from_json(const json& j, structs::Tuple<T, n>& v){
+    for (index_t i = 0; i < n; i++){
+        v[i] = j[i];
+    }
+}
+
+
 
 // A Tuple<arith_t, n> with mathematical operations defined.
 template<index_t n>
 struct structs::Vector : public Tuple<arith_t, n> {
     using Tuple<arith_t, n>::Tuple;
+
+    Vector& operator=(const Vector&) = default;
+    Vector& operator=(Vector&&) = default;
 
     Vector operator+(const Vector& v) const {
         Vector result;
@@ -274,6 +297,9 @@ struct structs::Grid{
     Grid(Grid&&) = default;
 
     ~Grid() = default;
+
+    Grid& operator=(const Grid&) = default;
+    Grid& operator=(Grid&&) = default;
 
 
     template<typename... Args>
@@ -474,7 +500,7 @@ struct structs::Index {
     Index(const Grid<T, n>& grid) : Tuple<index_t, n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
     
     template<typename T>
-    Index(const Grid<T, n>& grid, Tuple<index_t, n>&& value) : Index(value, grid.get_shape(), grid.get_sizes()) {}
+    Index(Tuple<index_t, n>&& value, const Grid<T, n>& grid) : Index(value, grid.get_shape(), grid.get_sizes()) {}
 
 
     
