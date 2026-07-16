@@ -61,14 +61,6 @@ namespace game {
     template<index_t n>
     using Action = structs::Tuple<structs::Index<n>, 2>;
 
-    template<index_t n>
-    struct Event{
-        const char* label;
-        Action<n> move;
-        std::vector<const char*> sounds;
-        arith_t promotion_axis;
-    };
-
     template<index_t n, index_t p>
     struct Instance;
 

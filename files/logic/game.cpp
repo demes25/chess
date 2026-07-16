@@ -117,7 +117,7 @@ struct game::Player{
     std::set<Piece> pieces;
     std::set<Piece> monarchs;
 
-    Player(index_t index, value_t material, std::set<Piece>&& pawns, std::set<Piece>&& pieces, std::set<Piece>&& monarchs) : index(index), material(material), pawns(pawns), pieces(pieces), monarchs(monarchs) {}
+    Player(index_t index, value_t material, std::set<Piece>&& pawns, std::set<Piece>&& pieces, std::set<Piece>&& monarchs) : index(index), material(material), pawns(pawns), pieces(pieces), monarchs(monarchs), {}
     
     bool army_sees(const Index<n>& target) const {
         for (const Piece& piece : this -> pieces){
@@ -166,63 +166,22 @@ struct game::Instance{
     ~Instance() = default;
 
 
-    bool move(const Index<n>& start, const Index<n>& end) const {
-        Piece* piece = this -> board[start];
-
-        if (piece == nullptr) {
-            return false;
-        } 
-
-        const moves::Move* move = piece -> which_sees(end);
-
-        if (move == nullptr){
-            return false;
+    json execute(const Index<n>& start, const Index<n>& end) const {
+        try{
+            this -> move(start, end);
+        } catch(const std::exception& e){
+            return {
+                {"label", "error"},
+                {"content", e.what()}
+            }
+        }
+        if (this -> post_move_and_vet()){
+            json r = std::move(this -> move_json);
+            this -> move_json = nullptr;
+            return r;
         } else {
-            Piece* target_piece = this -> board[end + piece -> capture_displacement];
-
-            if (target_piece != nullptr){
-                target_piece -> dead = true;
-            }
-
-            piece -> position = end;
-            this -> board[start] = nullptr;
-            this -> board[end] = piece;
-
-            if (this -> in_check(piece -> player_index)) {
-                piece -> position = start;
-                this -> board[start] = piece;
-                this -> board[end] = target_piece;
-
-                if (target_piece != nullptr){
-                    target_piece -> dead = false;
-                }
-
-                return false;
-            } else {
-                this -> history.emplace_back(start, end);
-                return true;
-            }
+            return nullptr;
         }
-    }
-
-
-    bool in_check(index_t player_index) const {
-        const Player<n>& player = this -> players[player_index];
-
-        if (player -> monarchs.size() == 1){
-            const Piece& king = player -> monarchs[0];
-
-            for (index_t i = 0; i < p; i++){
-                if (i != player_index){
-                    const Player<n>& opponent = this -> players[i];
-                    if (opponent.army_sees(king.position)){
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
     }
 
 
@@ -243,6 +202,82 @@ struct game::Instance{
 
 
     private:
+
+        json move_json;
+
+        json move(const Index<n>& start, const Index<n>& end) const {
+            Piece* piece = this -> board[start];
+
+            if (piece == nullptr) {
+                throw std::runtime_error("empty");
+            } 
+
+            const moves::Move* move = piece -> which_sees(end);
+
+            if (move == nullptr){
+                throw std::runtime_error("illegal");
+            } else {
+                Piece* target_piece = this -> board[end + piece -> capture_displacement];
+
+                if (target_piece != nullptr){
+                    target_piece -> dead = true;
+                }
+
+                piece -> position = end;
+                this -> board[start] = nullptr;
+                this -> board[end] = piece;
+
+                if (this -> in_check(piece -> player_index)) {
+                    piece -> position = start;
+                    this -> board[start] = piece;
+                    this -> board[end] = target_piece;
+
+                    if (target_piece != nullptr){
+                        target_piece -> dead = false;
+                    }
+
+                    throw std::runtime_error("check");
+                } else {
+                    this -> history.emplace_back(start, end);
+                    
+                    if (target_piece == nullptr){
+                        json die = nullptr;
+                    } else {
+                        json die = this -> tuple_to_json(target_piece -> position); 
+                    }
+
+                    this -> move_json = {
+                        {"label", "move"},
+                        {"action", this -> action_to_json(this -> history.back())},
+                        {"die", die},
+                    };
+                }
+            }
+        }
+
+        bool post_move_and_vet() const {}
+
+
+
+        bool in_check(index_t player_index) const {
+            const Player<n>& player = this -> players[player_index];
+
+            if (player -> monarchs.size() == 1){
+                const Piece& king = player -> monarchs[0];
+
+                for (index_t i = 0; i < p; i++){
+                    if (i != player_index){
+                        const Player<n>& opponent = this -> players[i];
+                        if (opponent.army_sees(king.position)){
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         json tuple_to_json(const Tuple<index_t, n>& i) const{
             json j = json::array();
 
@@ -273,12 +308,26 @@ struct game::Instance{
             return Index<n>(*this, std::move(temp));
         }
 
+        json action_to_json(const Action<n>& a) const {
+            json j = json::array();
+            j.push_back(this -> tuple_to_json(a[0]));
+            j.push_back(this -> tuple_to_json(a[1]));
+            return j;
+        }
+
+        Action<n> action_from_json(const json& j) const {
+            return Action<n>(
+                this -> index_from_json(j[0]),
+                this -> index_from_json(j[1])
+            )
+        }
+
 
         json round_to_json(const Tuple<Action<n>, p>& r) const{
             json j = json::array();
 
             for (index_t k; k < n; k++){
-                j.push_back(std::move(this -> tuple_to_json(r[k])));
+                j.push_back(std::move(this -> action_to_json(r[k])));
             }
 
             return j;
@@ -289,7 +338,7 @@ struct game::Instance{
             Tuple<Action<n>, p> r;
 
             for (index_t k; k < j.size(); k++){
-                r[k] = std::move(this -> index_from_json(json[k]));
+                r[k] = std::move(this -> action_from_json(j[k]));
             }
 
             return r;
