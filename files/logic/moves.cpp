@@ -33,17 +33,17 @@ struct moves::Move{
         return this -> directions[i];
     }
 
-    bool sees(const game::Instance& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+    bool sees(const game::Instance& instance, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         return (
-            this -> valid_occupancy(board, target, player_index) && this -> valid_square(board, position, target);
+            this -> valid_occupancy(instance, target, player_index) && this -> valid_square(instance, position, target);
         )
     }
 
     
     protected:
-        virtual bool valid_occupancy(const game::Instance& board, const Index<n>& target, index_t player_index) const {
-            const game::Piece* piece_at = board[target];
-            const game::Piece* takes_at = board[target + this -> capture_displacement]
+        virtual bool valid_occupancy(const game::Instance& instance, const Index<n>& target, index_t player_index) const {
+            const game::Piece* piece_at = instance[target];
+            const game::Piece* takes_at = instance[target + this -> capture_displacement]
 
             if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
@@ -56,13 +56,14 @@ struct moves::Move{
             else return false;
         }
 
-        virtual bool valid_square(const game::Instance& board, const Index<n>& position, const Index<n>& target) const = 0;
+        virtual bool valid_square(const game::Instance& instance, const Index<n>& position, const Index<n>& target) const = 0;
 };
 
 
 template<index_t n>
 struct moves::Figure {
     const std::string name;
+    const std::string key;
     const value_t value;
 
     const std::vector<moves::Move<n>> move_list;
@@ -70,14 +71,14 @@ struct moves::Figure {
 
     const bool open_exclusive;
 
-    static std::shared_ptr<Figure> define(const std::string& name, value_t value, std::vector<moves::Move<n>>&& move_list, std::vector<moves::Move<n>>&& opener_list, bool open_exclusive){
-        std::shared_ptr<Figure> result = std::make_shared<Figure>(name, value, move_list, opener_list, open_exclusive);
-        Figure::instances[name] = result;
+    static std::shared_ptr<Figure> define(const std::string& name, const std::string& key, value_t value, std::vector<moves::Move<n>>&& move_list, std::vector<moves::Move<n>>&& opener_list, bool open_exclusive){
+        std::shared_ptr<Figure> result = std::make_shared<Figure>(name, key, value, move_list, opener_list, open_exclusive);
+        Figure::instances[key] = result;
         return result;
     }
 
     template<index_t i, index_t j>
-    static std::shared_ptr<Figure> define(const std::string& name, value_t value, const Tuple<moves::Move<n>, i>& move_list, const Tuple<moves::Move<n>, k>& opener_list, bool open_exclusive){
+    static std::shared_ptr<Figure> define(const std::string& name, const std::string& key, value_t value, const Tuple<moves::Move<n>, i>& move_list, const Tuple<moves::Move<n>, k>& opener_list, bool open_exclusive){
         std::vector<moves::Move<n>> temp_moves;
         std::vector<moves::Move<n>> temp_openers;
 
@@ -89,15 +90,15 @@ struct moves::Figure {
             temp_openers.push_back(std::move(opener_list[_j]));
         }
 
-        return Figure::define(name, value, std::move(temp_moves), std::move(temp_openers), open_exclusive)
+        return Figure::define(name, key, value, std::move(temp_moves), std::move(temp_openers), open_exclusive)
     }
 
-    static std::shared_ptr<Figure> resolve(const std::string& name) {
-        return Figure::instances[name];
+    static std::shared_ptr<Figure> resolve(const std::string& key) {
+        return Figure::instances[key];
     }
 
     private:
-        Figure(const std::string& name, value_t value, std::vector<moves::Move>&& move_list, std::vector<moves::Move>&& opener_list, bool open_exclusive) : name(name), value(value), move_list(move_list), opener_list(opener_list), open_exclusive(open_exclusive) {}
+        Figure(const std::string& name, const std::string& key, value_t value, std::vector<moves::Move>&& move_list, std::vector<moves::Move>&& opener_list, bool open_exclusive) : name(name), key(key), value(value), move_list(move_list), opener_list(opener_list), open_exclusive(open_exclusive) {}
 
         static std::unordered_map<std::string, std::shared_ptr<Figure>> instances; 
 };
