@@ -11,14 +11,19 @@
 #include<memory>
 #include<stdexcept>
 #include<set>
+#include<chrono>
 #include<unordered_map>
 #include<vector>
 #include"json.hpp"
 
-typedef unsigned short index_t;
-typedef signed short arith_t;
-typedef float value_t;
+using index_t = unsigned short;
+using arith_t = signed short;
+using value_t = double;
 using json = nlohmann::json;
+
+using clock = std::chrono::steady_clock;
+using duration = std::chrono::duration<double>;
+using timestamp = clock::time_point;
 
 namespace structs {
     template<typename T, index_t n>
@@ -80,7 +85,7 @@ namespace game {
     struct Player;
 
     template<index_t n>
-    using Action = structs::Tuple<structs::Index<n>, 2>;
+    struct Action;
 
     enum Status : char {
         UNBEGUN = '0', ONGOING, PROMOTING, CHECKMATE, STALEMATE, TIMEOUT, DRAW
@@ -88,6 +93,9 @@ namespace game {
 
     template<index_t n, index_t p>
     struct Instance;
+
+    template<index_t n, index_t p>
+    struct SerializableInstance;
 
     template<index_t n, index_t p>
     struct Set;
@@ -98,6 +106,12 @@ void to_json(json& j, const structs::Tuple<T, n>& v);
 
 template<typename T, index_t n>
 void from_json(const json& j, structs::Tuple<T, n>& v);
+
+template<index_t n>
+void to_json(json& j, const game::Action<n>& v);
+
+template<index_t n>
+void from_json(const json& j, game::Action<n>& v);
 
 
 /*

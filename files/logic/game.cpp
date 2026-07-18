@@ -1,6 +1,6 @@
 // Demetre Seturidze
 // Chess
-// Instances
+// Game
 
 #ifndef GAME
 #define GAME
@@ -69,6 +69,7 @@ struct game::Piece{
         just_opened(just_opened){}
     
     Piece(Piece&&) = default;
+    Piece(const Piece&) = default;
 
     ~Piece() = default;
 
@@ -105,7 +106,7 @@ struct game::Piece{
         return this -> figure -> which_move(board, this -> position, target, this -> player_index);
     }
 
-    Piece<n> promote(index_t i) {
+    Piece<n> promoted_piece(index_t i) {
         this -> promoted = true;
 
         const std::string& promotion_fig = this -> promotion_list[i];
@@ -120,7 +121,6 @@ struct game::Piece{
         );
     }
 };
-
 
 template<index_t n>
 struct game::Player{
@@ -141,8 +141,8 @@ struct game::Player{
         pieces(std::forward<std::vector<Piece<n>>>(pieces)), 
         monarchs(std::forward<std::vector<Piece<n>>>(monarchs)) {}
     
-    bool army_sees(const Index<n>& target) const {
-        for (Piece<n>& piece : this -> pieces){
+    bool pieces_see(const Index<n>& target) const {
+        for (const Piece<n>& piece : this -> pieces){
             if (piece.sees(target)){
                 return true;
             }
@@ -162,21 +162,95 @@ struct game::Player{
     }
 
     bool sees(const Index<n>& target) const {
-        return this -> monarchs_see(target) || this -> army_sees(target);
+        return this -> monarchs_see(target) || this -> pieces_see(target);
+    }
+
+
+
+
+    std::vector<Piece<n>*> which_pieces_see(const Index<n>& target) const {
+        std::vector<Piece<n>*> result;
+
+        for (Piece<n>& piece : this -> pieces){
+            if (piece.sees(target)){
+                result.push_back(&piece);
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<Piece<n>*> which_monarchs_see(const Index<n>& target) const {
+        std::vector<Piece<n>*> result;
+
+        for (Piece<n>& monarch : this -> monarchs){
+            if (monarch.sees(target)){
+                result.push_back(&monarch);
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<Piece<n>*> which_see(const Index<n>& target) const {
+        std::vector<Piece<n>*> result;
+
+        for (Piece<n>& piece : this -> pieces){
+            if (piece.sees(target)){
+                result.push_back(&piece);
+            }
+        }
+
+        for (Piece<n>& monarch : this -> monarchs){
+            if (monarch.sees(target)){
+                result.push_back(&monarch);
+            }
+        }
+
+        return result;
+    }
+
+
+
+    index_t how_many_pieces_see(const Index<n>& target) const {
+        index_t n = 0;
+
+        for (const Piece<n>& piece : this -> pieces){
+            if (piece.sees(target)){
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    index_t how_many_monarchs_see(const Index<n>& target) const {
+        index_t n = 0;
+
+        for (const Piece<n>& monarch : this -> monarchs){
+            if (monarch.sees(target)){
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    index_t how_many_see(const Index<n>& target) const {
+        return this -> how_many_pieces_see(target) + this -> how_many_monarchs_see(target);
     }
 };
-
 
 template <index_t n, index_t p>
 struct game::Instance{
     Instance(
         Grid<Piece<n>*, n>&& board, 
         Tuple<Player<n>, p>&& players, 
-        double time
+        duration time
     ) : board(std::forward<Grid<Piece<n>*, n>>(board)), 
         players(std::forward<Tuple<Player<n>, n>>(players)),
+        times(time),
         turn(0), 
-        times(time),  
         promoting(nullptr){} 
 
     Instance(Instance&&) = default;
@@ -191,193 +265,176 @@ struct game::Instance{
         return this -> board[i];
     }
 
-    // MANIPULATORS
-
-    Piece<n>* add(Piece<n>&& piece){
-        std::vector<Piece<n>>& pieces = this -> players[piece.player_index].pieces;
-
-        pieces.push_back(std::forward<Piece<n>>(piece));
-        Piece<n>* result = &pieces.back();
-
-        this -> show(result);
-
-        return result;
-    }
-
-    Piece<n>* add_monarch(Piece<n>&& monarch){
-        std::vector<Piece<n>>& monarchs = this -> players[monarch.player_index].monarchs;
-
-        monarchs.push_back(std::forward<Piece<n>>(monarch));
-        Piece<n>* result = &monarchs.back();
-
-        this -> show(result);
-
-        return result;
-    }
-
-    void show(Piece<n>* piece) {
-        if (piece != nullptr && !piece -> dead && !piece -> promoted){
-            this -> board[piece -> position] = piece;
-        }
-    }
-
-    void kill(Piece<n>* piece) {
-        if (piece != nullptr && !piece -> dead && !piece -> promoted){
-            piece -> dead = true;
-            this -> board[piece -> position] = nullptr;
-        }
-    }
-
-    void unkill(Piece<n>* piece) {
-        if (piece != nullptr && piece -> dead && !piece -> promoted){
-            piece -> dead = false;
-            this -> board[piece -> position] = piece;
-        }
-    }
-
-    void promote(index_t promotion_index) {
-        if (promoting != nullptr) {
-            promoting -> promoted = true;
-            this -> add(promoting -> promote(promotion_index));
-            promoting = nullptr;
-        }
-    }
-
-
-    // COMMANDS
-
-    json execute(const Index<n>& start, const Index<n>& end) {
-        if (this -> status > ONGOING){
-            return {
-                {"label", "error"},
-                {"content", std::string("status ") + std::string((char)(this -> status))}
-            };
-        }
-
-        try{
-            if (this -> move(start, end)){
-                json r = std::move(this -> move_json);
-                this -> move_json = nullptr;
-                return r;
-            } else {
-                return nullptr;
-            }
-        } catch(const std::exception& e){
-            return {
-                {"label", "error"},
-                {"content", e.what()}
-            };
-        }
-    }
-
-
-    // SERIALIZATION
-
-    json serialize() const {
-        json promoting;
-
-        if (this -> promoting == nullptr){
-            promoting = nullptr;
-        } else {
-            promoting = this -> promoting -> position;
-        }
-
-        return {
-            {"board", this -> board.get_shape()},
-            {"players", Instance::players_to_json(this -> players)},
-            {"times", this -> times},
-
-            {"round", this -> round},
-            {"turn", this -> turn},
-            {"history", this -> history},
-
-            {"status", (char)this -> status},
-            {"promoting", promoting},
-
-            {"move_json", this -> move_json},
-        };
-    }
-
-    static Instance deserialize(const json& j) {
-        Grid<Piece<n>*, n> board(j.at("board").get<Tup<n>>());
-        Tuple<Player<n>, p> players = Instance::players_to_json(j.at("players"), board);
-
-
-        Instance result(
-            std::move(board), 
-            std::move(players), 
-            j.at("times").get<Tuple<double, p>>(),
-            j.at("round").get<Tuple<Action<n>, p>>(),
-            j.at("turn").get<index_t>(),
-            j.at("history").get<std::vector<Tuple<Action<n>, p>>>(),
-            j.at("status").get<Status>(),
-            nullptr,
-            j.at("move_json")
-        );
-
-        for (index_t i = 0; i < p; i++){
-            for (Piece<n>& piece : players[i].pieces){
-                result.show(&piece);
-            }
-
-            for (Piece<n>& monarch : players[i].monarchs){
-                result.show(&monarch);
-            }
-        }
-
-        json& promoting = j.at("promoting");
-
-        if (!promoting.is_null()){
-            result.promoting = result.board[Index<n>(promoting.get<Tup<n>>(), board)];
-        }
-        
-        return result;
-    }
-
-
-    private:
+    protected:
         Grid<Piece<n>*, n> board;
         Tuple<Player<n>, p> players;
-        Tuple<double, p> times;
-        
-        Tuple<Action<n>, p> round;
-        index_t turn;
+        Tuple<duration, p> times;
 
         std::vector<Tuple<Action<n>, p>> history;
+        Tuple<Action<n>>& round;
+
+        index_t turn;
+        timestamp turn_start_time;
 
         Status status;
         Piece<n>* promoting;
 
-        json move_json;
-
         Instance(
             Grid<Piece<n>*, n>&& board,
             Tuple<Player<n>, p>&& players,
-            Tuple<double, p>&& times,
+            Tuple<duration, p>&& times,
             
-            Tuple<Action<n>, p>&& round,
-            index_t turn,
-
             std::vector<Tuple<Action<n>, p>>&& history,
+            index_t turn,
+            timestamp turn_start_time,
 
             Status status,
             Piece<n>* promoting,
-
-            json&& move_json
         ) : board(std::forward<Grid<Piece<n>*, n>>(board)), 
             players(std::forward<Tuple<Player<n>, n>>(players)), 
-            times(std::forward<Tuple<double, p>>(times)), 
-            round(std::forward<Tuple<Action<n>, p>>(round)), 
+            times(std::forward<Tuple<duration, p>>(times)), 
             turn(turn), 
+            turn_start_time(turn_start_time),
             history(std::forward<Tuple<Action<n>, p>>(history)), 
             status(status), 
-            promoting(promoting), 
-            move_json(std::forward<json>(move_json)) {}
+            promoting(promoting) {
+                
+            if (this -> history.size() == 0){
+                this -> history.push_back(Tuple<Action<n>, p>());
+            }
+            this -> round = this -> history.back();
+        }
 
 
-        bool move(const Index<n>& start, const Index<n>& end) {
+        
+        // shows the piece on the board.
+        void show(Piece<n>* piece) {
+            if (piece != nullptr && !piece -> dead && !piece -> promoted){
+                this -> board[piece -> position] = piece;
+            }
+        }
+        
+        // adds the given piece to the board.
+        // if the position is occupied, raises error.
+        // adds the piece to the corresponding player and shows it on the board.
+        Piece<n>* add(Piece<n>&& piece){
+            if (this -> board[piece.position] != nullptr){
+                throw std::runtime_error("occupied");
+            }
+
+            std::vector<Piece<n>>& pieces = this -> players[piece.player_index].pieces;
+
+            pieces.push_back(std::forward<Piece<n>>(piece));
+            Piece<n>* result = &pieces.back();
+
+            this -> show(result);
+
+            return result;
+        }
+
+        // adds the given monarch to the board.
+        // if the position is occupied, raises error.
+        // adds the monarch to the corresponding player and shows it on the board.
+        Piece<n>* add_monarch(Piece<n>&& monarch){
+            if (this -> board[piece.position] != nullptr){
+                throw std::runtime_error("occupied");
+            }
+
+            std::vector<Piece<n>>& monarchs = this -> players[monarch.player_index].monarchs;
+
+            monarchs.push_back(std::forward<Piece<n>>(monarch));
+            Piece<n>* result = &monarchs.back();
+
+            this -> show(result);
+
+            return result;
+        }
+
+        // sets piece -> dead to true and hides the piece from the board.
+        void kill(Piece<n>* piece) {
+            if (piece != nullptr && !piece -> dead && !piece -> promoted){
+                piece -> dead = true;
+                this -> board[piece -> position] = nullptr;
+            }
+        }
+
+        // sets piece -> dead to false and shows the piece on the board.
+        void unkill(Piece<n>* piece) {
+            if (piece != nullptr && piece -> dead && !piece -> promoted){
+                piece -> dead = false;
+                this -> board[piece -> position] = piece;
+            }
+        }
+
+        // if promoting is nullptr, raises error.
+        // otherwise, sets promoting -> promoted = true, and calls .add on the promoted piece
+        void raw_promote(index_t promotion_index) {
+            if (promoting != nullptr) {
+                promoting -> promoted = true;
+                this -> add(promoting -> promoted_piece(promotion_index));
+                promoting = nullptr;
+            } else {
+                throw std::runtime_error("no promoting");
+            }
+        }
+
+
+
+
+        
+        void move(const Index<n>& start, const Index<n>& end) {
+            this -> make_move();
+
+            if (this -> status != PROMOTING) {
+                this -> post_move();
+            }
+        }
+        
+        virtual void resolve_promotion(index_t i) {
+            if (this -> status != PROMOTING) {
+                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
+            }
+
+            this -> raw_promote(i);
+            this -> post_move();
+        }
+
+        virtual void make_move(const Index<n>& start, const Index<n>& end) {
+            if (this -> status > ONGOING) {
+                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
+            }
+
             Piece<n>* piece = this -> board[start];
+            const Move<n>* move = this -> validate_and_get_move(piece, end);
+            const Piece<n>* target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
 
+            this -> round[this -> turn] = Action<n>(start, end);
+            
+            this -> update_promoting(piece);
+        }
+
+        virtual void post_move() {
+            std::vector<index_t> checks = this -> get_checks();
+            
+            this -> advance_turn();
+
+            bool next_in_check = false;
+
+            for (const index_t & check : checks){
+                if (check == this -> turn){
+                    next_in_check = true;
+                    break;
+                }
+            }
+
+            this -> update_game_status(next_in_check);
+        }
+
+        
+        
+        // if (piece, end) represent an illegal move, raises error.
+        // otherwise, returns a pointer to the Move object corresponding to the given move.
+        const Move<n>* validate_and_get_move(const Piece<n>* piece, const Index<n>& end) const {
             if (piece == nullptr) {
                 throw std::runtime_error("empty");
             } else if (piece -> player_index != this -> turn){
@@ -390,111 +447,39 @@ struct game::Instance{
 
             if (move == nullptr){
                 throw std::runtime_error("illegal");
-            } else {
-                Piece<n>* target_piece = this -> board[end + piece -> capture_displacement];
-                Piece<n>* end_piece = this -> board[end];
-
-                this -> kill(target_piece);
-
-                piece -> position = end;
-                this -> board[start] = nullptr;
-                this -> board[end] = piece;
-
-                if (this -> in_check(this -> turn)) {
-                    piece -> position = start;
-                    this -> board[start] = piece;
-                    this -> board[end] = end_piece;
-
-                    this -> unkill(target_piece);
-
-                    throw std::runtime_error("check");
-                } else {
-                    this -> history.emplace_back(start, end);
-                    
-                    this -> move_json = {
-                        {"label", "move"},
-                        {"action", this -> history.back()}
-                    };
-
-                    if (target_piece != nullptr){
-                        this -> move_json["die"] = target_piece -> position; 
-                    }
-
-                    std::vector<index_t> checks;
-
-                    for (index_t i = 0; i < p; i++){
-                        if (i != this -> turn && this -> in_check(i)){
-                            checks.push_back(i);
-                        }
-                    }
-
-                    if (checks.size() > 0){
-                        this -> move_json["checks"] = std::move(checks);
-                    }
-                    
-
-                    if (piece -> promotion_list.size() == 0){
-                        return true;
-                    } else {
-                        if (piece -> position[piece -> promotion_axis] == piece -> promotion_index){
-                            if (piece -> promotion_list.size() == 1){
-                                piece -> promote(0);
-                                this -> move_json["promote"] = 0;
-                                return true;
-                            } else {
-                                this -> promoting = piece;
-                                this -> status = PROMOTING;
-                                return false;
-                            }
-                        } else {
-                            return true;
-                        }
-                    }
-                }
             }
+            
+            return move;
         }
 
-        /*
-            # update process after a move has been completed.
-    # checks for checks, registers the necessary sounds, updates history
-    def _post_move_update(self, event : Event, update_time=True):
-        if update_time:
-            if self.status == Status.UNBEGUN:
-                self.status = Status.ONGOING
-                self.turn_start_time = turn_end_time = time.time()
-            elif self.status == Status.ONGOING and update_time:
-                turn_end_time = time.time()
-                time_dif = turn_end_time - self.turn_start_time
-                self.times[self.turn] -= time_dif
-            
-            event.action.times = self.times.copy()
-            event.action.start_time = self.turn_start_time
-            event.action.end_time = turn_end_time
-            
-            self.turn_start_time = turn_end_time    
-        
-        self._next_turn()
+        // updates the board according to the given piece and move.
+        // i.e. -- captures any pieces that need to be captured, updates positions, etc...
+        // if the given move "walks into" check, undoes everything and raises error.
+        // otherwise, returns a pointer to the piece, if any, that was captured.
+        const Piece<n>* adjust_board_and_get_target(Piece<n>* piece, const Move<n>* move, const Index<n>& start, const Index<n>& end) {
+            Piece<n>* target_piece = this -> board[end + move -> relative_capture];
+            Piece<n>* end_piece = this -> board[end];
 
-        check = self.update_checks()
-        if check:
-            event.sounds.append('check')
+            this -> kill(target_piece);
 
-            if 'move' in event.sounds:
-                event.sounds.remove('move')
-        
-        # if the player is out of legal moves, the game ends
-        if not self.has_legal_moves(self.players[self.turn]):
-            event.sounds.append('end')
-            self.status = Status.CHECKMATE if check else Status.STALEMATE
+            piece -> position = end;
+            this -> board[start] = nullptr;
+            this -> board[end] = piece;
 
-        # registers the move in the game history
-        self.history[-1].append(event.action)
-        return event
+            if (this -> in_check(this -> turn)) {
+                piece -> position = start;
+                this -> board[start] = piece;
+                this -> board[end] = end_piece;
 
+                this -> unkill(target_piece);
+
+                throw std::runtime_error("check");
+            }
+
+            return target_piece;
         }
-    */
 
-
+        // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
         bool in_check(index_t player_index) const {
             const Player<n>& player = this -> players[player_index];
 
@@ -504,7 +489,7 @@ struct game::Instance{
                 for (index_t i = 0; i < p; i++){
                     if (i != player_index){
                         const Player<n>& opponent = this -> players[i];
-                        if (opponent.army_sees(king.position)){
+                        if (opponent.pieces_see(king.position)){
                             return true;
                         }
                     }
@@ -515,116 +500,86 @@ struct game::Instance{
         }
 
 
-        static json piece_to_json(const Piece<n>& pi) {
-            return {
-                {"position", pi.position},
-                {"figure", pi.figure -> key},
-                {"player_index", pi.player_index},
-                {"promotion_list", pi.promotion_list},
-                {"promotion_axis", pi.promotion_axis},
-                {"promotion_index", pi.promotion_index},
-                {"promoted", pi.promoted},
-                {"dead", pi.dead},
-                {"has_moved", pi.has_moved},
-                {"just_opened", pi.just_opened}
-            };
+        // if the piece is not on its promotion square, returns false.
+        // if the piece is on its promotion square, then:
+        //    -  if the piece can only promote to one thing, automatically promotes and returns true.
+        //    -  otherwise, caches the unfinished promotion, sets status to PROMOTING and returns false
+        bool update_promoting(Piece<n>* piece) {
+            if (piece -> promotion_list.size() != 0 && piece -> position[piece -> promotion_axis] == piece -> promotion_index){
+                if (piece -> promotion_list.size() == 1){
+                    this -> raw_promote(0);
+                    return true;
+                } else {
+                    this -> promoting = piece;
+                    this -> status = PROMOTING;
+                }
+            }
+            return false;
+        }
+        
+        // returns a std::vector containing the indices of all the players that are currently in check.
+        std::vector<index_t> get_checks() {
+            std::vector<index_t> checks;
+
+            for (index_t i = 0; i < p; i++){
+                if (i != this -> turn && this -> in_check(i)){
+                    checks.push_back(i);
+                }
+            }
+
+            return std::move(checks);
         }
 
-        static Piece<n> piece_from_json(const json& j, const Grid<Piece<n>*, n>& board) {
-            return Piece<n>(
-                Index<n>(std::move(j.at("position").get<Tup<n>>()), board),
-                Figure<n>::resolve(j.at("figure").get<std::string>()),
+        // updates the times, places the given action in history and calls .next_turn.
+        // returns the duration of the move.
+        duration advance_turn(const Index<n>& start, const Index<n>& end){
+            timestamp turn_end_time = clock::now();
 
-                j.at("player_index").get<index_t>(),
-                j.at("promotion_list").get<std::vector<std::string>>(),
-                j.at("promotion_axis").get<index_t>(),
-                j.at("promotion_index").get<index_t>(),
-                
-                j.at("promoted").get<bool>(),
-                j.at("dead").get<bool>(),
-                j.at("has_moved").get<bool>(),
-                j.at("just_opened").get<bool>()
-            );
-        }
+            duration time_dif;
 
+            if (this -> status == UNBEGUN){
+                this -> status = ONGOING;
+                this -> turn_start_time = turn_end_time;
+                time_dif = duration(0);
+            } 
 
-        json player_to_json(const Player<n>& pl) const {
-            json pieces = json::array();
-            json pawns = json::array();
-            json monarchs = json::array();
-
-            for (const Piece<n>& piece : pl.pieces){
-                pieces.push_back(this -> piece_to_json(piece));
+            else if (this -> status == ONGOING) {
+                duration time_dif = turn_end_time - this -> turn_start_time;
+                this -> times[this -> turn] -= time_dif;
             }
-
-            for (const Piece<n>& pawn : pl.pawns){
-                pawns.push_back(this -> piece_to_json(pawn));
-            }
-
-            for (const Piece<n>& monarch : pl.monarchs){
-                monarchs.push_back(this -> piece_to_json(monarch));
-            }
-
-            return {
-                {"index", pl.index},
-                {"material", pl.material},
-                {"pawns", pawns},
-                {"pieces", pieces},
-                {"monarchs", monarchs}
-            };
-        }
-
-        Player<n> player_from_json(const json& j) const {
-            std::vector<Piece<n>> pieces;
-            std::vector<Piece<n>> pawns;
-            std::vector<Piece<n>> monarchs;
-
-            const json& jpieces = j["pieces"];
-            const json& jpawns = j["pawns"];
-            const json& jmonarchs = j["monarchs"];
-
-            for (const auto& piece : jpieces){
-                pieces.push_back(this -> piece_from_json(piece));
-            }
-
-            for (const auto& pawn : jpawns){
-                pawns.push_back(this -> piece_from_json(pawn));
-            }
-
-            for (const auto& monarch : jmonarchs){
-                monarchs.push_back(this -> piece_from_json(monarch));
-            }
-
-            return Player<n>(
-                j["index"],
-                j["material"],
-                std::move(pawns),
-                std::move(pieces),
-                std::move(monarchs)
-            );
-        }
-
-
-        json players_to_json(const Tuple<Player<n>, p>& ps) const{
-            json j = json::array();
-
-            for (index_t k; k < p; k++){
-                j.push_back(this -> player_to_json(ps[k]));
-            }
-
-            return j;
-        }
-
-        Tuple<Player<n>, p> players_from_json(const json& j) const{
             
-            Tuple<Player<n>, p> ps;
+            this -> next_turn();
+            this -> turn_start_time = turn_end_time;
 
-            for (index_t k; k < p; k++){
-                ps[k] = this -> player_from_json(j[k]);
-            }
-
-            return ps;
+            return time_dif;
         }
+
+        // registers the given action to the history and 
+        void next_turn() {
+            this -> turn = (this -> turn + 1) % p;
+            
+            if (this -> turn == 0){
+                this -> history.push_back(Tuple<Action<n>, p>());
+                this -> round = this -> history.back();
+            }
+        }
+
+        // if the next player is in check and has no legal moves, sets status to CHECKMATE
+        // if the next player is not in check but has no legal moves, sets status to STALEMATE
+        // otherwise sets the status to ONGOING.
+        void update_game_status(bool next_in_check) {
+            if (this -> no_legal_moves()){
+                if (next_in_check){
+                    this -> status = CHECKMATE;
+                } else {
+                    this -> status = STALEMATE;
+                }
+            } else {
+                this - > status = ONGOING;
+            }
+        }
+
+        bool no_legal_moves();
 
 };
 
