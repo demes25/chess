@@ -1,6 +1,9 @@
 // Demetre Seturidze
 // Chess
-// Tuples
+// Structs
+
+#ifndef STRUCTS
+#define STRUCTS
 
 #include"logic.hpp"
 
@@ -16,7 +19,7 @@ struct structs::Tuple{
 
     template<typename... Args>
     requires (sizeof...(Args) == n && (std::convertible_to<Args, T> && ...))
-    Tuple(Args&&... args) : tup{static_cast<T>(args)...} {}
+    Tuple(Args&&... args) : tup{static_cast<T>(std::forward<Args>(args))...} {}
 
     Tuple(const Tuple&) = default;
     Tuple(Tuple&&) = default;
@@ -72,6 +75,24 @@ struct structs::Tuple{
         return os;
     }
 
+    std::vector<T> to_vector() const {
+        std::vector<T> result;
+        result.reserve(n);
+        for (index_t i = 0; i < n; i++){
+            result.push_back(this -> at(i));
+        }
+        return result;
+    }
+
+    std::vector<T> into_vector() {
+        std::vector<T> result;
+        result.reserve(n);
+        for (index_t i = 0; i < n; i++){
+            result.push_back(std::move(this -> at(i)));
+        }
+        return result;
+    }
+
     protected:
         T tup[n];
 
@@ -102,10 +123,527 @@ void from_json(const json& j, structs::Tuple<T, n>& v){
 
 
 
+// A Grid of rank n.
+// For shape S = [s1, s2, ..., sn], stores a contiguous array of size prod(S). (*)
+//
+// Elements may be retrieved by:
+//   - Indexing using a Tup<n>, in which case the array is "collapsed" under-the-hood into a single integral type object according to (*) which then is used to access the element.
+//   - Using the () operator with n integer arguments i.e. b(1, 3, 481, 23, ...), in which case the variadic arguments are collected into a Tuple, whereafter the same procedure is followed as above.
+//   - Directly indexing using a single integral type object which is taken to be the same as the "collapsed" index noted above.
+template<typename T, index_t n>
+struct structs::Grid{
+    template<typename... Args>
+    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
+    Grid(Args&&... k) : Grid(Tup<n>(std::move(k)...)) {}
+
+    Grid(Tup<n>&& shape) : shape(std::forward<Tup<n>>(shape)), sizes(0), capacity(1){
+        index_t i;
+
+        for (i = 0; i < n; ++i){
+            if (shape[i] == 0){
+                throw std::invalid_argument("Axis of size 0.");
+            } else {
+                this -> capacity *= shape[i];
+            }
+        }
+
+        --i;
+        this -> sizes[i] = 1;
+
+        while(i > 0){
+            --i;
+            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
+        }
+
+        this -> arr = std::make_unique<T[]>(this -> capacity);
+    }
+
+    Grid(const Tup<n>& shape) : shape(), sizes(0), capacity(1){
+        index_t i;
+
+        for (i = 0; i < n; ++i){
+            if (shape[i] == 0){
+                throw std::invalid_argument("Axis of size 0.");
+            } else {
+                this -> shape[i] = shape[i];
+                this -> capacity *= shape[i];
+            }
+        }
+
+        while(i > 0){
+            --i;
+            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
+        }
+
+        
+        this -> arr = std::make_unique<T[]>(this -> capacity);
+    }
+
+    Grid(const Grid&) = default;
+    Grid(Grid&&) = default;
+
+    ~Grid() = default;
+
+    Grid& operator=(const Grid&) = default;
+    Grid& operator=(Grid&&) = default;
+
+
+    void fill(const T& f) {
+        for (index_t i = 0; i < this -> capacity; ++i){
+            this -> at(i) = f;
+        }
+    }
+
+    template<typename... Args>
+    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
+    T& operator()(Args&&... k) {
+        return this -> operator[](Tup<n>(std::move(k)...));
+    }
+
+    template<typename... Args>
+    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
+    const T& operator()(Args&&... k) const{
+        return this -> operator[](Tup<n>(std::move(k)...));
+    }
+
+    T& operator[](index_t i) {
+        return this -> at(i);
+    }
+
+    const T& operator[](index_t i) const{
+        return this -> at(i);
+    }
+
+    T& operator[](const Index<n>& index) {
+        if (!index.is_valid()){
+            throw std::out_of_range("Index out of bounds.");
+        }
+        return this -> at((index_t)index);
+    }
+
+    const T& operator[](const Index<n>& index) const {
+        if (!index.is_valid()){
+            throw std::out_of_range("Index out of bounds.");
+        }
+        return this -> at((index_t)index);
+    }
+
+    T& operator[](const Tup<n>& index){
+        index_t i = this -> collapse(index);
+        return this -> at(i);
+    }
+
+    const T& operator[](const Tup<n>& index) const {
+        index_t i = 0;
+
+        for (index_t j = 1; j < n; ++j){
+            if (index[j-1] >= this -> shape[j-1]){
+                throw std::out_of_range("Index out of bounds.");
+            } else {
+                i += (this -> shape[j]*index[j-1]); 
+            }
+        }
+        
+        if (index[n-1] >= this -> shape[n-1]){
+            throw std::out_of_range("Index out of bounds.");
+        } else {
+            i += index[n-1]; 
+        }
+
+        return this -> at(i);
+    }
+
+    bool operator==(const Grid& g) const {
+        if (this -> shape != g.shape){
+            throw std::invalid_argument("Shape mismatch.");
+        }
+
+        for (index_t i = 0; i < this -> capacity; ++i){
+            if (this -> at(i) != g.at(i)){
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool operator!=(const Grid& g) const {
+        if (this -> shape != g.shape){
+            throw std::invalid_argument("Shape mismatch.");
+        }
+
+        for (index_t i = 0; i < this -> capacity; ++i){
+            if (this -> at(i) != g.at(i)){
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    
+    const Tup<n>& get_shape() const {
+        return this -> shape;
+    }
+
+    const Tup<n>& get_sizes() const {
+        return this -> sizes;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Grid& g) {
+        index_t index = 0;
+        return g.print_help(os, 0, index);
+    }
+
+    protected:
+        Tup<n> shape;
+        Tup<n> sizes;
+
+        index_t capacity;
+        std::unique_ptr<T[]> arr;
+
+        T& at(index_t index){
+            return this -> arr[index];
+        }
+        
+        const T& at(index_t index) const{
+            return this -> arr[index];
+        }
+
+        std::ostream& print_help(std::ostream& os, index_t axis, index_t& index) const {
+            if (axis == n-1){
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << '[';
+        
+                index_t last = this -> shape[axis] - 1;
+                for(index_t i = 0; i < last; ++i){
+                    os << this -> at(index++) << ", ";
+                }
+                os << this -> at(index++) << "]";
+            } else {
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << '[' << std::endl;
+
+                index_t last = this -> shape[axis] - 1;
+                for(index_t i = 0; i < last; ++i){
+                    this -> print_help(os, axis+1, index);
+                    os << ',' << std::endl;
+                }
+
+                this -> print_help(os, axis+1, index);
+                os << std::endl;
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << ']';
+            }
+
+            return os;
+        }
+
+    private:
+        index_t collapse(const Tup<n>& index) const{
+            index_t i = 0;
+
+            for (index_t j = 0; j < n; ++j){
+                if (index[j] >= this -> shape[j]){
+                    throw std::out_of_range("Index out of bounds.");
+                } else {
+                    i += (this -> sizes[j]*index[j]); 
+                }
+            }
+
+            return i;
+        }
+};
+
+
+// A Tup<n> used to index Grid objects.
+//
+// equipped with operators:
+//   - ++Index / --Index : increments/decrements by 1, automatically rolls over
+//   - Index += Vector / Index -= Vector : assign-adds/assign-subtracts a vector, does not roll over.
+//   - Index + Vector / Index - Vector : assign-adds/assign-subtracts vector to a copy, returns the copy.
+//   - Index - Index : returns the Vector difference between two indices.
+//
+// stores a collapsed index that it can used to directly key grids.
+// stores a reference to the shape of the grid and checks updates validity upon every increment/decrement.
+// (throws error if incrementing/decrementing invalid indices).
+template<index_t n>
+struct structs::Index : public Tup<n>{
+    const Tup<n>& limits;
+    const Tup<n>& sizes;
+
+    Index(Tup<n>&& value, const Tup<n>& limits, const Tup<n>& sizes) : Tup<n>(std::forward<Tup<n>>(value)), limits(limits), sizes(sizes), collapsed(0), valid(true) {
+        try {
+            this -> collapsed = this -> collapse(value);
+        } catch(...) {
+            this -> valid = false;
+        }
+    }
+    
+    template<typename T>
+    Index(const Grid<T, n>& grid) : Tup<n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
+    
+    template<typename T>
+    Index(Tup<n>&& value, const Grid<T, n>& grid) : Index(std::forward<Tup<n>>(value), grid.get_shape(), grid.get_sizes()) {}
+
+
+    
+    template<typename T>
+    static Index begin(const Grid<T, n>& grid) {
+        return Index(grid);
+    }
+
+    template<typename T>
+    static Index end(const Grid<T, n>& grid) {
+        Index result(grid);
+        result.set_end();
+        return result;
+    }
+
+    Index(const Index&) = default;
+    Index(Index&&) = default;
+
+    ~Index() = default;
+
+    Index& operator=(const Index&) = default;
+    Index& operator=(Index&&) = default;
+
+
+    Index& set(const Tup<n>& value) {
+        this -> valid = true;
+
+        try {
+            this -> collapsed = this -> collapse(value);
+        } catch(...) {
+            this -> valid = false;
+        }
+
+        Tup<n>::operator=(value);
+        return *this;
+    }
+
+    Index& set_begin() {
+        this -> valid = true;
+        this -> fill(0);
+
+        return *this;
+    }
+
+    Index& set_end() {
+        this -> valid = true;
+        this -> collapsed = 0;
+
+        for (index_t i = 0; i < n; ++i){
+            index_t lim = this ->  limits[i];
+            this -> at(i) = lim - 1;
+        }
+
+        this -> collapsed = this -> collapse();
+
+        return *this;
+    }
+
+    index_t& operator[](index_t i) = delete;
+
+
+    Index& operator++() {
+        if (!this -> valid){
+            throw std::out_of_range("Incrementing invalid index.");
+        }
+
+        index_t axis = n-1;
+        ++(this -> at(axis));
+
+        if (this -> at(axis) >= this -> limits[axis]) {
+            if (axis == 0) {
+                this -> valid = false;
+                return *this;
+            } else while(true) {
+                --axis;
+
+                this -> at(axis+1) = 0;
+
+                ++(this -> at(axis));
+                
+                if (this -> at(axis) < this -> limits[axis]){
+                    break;
+                } else if (axis==0){
+                    this -> valid = false;
+                    return *this;
+                }
+            }
+        }  
+        
+        ++(this -> collapsed);
+
+        return *this;
+    }
+
+    Index& operator--() {
+        if (!this -> valid){
+            throw std::out_of_range("Decrementing invalid index.");
+        }
+
+        if (this -> at(n-1) == 0){
+            index_t axis = n-2;
+            while (true) {
+                this -> at(axis+1) = this -> limits[axis+1]-1;
+
+                if (this -> at(axis) > 0) {
+                    --(this -> at(axis));
+                    break;
+                } else if (axis == 0) {
+                    this -> valid = false;
+                    return *this;
+                }
+
+                --axis;
+            }
+        } else {
+            --(this -> at(n-1));
+        }
+        
+        --(this -> collapsed);
+
+        return *this;
+    }
+
+    Index& operator+=(const Vector<n>& v) {
+        if (!this -> valid){
+            throw std::out_of_range("Incrementing invalid index.");
+        }
+
+        for(index_t i = 0; i < n; ++i){
+            arith_t temp = (arith_t) this -> at(i) + v[i];
+
+            if (temp < 0 || temp >= this -> limits[i]){
+                this -> valid = false;
+                return *this;
+            }
+
+            this -> at(i) = (index_t)temp;
+        }
+
+        this -> collapsed = (index_t)((arith_t)(this -> collapsed) + this -> collapse(v));
+        return *this;
+    }
+
+    Index& operator-=(const Vector<n>& v) {
+        if (!this -> valid){
+            throw std::out_of_range("Decrementing invalid index.");
+        }
+
+        for(index_t i = 0; i < n; ++i){
+            arith_t temp = (arith_t)(this -> at(i)) -  v[i];
+
+            if (temp < 0 || temp >= this -> limits[i]){
+                this -> valid = false;
+                return *this;
+            }
+
+            this -> at(i) = (index_t)temp;
+        }
+
+        this -> collapsed = (index_t)((arith_t)(this -> collapsed) + this -> collapse(v));;
+        return *this;
+    }
+
+
+    Index operator+(const Vector<n>& v) const {
+        Index result(*this);
+        result += v;
+        return result;
+    }
+
+    Index operator-(const Vector<n>& v) const {
+        Index result(*this);
+        result -= v;
+        return result;
+    }
+
+
+    Vector<n> operator-(const Index& v) const {
+        if (!this -> valid || !v.valid){
+            throw std::out_of_range("Invalid index.");
+        }
+
+        Vector<n> result;
+
+        for (index_t i = 0; i < n; i++){
+            result[i] = ((arith_t)(this -> at(i)) - (arith_t)(v.at(i)));
+        }
+
+        return result;
+    }
+
+
+    operator index_t() const {
+        return this -> collapsed;
+    }
+
+    bool is_valid() const {
+        return this -> valid;
+    }
+
+    private:
+        index_t collapsed;
+        bool valid;
+
+        index_t collapse() const {
+            if (!this -> valid){
+                throw std::out_of_range("Index out of bounds.");
+            }
+
+            index_t i = 0;
+
+            for (index_t j = 0; j < n; ++j){
+                i += (this -> sizes[j]*this -> at(j)); 
+            }
+
+            return i;
+        }
+
+        index_t collapse(const Tup<n>& index) const{
+            index_t i = 0;
+
+            for (index_t j = 0; j < n; ++j){
+                if (index[j] >= this -> limits[j]){
+                    throw std::out_of_range("Index out of bounds.");
+                } else {
+                    i += (this -> sizes[j]*index[j]); 
+                }
+            }
+
+            return i;
+        }
+
+        arith_t collapse(const Tuple<arith_t, n>& vector) const{
+            arith_t i = 0;
+
+            for (index_t j = 0; j < n; ++j){
+                i += (this -> sizes[j]*vector[j]);
+            }
+
+            return i;
+        }
+};
+
+
 // A Tuple<arith_t, n> with mathematical operations defined.
 template<index_t n>
 struct structs::Vector : public Tuple<arith_t, n> {
     using Tuple<arith_t, n>::Tuple;
+
+    Vector(Vector&&) = default;
+    Vector(const Vector&) = default;
+
+    ~Vector() = default;
 
     Vector& operator=(const Vector&) = default;
     Vector& operator=(Vector&&) = default;
@@ -237,519 +775,50 @@ struct structs::Vector : public Tuple<arith_t, n> {
     }
 };
 
-// A Grid of rank n.
-// For shape S = [s1, s2, ..., sn], stores a contiguous array of size prod(S). (*)
-//
-// Elements may be retrieved by:
-//   - Indexing using a Tuple<index_t, n>, in which case the array is "collapsed" under-the-hood into a single integral type object according to (*) which then is used to access the element.
-//   - Using the () operator with n integer arguments i.e. b(1, 3, 481, 23, ...), in which case the variadic arguments are collected into a Tuple, whereafter the same procedure is followed as above.
-//   - Directly indexing using a single integral type object which is taken to be the same as the "collapsed" index noted above.
-template<typename T, index_t n>
-struct structs::Grid{
-    template<typename... Args>
-    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
-    Grid(Args&&... k) : Grid(Tuple<index_t, n>(k...)) {}
-
-    Grid(Tuple<index_t, n>&& shape) : shape(shape), sizes(0), capacity(1){
-        index_t i;
-
-        for (i = 0; i < n; ++i){
-            if (shape[i] == 0){
-                throw std::invalid_argument("Axis of size 0.");
-            } else {
-                this -> capacity *= shape[i];
-            }
-        }
-
-        --i;
-        this -> sizes[i] = 1;
-
-        while(i > 0){
-            --i;
-            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
-        }
-
-        this -> arr = std::make_unique<T[]>(this -> capacity);
-    }
-
-    Grid(const Tuple<index_t, n>& shape) : shape(), sizes(0), capacity(1){
-        index_t i;
-
-        for (i = 0; i < n; ++i){
-            if (shape[i] == 0){
-                throw std::invalid_argument("Axis of size 0.");
-            } else {
-                this -> shape[i] = shape[i];
-                this -> capacity *= shape[i];
-            }
-        }
-
-        while(i > 0){
-            --i;
-            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
-        }
-
-        
-        this -> arr = std::make_unique<T[]>(this -> capacity);
-    }
-
-    Grid(const Grid&) = default;
-    Grid(Grid&&) = default;
-
-    ~Grid() = default;
-
-    Grid& operator=(const Grid&) = default;
-    Grid& operator=(Grid&&) = default;
-
-
-    template<typename... Args>
-    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
-    T& operator()(Args&&... k) {
-        return this -> operator[](Tuple<index_t, n>(k...));
-    }
-
-    template<typename... Args>
-    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
-    const T& operator()(Args&&... k) const{
-        return this -> operator[](Tuple<index_t, n>(k...));
-    }
-
-    T& operator[](index_t i) {
-        return this -> at(i);
-    }
-
-    const T& operator[](index_t i) const{
-        return this -> at(i);
-    }
-
-    T& operator[](const Index<n>& index) {
-        if (!index.is_valid()){
-            throw std::out_of_range("Index out of bounds.");
-        }
-        return this -> at((index_t)index);
-    }
-
-    const T& operator[](const Index<n>& index) const {
-        if (!index.is_valid()){
-            throw std::out_of_range("Index out of bounds.");
-        }
-        return this -> at((index_t)index);
-    }
-
-    T& operator[](const Tuple<index_t, n>& index){
-        index_t i = this -> collapse(index);
-        return this -> at(i);
-    }
-
-    const T& operator[](const Tuple<index_t, n>& index) const {
-        index_t i = 0;
-
-        for (index_t j = 1; j < n; ++j){
-            if (index[j-1] >= this -> shape[j-1]){
-                throw std::out_of_range("Index out of bounds.");
-            } else {
-                i += (this -> shape[j]*index[j-1]); 
-            }
-        }
-        
-        if (index[n-1] >= this -> shape[n-1]){
-            throw std::out_of_range("Index out of bounds.");
-        } else {
-            i += index[n-1]; 
-        }
-
-        return this -> at(i);
-    }
-
-    bool operator==(const Grid& g) const {
-        if (this -> shape != g.shape){
-            throw std::invalid_argument("Shape mismatch.");
-        }
-
-        for (index_t i = 0; i < this -> capacity; ++i){
-            if (this -> at(i) != g.at(i)){
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool operator!=(const Grid& g) const {
-        if (this -> shape != g.shape){
-            throw std::invalid_argument("Shape mismatch.");
-        }
-
-        for (index_t i = 0; i < this -> capacity; ++i){
-            if (this -> at(i) != g.at(i)){
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    
-    const Tuple<index_t, n>& get_shape() const {
-        return this -> shape;
-    }
-
-    const Tuple<index_t, n>& get_sizes() const {
-        return this -> sizes;
-    }
-
-
-    friend std::ostream& operator<<(std::ostream& os, const Grid& g) {
-        index_t index = 0;
-        return g.print_help(os, 0, index);
-    }
-
-    protected:
-        Tuple<index_t, n> shape;
-        Tuple<index_t, n> sizes;
-
-        index_t capacity;
-        std::unique_ptr<T[]> arr;
-
-        T& at(index_t index){
-            return this -> arr[index];
-        }
-        
-        const T& at(index_t index) const{
-            return this -> arr[index];
-        }
-
-        std::ostream& print_help(std::ostream& os, index_t axis, index_t& index) const {
-            if (axis == n-1){
-                for (index_t k = 0; k < axis; ++k){
-                    os << indent;
-                }
-                os << '[';
-        
-                index_t last = this -> shape[axis] - 1;
-                for(index_t i = 0; i < last; ++i){
-                    os << this -> at(index++) << ", ";
-                }
-                os << this -> at(index++) << "]";
-            } else {
-                for (index_t k = 0; k < axis; ++k){
-                    os << indent;
-                }
-                os << '[' << std::endl;
-
-                index_t last = this -> shape[axis] - 1;
-                for(index_t i = 0; i < last; ++i){
-                    this -> print_help(os, axis+1, index);
-                    os << ',' << std::endl;
-                }
-
-                this -> print_help(os, axis+1, index);
-                os << std::endl;
-                for (index_t k = 0; k < axis; ++k){
-                    os << indent;
-                }
-                os << ']';
-            }
-
-            return os;
-        }
-
-    private:
-        index_t collapse(const Tuple<index_t, n>& index) const{
-            index_t i = 0;
-
-            for (index_t j = 0; j < n; ++j){
-                if (index[j] >= this -> shape[j]){
-                    throw std::out_of_range("Index out of bounds.");
-                } else {
-                    i += (this -> sizes[j]*index[j]); 
-                }
-            }
-
-            return i;
-        }
-};
-
-
-// A Tuple<index_t, n> used to index Grid objects.
-//
-// equipped with operators:
-//   - ++Index / --Index : increments/decrements by 1, automatically rolls over
-//   - Index += Vector / Index -= Vector : assign-adds/assign-subtracts a vector, does not roll over.
-//   - Index + Vector / Index - Vector : assign-adds/assign-subtracts vector to a copy, returns the copy.
-//   - Index - Index : returns the Vector difference between two indices.
-//
-// stores a collapsed index that it can used to directly key grids.
-// stores a reference to the shape of the grid and checks updates validity upon every increment/decrement.
-// (throws error if incrementing/decrementing invalid indices).
-template<index_t n>
-struct structs::Index {
-    const Tuple<index_t, n>& limits;
-    const Tuple<index_t, n>& sizes;
-
-    template<typename T>
-    Index(Tuple<index_t, n>&& value, const Tuple<index_t, n>& limits, const Tuple<index_t, n>& sizes) : Tuple<index_t, n>(value), limits(limits), sizes(sizes), collapsed(0), valid(true) {
-        try {
-            this -> collapsed = this -> collapse(value);
-        } catch(...) {
-            this -> valid = false;
-        }
-    }
-    
-    template<typename T>
-    Index(const Grid<T, n>& grid) : Tuple<index_t, n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
-    
-    template<typename T>
-    Index(Tuple<index_t, n>&& value, const Grid<T, n>& grid) : Index(value, grid.get_shape(), grid.get_sizes()) {}
-
-
-    
-    template<typename T>
-    static Index begin(const Grid<T, n>& grid) {
-        return Index(grid);
-    }
-
-    template<typename T>
-    static Index end(const Grid<T, n>& grid) {
-        Index result(grid);
-        result.set_end();
-        return result;
-    }
-
-    Index(const Index&) = default;
-    Index(Index&&) = default;
-
-    ~Index() = default;
-
-    Index& operator=(const Index&) = default;
-    Index& operator=(Index&&) = default;
-
-
-    Index& set(const Tuple<index_t, n>& value) {
-        this -> valid = true;
-
-        try {
-            this -> collapsed = this -> collapse(value);
-        } catch(...) {
-            this -> valid = false;
-        }
-
-        Tuple<index_t, n>::operator=(value);
-        return *this;
-    }
-
-    Index& set_begin() {
-        this -> valid = true;
-        this -> fill(0);
-
-        return *this;
-    }
-
-    Index& set_end() {
-        this -> valid = true;
-        this -> collapsed = 0;
-
-        for (index_t i = 0; i < n; ++i){
-            index_t lim = this ->  limits[i];
-            this -> at(i) = lim - 1;
-        }
-
-        this -> collapsed = this -> collapse();
-
-        return *this;
-    }
-
-    index_t& operator[](index_t i) = delete;
-
-
-    Index& operator++() {
-        if (!this -> valid){
-            throw std::out_of_range("Incrementing invalid index.");
-        }
-
-        index_t axis = n-1;
-        ++(this -> at(axis));
-
-        if (this -> at(axis) >= this -> limits[axis]) {
-            if (axis == 0) {
-                this -> valid = false;
-                return *this;
-            } else while(true) {
-                --axis;
-
-                this -> at(axis+1) = 0;
-
-                ++(this -> at(axis));
-                
-                if (this -> at(axis) < this -> limits[axis]){
-                    break;
-                } else if (axis==0){
-                    this -> valid = false;
-                    return *this;
-                }
-            }
-        }  
-        
-        ++(this -> collapsed);
-
-        return *this;
-    }
-
-    Index& operator--() {
-        if (!this -> valid){
-            throw std::out_of_range("Decrementing invalid index.");
-        }
-
-        if (this -> at(n-1) == 0){
-            index_t axis = n-2;
-            while (true) {
-                this -> at(axis+1) = this -> limits[axis+1]-1;
-
-                if (this -> at(axis) > 0) {
-                    --(this -> at(axis));
-                    break;
-                } else if (axis == 0) {
-                    this -> valid = false;
-                    return *this;
-                }
-
-                --axis;
-            }
-        } else {
-            --(this -> at(n-1));
-        }
-        
-        --(this -> collapsed);
-
-        return *this;
-    }
-
-    Index& operator+=(const Vector<n>& v) {
-        if (!this -> valid){
-            throw std::out_of_range("Incrementing invalid index.");
-        }
-
-        for(index_t i = 0; i < n; ++i){
-            arith_t temp = (arith_t) this -> at(i) + v[i];
-
-            if (temp < 0 || temp >= this -> limits[i]){
-                this -> valid = false;
-                return *this;
-            }
-
-            this -> at(i) = (index_t)temp;
-        }
-
-        this -> collapsed = (index_t)((arith_t)(this -> collapsed) + this -> collapse(v));
-        return *this;
-    }
-
-    Index& operator-=(const Vector<n>& v) {
-        if (!this -> valid){
-            throw std::out_of_range("Decrementing invalid index.");
-        }
-
-        for(index_t i = 0; i < n; ++i){
-            arith_t temp = (arith_t)(this -> at(i)) -  v[i];
-
-            if (temp < 0 || temp >= this -> limits[i]){
-                this -> valid = false;
-                return *this;
-            }
-
-            this -> at(i) = (index_t)temp;
-        }
-
-        this -> collapsed -= (index_t)((arith_t)(this -> collapsed) + this -> collapse(v));;
-        return *this;
-    }
-
-
-    Index operator+(const Vector<n>& v) const {
-        Index result(*this);
-        result += v;
-        return result;
-    }
-
-    Index operator-(const Vector<n>& v) const {
-        Index result(*this);
-        result -= v;
-        return result;
-    }
-
-
-    Vector<n> operator-(const Index& v) const {
-        if (!this -> valid || !v.valid){
-            throw std::out_of_range("Invalid index.");
-        }
-
-        Vector<n> result;
-
-        for (index_t i = 0; i < n; i++){
-            result[i] = ((arith_t)(this -> at(i)) - (arith_t)(v.at(i)));
-        }
-
-        return result;
-    }
-
-
-    operator index_t() const {
-        return this -> collapsed;
-    }
-
-    bool is_valid() const {
-        return this -> valid;
-    }
-
-    private:
-        index_t collapsed;
-        bool valid;
-
-        index_t collapse() const {
-            if (!this -> valid){
-                throw std::out_of_range("Index out of bounds.");
-            }
-
-            index_t i = 0;
-
-            for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes[j]*this -> at(j)); 
-            }
-
-            return i;
-        }
-
-        index_t collapse(const Tuple<index_t, n>& index) const{
-            index_t i = 0;
-
-            for (index_t j = 0; j < n; ++j){
-                if (index[j] >= this -> limits[j]){
-                    throw std::out_of_range("Index out of bounds.");
-                } else {
-                    i += (this -> sizes[j]*index[j]); 
-                }
-            }
-
-            return i;
-        }
-
-        arith_t collapse(const Tuple<arith_t, n>& vector) const{
-            arith_t i = 0;
-
-            for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes[j]*vector[j]);
-            }
-
-            return i;
-        }
-};
-
 
 // A BitMap of rank n.
 // Works identically to Grid<bool, n> but has boolean operators & | ^ ! defined.
 template <index_t n>
 struct structs::BitMap : public Grid<bool, n>{
     using Grid<bool, n>::Grid;
+
+    BitMap(BitMap&&) = default;
+    BitMap(const BitMap&) = default;
+
+    ~BitMap() = default;
+    
+    BitMap& operator=(const BitMap&) = default;
+    BitMap& operator=(BitMap&&) = default;
+
+
+    bool all() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (!this -> at(i)){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool none() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (this -> at(i)){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool any() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (this -> at(i)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+
 
     BitMap operator&(const BitMap& b) const {
         if (this -> shape != b.shape){
@@ -763,6 +832,18 @@ struct structs::BitMap : public Grid<bool, n>{
         }
 
         return r;
+    }
+
+    BitMap& operator&=(const BitMap& b) {
+        if (this -> shape != b.shape){
+            throw std::invalid_argument("Shape mismatch.");
+        }
+        
+        for (index_t i = 0; i < this -> capacity; ++i){
+            this -> at(i) = (this -> at(i) && b.at(i));
+        }
+
+        return *this;
     }
 
     BitMap operator|(const BitMap& b) const {
@@ -779,6 +860,19 @@ struct structs::BitMap : public Grid<bool, n>{
         return r;
     }
 
+    BitMap& operator|=(const BitMap& b) {
+        if (this -> shape != b.shape){
+            throw std::invalid_argument("Shape mismatch.");
+        }
+        
+        for (index_t i = 0; i < this -> capacity; ++i){
+            this -> at(i) = (this -> at(i) || b.at(i));
+        }
+
+        return *this;
+    }
+
+
     BitMap operator^(const BitMap& b) const {
         if (this -> shape != b.shape){
             throw std::invalid_argument("Shape mismatch.");
@@ -787,11 +881,24 @@ struct structs::BitMap : public Grid<bool, n>{
         BitMap r(this -> shape);
         
         for (index_t i = 0; i < this -> capacity; ++i){
-            r.at(i) = (this -> at(i) ^ b.at(i));
+            r.at(i) = (this -> at(i) != b.at(i));
         }
 
         return r;
     }
+
+    BitMap& operator^=(const BitMap& b) {
+        if (this -> shape != b.shape){
+            throw std::invalid_argument("Shape mismatch.");
+        }
+        
+        for (index_t i = 0; i < this -> capacity; ++i){
+            this -> at(i) = (this -> at(i) != b.at(i));
+        }
+
+        return *this;
+    }
+
 
     BitMap operator!() const {
         BitMap r(this -> shape);
@@ -806,6 +913,68 @@ struct structs::BitMap : public Grid<bool, n>{
 };
 
 
+template <typename T, index_t n>
+struct structs::PointerMap : public Grid<T*, n>{
+    using Grid<T*, n>::Grid;
+
+    PointerMap(PointerMap&&) = default;
+    PointerMap(const PointerMap&) = default;
+
+    ~PointerMap() = default;
+    
+    PointerMap& operator=(const PointerMap&) = default;
+    PointerMap& operator=(PointerMap&&) = default;
+
+    BitMap<n> to_bitmap() const {
+        BitMap<n> b(this -> get_shape());
+        b.fill(false);
+
+        for (index_t i = 0; i < this -> capacity; i++){
+            b[i] = (this -> at(i) != nullptr);
+        }
+
+        return b;
+    }
+
+    PointerMap operator&(const BitMap<n>& b) const {
+        if (this -> shape != b.get_shape()) {
+            throw std::invalid_argument("Shape mismatch.");
+        }
+
+        PointerMap p(this -> shape);
+
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (b[i] == 0) {
+                p.at(i) = nullptr;
+            } else {
+                p.at(i) = this -> at(i); 
+            }
+        }
+
+        return p;
+    }
+
+    PointerMap& operator&=(const BitMap<n>& b) {
+        if (this -> shape != b.get_shape()) {
+            throw std::invalid_argument("Shape mismatch.");
+        }
+
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (b[i] == 0) {
+                this -> at(i) = nullptr;
+            } 
+        }
+
+        return &this;
+    }
+    
+};
+
+
+#endif
+
+#ifdef STRUCT_TEST
+
 int main() {
     using namespace structs;
 
@@ -813,10 +982,16 @@ int main() {
     Grid<int, 3> r(3, 3, 3);
     Vector<3> di(1, 0, 1);
 
-    for (Index<3> i(r); i.is_valid(); i += di){
-        r[i] = (index_t)i+1;
-        std::cout << i << '\t' << r[i] << std::endl;
+    BitMap<3> b(3, 3, 3);
+
+    for (Index<3> i(b); i.is_valid(); ++i){
+        b[i] = rand() % 2 == 0;
     }
 
-    std::cout << r << std::endl;
+    BitMap<3> c = !b;
+
+    std::cout << (b ^ c) << std::endl;
+    std::cout << (b | c) << std::endl;
 }
+
+#endif 

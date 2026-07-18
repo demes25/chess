@@ -2,6 +2,9 @@
 // Chess
 // Logic
 
+#ifndef LOGIC
+#define LOGIC 
+
 #include<cstddef>
 #include<concepts>
 #include<iostream>
@@ -21,22 +24,38 @@ namespace structs {
     template<typename T, index_t n>
     struct Tuple;
 
+    template<index_t n>
+    using Tup = Tuple<index_t, n>;
+ 
     template <typename T, index_t n>
     struct Grid;
 
     template<index_t n>
-    struct Index;
-    
-    template<index_t n>
     struct Vector;
+
+    template<index_t n>
+    struct Index;
 
     template <index_t n>
     struct BitMap;
+
+    template <typename T, index_t n>
+    struct PointerMap;
+}
+
+namespace game {
+    template<index_t n>
+    struct Piece;
 }
 
 namespace moves {
+    using namespace structs; 
+
     template<index_t n>
     struct Move;
+
+    template<index_t n>
+    using MoveMap = PointerMap<const Move<n>, n>;
 
     template<index_t n>
     struct Span;
@@ -49,6 +68,8 @@ namespace moves {
 
     template<index_t n>
     struct Figure;
+
+
 }
 
 namespace game {
@@ -99,3 +120,5 @@ void to_json(json& j, const game::Instance<n, p>& g);
 
 template<index_t n, index_t p>
 void from_json(json& j, game::Instance<n, p>& g);
+
+#endif
