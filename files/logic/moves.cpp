@@ -38,7 +38,7 @@ struct moves::Move{
         return this -> directions[i];
     }
 
-    bool sees(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+    virtual bool sees(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         return (
             this -> valid_occupancy(board, target, player_index) && this -> valid_square(board, position, target)
         );
@@ -185,7 +185,7 @@ struct moves::Span : public Move<n>{
 
 
     protected:
-        virtual bool valid_square(const game::Board<n>& board, const Index<n>& position, const Index<n>& target) const {
+        bool valid_square(const game::Board<n>& board, const Index<n>& position, const Index<n>& target) const override {
             if (position == target){
                 return false;
             }

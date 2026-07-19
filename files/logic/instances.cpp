@@ -148,10 +148,10 @@ struct game::SerializableInstance : public Instance<n, p>{
 
             bool auto_promote = this -> update_promoting(piece);
 
-            this -> move_json = json::object();
+            this->move_json = json::object();
             
             this -> move_json["label"] = "move";
-            this -> move_json["action"] = "action";
+            this -> move_json["action"] = action;
             
             if (target_piece != nullptr){
                 this -> move_json["die"] = target_piece -> position;
@@ -197,9 +197,7 @@ struct game::SerializableInstance : public Instance<n, p>{
         
 
         json drain_json() {
-            json r = std::move(this -> move_json);
-            this -> move_json.clear();
-            return r;
+            return std::exchange(this->move_json, nullptr);
         }
 
 
