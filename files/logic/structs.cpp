@@ -7,7 +7,6 @@
 
 #include"logic.hpp"
 
-const char* indent = "  ";
 // A standard Tuple object of fixed size n.
 template <typename T, index_t n>
 struct structs::Tuple{
@@ -106,16 +105,20 @@ struct structs::Tuple{
 };
 
 template <typename T, index_t n>
-void to_json(json& j, const structs::Tuple<T, n>& v){
+requires requires(json& j, const T& value) {
+    json(value);
+}
+void structs::to_json(json& j, const structs::Tuple<T, n>& v){
     for (index_t i = 0; i < n; i++){
-        json j;
-        to_json(j, v[i]);
-        j.push_back(std::move(j));
+        j.push_back(v[i]);
     }
 }
 
 template <typename T, index_t n>
-void from_json(const json& j, structs::Tuple<T, n>& v){
+requires requires(json& j, const T& value) {
+    json(value);
+}
+void structs::from_json(const json& j, structs::Tuple<T, n>& v){
     for (index_t i = 0; i < n; i++){
         v[i] = j[i];
     }
@@ -375,10 +378,12 @@ struct structs::Grid{
 // (throws error if incrementing/decrementing invalid indices).
 template<index_t n>
 struct structs::Index : public Tup<n>{
-    const Tup<n>& limits;
-    const Tup<n>& sizes;
+    const Tup<n>* limits;
+    const Tup<n>* sizes;
 
-    Index(Tup<n>&& value, const Tup<n>& limits, const Tup<n>& sizes) : Tup<n>(std::forward<Tup<n>>(value)), limits(limits), sizes(sizes), collapsed(0), valid(true) {
+    Index() : Tup<n>(), limits(nullptr), sizes(nullptr), collapsed(0), valid(false) {}
+
+    Index(Tup<n>&& value, const Tup<n>& limits, const Tup<n>& sizes) : Tup<n>(std::forward<Tup<n>>(value)), limits(&limits), sizes(&sizes), collapsed(0), valid(true) {
         try {
             this -> collapsed = this -> collapse(value);
         } catch(...) {
@@ -387,7 +392,7 @@ struct structs::Index : public Tup<n>{
     }
     
     template<typename T>
-    Index(const Grid<T, n>& grid) : Tup<n>(0), limits(grid.get_shape()), sizes(grid.get_sizes()), collapsed(0), valid(true) {}
+    Index(const Grid<T, n>& grid) : Tup<n>(0), limits(&grid.get_shape()), sizes(&grid.get_sizes()), collapsed(0), valid(true) {}
     
     template<typename T>
     Index(Tup<n>&& value, const Grid<T, n>& grid) : Index(std::forward<Tup<n>>(value), grid.get_shape(), grid.get_sizes()) {}
@@ -440,7 +445,7 @@ struct structs::Index : public Tup<n>{
         this -> collapsed = 0;
 
         for (index_t i = 0; i < n; ++i){
-            index_t lim = this ->  limits[i];
+            index_t lim = this ->  limits -> operator[](i);
             this -> at(i) = lim - 1;
         }
 
@@ -449,7 +454,9 @@ struct structs::Index : public Tup<n>{
         return *this;
     }
 
-    index_t& operator[](index_t i) = delete;
+    index_t operator[](index_t i) const{
+        return this -> at(i);
+    }
 
 
     Index& operator++() {
@@ -460,7 +467,7 @@ struct structs::Index : public Tup<n>{
         index_t axis = n-1;
         ++(this -> at(axis));
 
-        if (this -> at(axis) >= this -> limits[axis]) {
+        if (this -> at(axis) >= this -> limits -> operator[](axis)) {
             if (axis == 0) {
                 this -> valid = false;
                 return *this;
@@ -471,7 +478,7 @@ struct structs::Index : public Tup<n>{
 
                 ++(this -> at(axis));
                 
-                if (this -> at(axis) < this -> limits[axis]){
+                if (this -> at(axis) < this -> limits -> operator[](axis)){
                     break;
                 } else if (axis==0){
                     this -> valid = false;
@@ -493,7 +500,7 @@ struct structs::Index : public Tup<n>{
         if (this -> at(n-1) == 0){
             index_t axis = n-2;
             while (true) {
-                this -> at(axis+1) = this -> limits[axis+1]-1;
+                this -> at(axis+1) = this -> limits -> operator[](axis+1)-1;
 
                 if (this -> at(axis) > 0) {
                     --(this -> at(axis));
@@ -522,7 +529,7 @@ struct structs::Index : public Tup<n>{
         for(index_t i = 0; i < n; ++i){
             arith_t temp = (arith_t) this -> at(i) + v[i];
 
-            if (temp < 0 || temp >= this -> limits[i]){
+            if (temp < 0 || temp >= this -> limits -> operator[](i)){
                 this -> valid = false;
                 return *this;
             }
@@ -542,7 +549,7 @@ struct structs::Index : public Tup<n>{
         for(index_t i = 0; i < n; ++i){
             arith_t temp = (arith_t)(this -> at(i)) -  v[i];
 
-            if (temp < 0 || temp >= this -> limits[i]){
+            if (temp < 0 || temp >= this -> limits -> operator[](i)){
                 this -> valid = false;
                 return *this;
             }
@@ -603,7 +610,7 @@ struct structs::Index : public Tup<n>{
             index_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes[j]*this -> at(j)); 
+                i += (this -> sizes -> operator[](j)*this -> at(j)); 
             }
 
             return i;
@@ -613,10 +620,10 @@ struct structs::Index : public Tup<n>{
             index_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                if (index[j] >= this -> limits[j]){
+                if (index[j] >= this -> limits -> operator[](j)){
                     throw std::out_of_range("Index out of bounds.");
                 } else {
-                    i += (this -> sizes[j]*index[j]); 
+                    i += (this -> sizes -> operator[](j)*index[j]); 
                 }
             }
 
@@ -627,7 +634,7 @@ struct structs::Index : public Tup<n>{
             arith_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes[j]*vector[j]);
+                i += (this -> sizes -> operator[](j)*vector[j]);
             }
 
             return i;
@@ -774,6 +781,22 @@ struct structs::Vector : public Tuple<arith_t, n> {
         return result;
     }
 };
+
+template <index_t n>
+void structs::to_json(json& j, const structs::Vector<n>& v){
+    for (index_t i = 0; i < n; i++){
+        j.push_back(v[i]);
+    }
+}
+
+template <index_t n>
+void structs::from_json(const json& j, structs::Vector<n>& v){
+    for (index_t i = 0; i < n; i++){
+        v[i] = j[i];
+    }
+}
+
+
 
 
 // A BitMap of rank n.

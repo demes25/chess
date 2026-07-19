@@ -21,13 +21,22 @@ using arith_t = signed short;
 using value_t = double;
 using json = nlohmann::json;
 
-using clock = std::chrono::steady_clock;
+using timer = std::chrono::system_clock;
 using duration = std::chrono::duration<double>;
-using timestamp = clock::time_point;
+using timestamp = timer::time_point;
+
+const char* indent = "  ";
 
 namespace structs {
     template<typename T, index_t n>
     struct Tuple;
+    
+    template<typename T, index_t n>
+    void to_json(json& j, const structs::Tuple<T, n>& v);
+
+    template<typename T, index_t n>
+    void from_json(const json& j, structs::Tuple<T, n>& v);
+
 
     template<index_t n>
     using Tup = Tuple<index_t, n>;
@@ -37,6 +46,14 @@ namespace structs {
 
     template<index_t n>
     struct Vector;
+    
+    template<index_t n>
+    void to_json(json& j, const structs::Vector<n>& v);
+
+    template<index_t n>
+    void from_json(const json& j, structs::Vector<n>& v);
+
+
 
     template<index_t n>
     struct Index;
@@ -46,11 +63,6 @@ namespace structs {
 
     template <typename T, index_t n>
     struct PointerMap;
-}
-
-namespace game {
-    template<index_t n>
-    struct Piece;
 }
 
 namespace moves {
@@ -74,7 +86,6 @@ namespace moves {
     template<index_t n>
     struct Figure;
 
-
 }
 
 namespace game {
@@ -85,11 +96,14 @@ namespace game {
     struct Player;
 
     template<index_t n>
-    struct Action;
+    using Action = structs::Tuple<structs::Index<n>, 2>;
 
     enum Status : char {
         UNBEGUN = '0', ONGOING, PROMOTING, CHECKMATE, STALEMATE, TIMEOUT, DRAW
     };
+
+    template<index_t n>
+    using Board = structs::Grid<std::shared_ptr<Piece<n>>, n>;
 
     template<index_t n, index_t p>
     struct Instance;
@@ -98,41 +112,17 @@ namespace game {
     struct SerializableInstance;
 
     template<index_t n, index_t p>
+    void to_json(json& j, const game::SerializableInstance<n, p>& g);
+
+    template<index_t n, index_t p>
+    void from_json(json& j, game::SerializableInstance<n, p>& g);
+
+
+    template<index_t n, index_t p>
     struct Set;
 }
 
-template<typename T, index_t n>
-void to_json(json& j, const structs::Tuple<T, n>& v);
-
-template<typename T, index_t n>
-void from_json(const json& j, structs::Tuple<T, n>& v);
-
-template<index_t n>
-void to_json(json& j, const game::Action<n>& v);
-
-template<index_t n>
-void from_json(const json& j, game::Action<n>& v);
 
 
-/*
-template<index_t n>
-void to_json(json& j, const moves::Move<n>& m);
-
-template<index_t n>
-void from_json(const json& j, moves::Move<n>& m);
-
-
-template<index_t n>
-void to_json(json& j, const moves::Figure<n>& f);
-
-template<index_t n>
-void from_json(const json& j, moves::Figure<n>& f);
-*/
-
-template<index_t n, index_t p>
-void to_json(json& j, const game::Instance<n, p>& g);
-
-template<index_t n, index_t p>
-void from_json(json& j, game::Instance<n, p>& g);
 
 #endif

@@ -38,13 +38,13 @@ struct moves::Move{
         return this -> directions[i];
     }
 
-    bool sees(const Grid<game::Piece<n>*, n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+    bool sees(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         return (
             this -> valid_occupancy(board, target, player_index) && this -> valid_square(board, position, target)
         );
     }
 
-    virtual void populate(MoveMap<n>& map, const Grid<game::Piece<n>*, n>& board, const Index<n>& position, index_t player_index) const {
+    virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
         for (const Vector<n>& v : this -> directions){
             Index<n> target = position + v;
             
@@ -61,10 +61,28 @@ struct moves::Move{
     }
 
     
+    // SERIALIZATION
+
+    Move(const json& j) : 
+        directions(j.at("directions").get<std::vector<Vector<n>>>()),
+        captures(j.at("captures").get<bool>()),
+        moves(j.at("moves").get<bool>()),
+        relative_capture(j.at("relative_capture").get<Vector<n>>()) {}
+
+    virtual json serialize() const {
+        return {
+            {"directions", this -> directions},
+            {"captures", this -> captures},
+            {"moves", this -> moves},
+            {"relative_capture", this -> relative_capture}
+        };
+    }
+
+
     protected:
-        virtual bool valid_occupancy(const Grid<game::Piece<n>*, n>& board, const Index<n>& target, index_t player_index) const {
-            const game::Piece<n>* piece_at = board[target];
-            const game::Piece<n>* takes_at = board[target + this -> relative_capture];
+        virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& target, index_t player_index) const {
+            const std::shared_ptr<game::Piece<n>>& piece_at = board[target];
+            const std::shared_ptr<game::Piece<n>>& takes_at = board[target + this -> relative_capture];
 
             if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
@@ -77,7 +95,7 @@ struct moves::Move{
             return false;
         }
 
-        virtual bool valid_square(const Grid<game::Piece<n>*, n>& board, const Index<n>& position, const Index<n>& target) const {
+        virtual bool valid_square(const game::Board<n>& board, const Index<n>& position, const Index<n>& target) const {
             if (position == target){
                 return false;
             }
@@ -137,15 +155,37 @@ struct moves::Span : public Move<n>{
         max_obstacles(max_obstacles) {}
 
     
-    virtual void populate(MoveMap<n>& map, const Grid<game::Piece<n>*, n>& board, const Index<n>& position, index_t player_index) const {
+    virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
         for (const Vector<n>& di : this -> directions){
             this -> positive_span(map, board, position, player_index, di);
             this -> positive_span(map, board, position, player_index, -di);
         }
     }
 
+    // SERIALIZATION
+
+    Span(const json& j) : 
+        Move<n>(j),
+        min_steps(j.at("min_steps").get<arith_t>()),
+        max_steps(j.at("max_steps").get<arith_t>()),
+        min_obstacles(j.at("min_obstacles").get<arith_t>()),
+        max_obstacles(j.at("max_obstacles").get<arith_t>()) {}
+
+
+    json serialize() const override {
+        json result = Move<n>::serialize();
+
+        result["min_steps"] = this -> min_steps;
+        result["max_steps"] = this -> max_steps;
+        result["min_obstacles"] = this -> min_obstacles;
+        result["max_obstacles"] = this -> max_obstacles;
+
+        return result;
+    }
+
+
     protected:
-        virtual bool valid_square(const Grid<game::Piece<n>*, n>& board, const Index<n>& position, const Index<n>& target) const {
+        virtual bool valid_square(const game::Board<n>& board, const Index<n>& position, const Index<n>& target) const {
             if (position == target){
                 return false;
             }
@@ -199,7 +239,7 @@ struct moves::Span : public Move<n>{
             return false;
         }
 
-        virtual void positive_span(MoveMap<n>& map, const Grid<game::Piece<n>*, n>& board, const Index<n>& position, index_t player_index, const Vector<n>& v) const {
+        virtual void positive_span(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index, const Vector<n>& v) const {
             arith_t steps(1);
             arith_t obstacles(0);
 
@@ -231,6 +271,8 @@ struct moves::Span : public Move<n>{
                 }
             }
         }
+
+
 };
 
 template<index_t n>
@@ -259,7 +301,8 @@ struct moves::Figure {
         return Figure::instances[key];
     }
 
-    const Move<n>* sees_opener(const Grid<game::Piece<n>*, n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+
+    const Move<n>* which_opener(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         for (const Move<n>& m : this -> opener_list){
             if (m.sees(board, position, target, player_index)){
                 return &m;
@@ -269,13 +312,13 @@ struct moves::Figure {
         return nullptr;
     }
 
-    virtual void populate_openers(MoveMap<n>& map, const Grid<game::Piece<n>*, n>& board, const Index<n>& position, index_t player_index) const {
+    virtual void populate_openers(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
         for (const Move<n>& m : this -> opener_list){
-            m.populate(map);
+            m.populate(map, board, position, player_index);
         }
     }
 
-    const Move<n>* sees_move(const Grid<game::Piece<n>*, n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+    const Move<n>* which_move(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         for (const Move<n>& m : this -> move_list){
             if (m.sees(board, position, target, player_index)){
                 return &m;
@@ -285,22 +328,95 @@ struct moves::Figure {
         return nullptr;
     }
 
-    virtual void populate_moves(MoveMap<n>& map, const Grid<game::Piece<n>*, n>& board, const Index<n>& position, index_t player_index) const {
+    virtual void populate_moves(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
         for (const Move<n>& m : this -> move_list){
-            m.populate(map);
+            m.populate(map, board, position, player_index);
         }
     }
+
+
+    // SERIALIZATION
+
+    static Move<n> deserialize(const json& m) {
+        if (m.contains("min_steps")){
+            return Span<n>(m);
+        } else {
+            return Move<n>(m);
+        }
+    }
+
+    static std::shared_ptr<Figure> define(const json& j){
+        std::vector<Move<n>> move_list;
+
+        for (const json& m : j.at("move_list")){
+            move_list.push_back(deserialize(m));
+        }
+
+        std::vector<Move<n>> opener_list;
+        for (const json& o : j.at("opener_list")){
+            opener_list.push_back(deserialize(o));
+        }
+
+        return Figure::define(
+            j.at("name").get<std::string>(),
+            j.at("key").get<std::string>(),
+            j.at("value").get<value_t>(),
+            std::move(move_list),
+            std::move(opener_list),
+            j.at("open_exclusive").get<bool>()
+        );
+    }
+
+    static void load(const json& j) {
+        for (const json& m : j){
+            Figure::define(m);
+        }
+    }
+
+    json serialize() {
+        json move_arr = json::array();
+        for (const Move<n>& m : this -> move_list){
+            move_arr.push_back(m.serialize());
+        }
+
+        json opener_arr = json::array();
+        for (const Move<n>& o : this -> opener_list){
+            opener_arr.push_back(o.serialize());
+        }
+
+        return {
+            {"name", this -> name},
+            {"key", this -> key},
+            {"value", this -> value},
+            {"move_list", move_arr},
+            {"opener_list", opener_arr},
+            {"open_exclusive", this -> open_exclusive}
+        };
+    }
+
+    static json save() {
+        json j;
+
+        for (auto f : Figure::instances){
+            j[f -> key] = f -> serialize();
+        }
+
+        return j;
+    }
+
+    Figure(const std::string& name, const std::string& key, value_t value, std::vector<Move<n>>&& move_list, std::vector<Move<n>>&& opener_list, bool open_exclusive) : name(name), key(key), value(value), move_list(std::forward<std::vector<Move<n>>>(move_list)), opener_list(std::forward<std::vector<Move<n>>>(opener_list)), open_exclusive(open_exclusive) {}
+
 
     private:
-        Figure(const std::string& name, const std::string& key, value_t value, std::vector<Move<n>>&& move_list, std::vector<Move<n>>&& opener_list, bool open_exclusive) : name(name), key(key), value(value), move_list(std::forward<std::vector<Move<n>>>(move_list)), opener_list(std::forward<std::vector<Move<n>>>(opener_list)), open_exclusive(open_exclusive) {}
-
         static std::unordered_map<std::string, std::shared_ptr<Figure>> instances; 
 };
 
+template<index_t n>
+std::unordered_map<std::string, std::shared_ptr<moves::Figure<n>>>
+moves::Figure<n>::instances{};
+
 #endif
 
-
-#define SPAN_TEST
 
 #ifdef MOVE_TEST
 
@@ -391,3 +507,31 @@ int main() {
 
 
 #endif
+
+#ifdef FIGURE_TEST
+
+#include"structs.cpp"
+#include"game.cpp"
+#include<fstream>
+
+int main(){
+    json j;
+
+    std::ifstream file("figures.json");
+    if (!file) {
+        throw std::runtime_error("Could not open config.json");
+    }
+
+    file >> j;
+
+    std::shared_ptr<Figure<2>> ptr;
+
+    for (const json& m : j){
+        std::shared_ptr<Figure<2>> ptr = Figure<2>::define(m);
+    }
+
+    ptr;
+
+
+}
+#endif 

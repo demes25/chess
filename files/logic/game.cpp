@@ -29,7 +29,7 @@ struct game::Piece{
     mutable bool just_opened;
 
     Piece(
-        Tup<n>&& position, 
+        Index<n>&& position, 
         std::shared_ptr<Figure<n>> figure, 
         index_t player_index, 
         std::vector<std::string>&& promotion_list, 
@@ -39,7 +39,7 @@ struct game::Piece{
         bool dead, 
         bool has_moved, 
         bool just_opened
-    ) : position(std::forward<Tup<n>>(position)), 
+    ) : position(std::forward<Index<n>>(position)), 
         figure(figure), 
         player_index(player_index), 
         promotion_list(std::forward<std::vector<std::string>>(promotion_list)), 
@@ -51,13 +51,13 @@ struct game::Piece{
         just_opened(just_opened){}
     
     Piece(
-        Tup<n>&& position, 
+        Index<n>&& position, 
         std::shared_ptr<Figure<n>> figure, 
         index_t player_index, 
         bool dead, 
         bool has_moved, 
         bool just_opened
-    ) : position(std::forward<Tup<n>>(position)), 
+    ) : position(std::forward<Index<n>>(position)), 
         figure(figure), 
         player_index(player_index), 
         promotion_list(), 
@@ -73,7 +73,7 @@ struct game::Piece{
 
     ~Piece() = default;
 
-    bool sees(const Grid<Piece<n>*, n>& board, const Index<n>& target) const {
+    bool sees(const Board<n>& board, const Index<n>& target) const {
         if (this -> dead || this -> promoted) {
             return false;
         }
@@ -89,7 +89,7 @@ struct game::Piece{
         return (this -> figure -> which_move(board, this -> position, target, this -> player_index) != nullptr);
     }
 
-    const Move<n>* which_sees(const Grid<Piece<n>*, n>& board, const Index<n>& target) const {
+    const Move<n>* which_sees(const Board<n>& board, const Index<n>& target) const {
         if (this -> dead || this -> promoted) {
             return nullptr;
         }
@@ -106,13 +106,13 @@ struct game::Piece{
         return this -> figure -> which_move(board, this -> position, target, this -> player_index);
     }
 
-    Piece<n> promoted_piece(index_t i) {
+    std::shared_ptr<Piece<n>> promoted_piece(index_t i) {
         this -> promoted = true;
 
         const std::string& promotion_fig = this -> promotion_list[i];
 
-        return Piece<n>(
-            this -> position,
+        return std::make_shared<Piece<n>>(
+            Index<n>(this -> position),
             Figure<n>::resolve(promotion_fig),
             this -> player_index, 
             false,
@@ -124,26 +124,35 @@ struct game::Piece{
 
 template<index_t n>
 struct game::Player{
-    const index_t index;
+    index_t index;
 
     value_t material;
 
-    std::vector<Piece<n>> pieces;
-    std::vector<Piece<n>> monarchs;
+    std::vector<std::shared_ptr<Piece<n>>> pieces;
+    std::vector<std::shared_ptr<Piece<n>>> monarchs;
 
     Player(
         index_t index, 
         value_t material, 
-        std::vector<Piece<n>>&& pieces, 
-        std::vector<Piece<n>>&& monarchs
+        std::vector<std::shared_ptr<Piece<n>>>&& pieces, 
+        std::vector<std::shared_ptr<Piece<n>>>&& monarchs
     ) : index(index), 
         material(material), 
-        pieces(std::forward<std::vector<Piece<n>>>(pieces)), 
-        monarchs(std::forward<std::vector<Piece<n>>>(monarchs)) {}
+        pieces(std::forward<std::vector<std::shared_ptr<Piece<n>>>>(pieces)), 
+        monarchs(std::forward<std::vector<std::shared_ptr<Piece<n>>>>(monarchs)) {}
+
+    Player() : index(0), material(0), pieces(), monarchs() {}
+
+    Player(Player&&) = default;
+    Player(const Player&) = default;
     
-    bool pieces_see(const Index<n>& target) const {
-        for (const Piece<n>& piece : this -> pieces){
-            if (piece.sees(target)){
+
+    Player& operator=(Player&&) = default;
+    Player& operator=(const Player&) = default;
+
+    bool pieces_see(const Board<n>& board, const Index<n>& target) const {
+        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+            if (piece -> sees(board, target)){
                 return true;
             }
         }
@@ -151,9 +160,9 @@ struct game::Player{
         return false;
     }
 
-    bool monarchs_see(const Index<n>& target) const {
-        for (Piece<n>& monarch : this -> monarchs){
-            if (monarch.sees(target)){
+    bool monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+            if (monarch -> sees(board, target)){
                 return true;
             }
         }
@@ -161,18 +170,18 @@ struct game::Player{
         return false;
     }
 
-    bool sees(const Index<n>& target) const {
-        return this -> monarchs_see(target) || this -> pieces_see(target);
+    bool sees(const Board<n>& board, const Index<n>& target) const {
+        return this -> monarchs_see(board, target) || this -> pieces_see(board, target);
     }
 
 
 
 
-    std::vector<Piece<n>*> which_pieces_see(const Index<n>& target) const {
-        std::vector<Piece<n>*> result;
+    std::vector<std::shared_ptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<std::shared_ptr<Piece<n>>> result;
 
-        for (Piece<n>& piece : this -> pieces){
-            if (piece.sees(target)){
+        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+            if (piece -> sees(board, target)){
                 result.push_back(&piece);
             }
         }
@@ -180,11 +189,11 @@ struct game::Player{
         return result;
     }
 
-    std::vector<Piece<n>*> which_monarchs_see(const Index<n>& target) const {
-        std::vector<Piece<n>*> result;
+    std::vector<std::shared_ptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<std::shared_ptr<Piece<n>>> result;
 
-        for (Piece<n>& monarch : this -> monarchs){
-            if (monarch.sees(target)){
+        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+            if (monarch -> sees(board, target)){
                 result.push_back(&monarch);
             }
         }
@@ -192,17 +201,17 @@ struct game::Player{
         return result;
     }
 
-    std::vector<Piece<n>*> which_see(const Index<n>& target) const {
-        std::vector<Piece<n>*> result;
+    std::vector<std::shared_ptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<std::shared_ptr<Piece<n>>> result;
 
-        for (Piece<n>& piece : this -> pieces){
-            if (piece.sees(target)){
+        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+            if (piece -> sees(board, target)){
                 result.push_back(&piece);
             }
         }
 
-        for (Piece<n>& monarch : this -> monarchs){
-            if (monarch.sees(target)){
+        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+            if (monarch -> sees(board, target)){
                 result.push_back(&monarch);
             }
         }
@@ -212,75 +221,103 @@ struct game::Player{
 
 
 
-    index_t how_many_pieces_see(const Index<n>& target) const {
-        index_t n = 0;
+    index_t how_many_pieces_see(const Board<n>& board, const Index<n>& target) const {
+        index_t N = 0;
 
-        for (const Piece<n>& piece : this -> pieces){
-            if (piece.sees(target)){
-                n++;
+        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+            if (piece -> sees(board, target)){
+                N++;
             }
         }
 
-        return n;
+        return N;
     }
 
-    index_t how_many_monarchs_see(const Index<n>& target) const {
-        index_t n = 0;
+    index_t how_many_monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        index_t N = 0;
 
-        for (const Piece<n>& monarch : this -> monarchs){
-            if (monarch.sees(target)){
-                n++;
+        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+            if (monarch -> sees(board, target)){
+                N++;
             }
         }
 
-        return n;
+        return N;
     }
 
-    index_t how_many_see(const Index<n>& target) const {
-        return this -> how_many_pieces_see(target) + this -> how_many_monarchs_see(target);
+    index_t how_many_see(const Board<n>& board, const Index<n>& target) const {
+        return this -> how_many_pieces_see(board, target) + this -> how_many_monarchs_see(board, target);
     }
 };
 
 template <index_t n, index_t p>
 struct game::Instance{
     Instance(
-        Grid<Piece<n>*, n>&& board, 
-        Tuple<Player<n>, p>&& players, 
-        duration time
-    ) : board(std::forward<Grid<Piece<n>*, n>>(board)), 
-        players(std::forward<Tuple<Player<n>, n>>(players)),
-        times(time),
+        const Tup<n>& shape,
+        Tuple<Player<n>, p>&& players,
+        double time
+    ) : board(shape), 
+        players(std::forward<Tuple<Player<n>, n>>(players)), 
+        times(duration(time)), 
         turn(0), 
-        promoting(nullptr){} 
+        turn_start_time(0),
+        history(), 
+        status(UNBEGUN), 
+        promoting(nullptr) 
+    {
+        this -> set();
+
+        this -> history.emplace_back();
+        this -> round = &(this -> history.back());
+    }
 
     Instance(Instance&&) = default;
     Instance& operator=(Instance&&) = default;
     ~Instance() = default;
 
-    Piece<n>*& operator[](const Index<n>& i) {
+    std::shared_ptr<Piece<n>>& operator[](const Index<n>& i) {
         return this -> board[i];
     }
 
-    const Piece<n>*& operator[](const Index<n>& i) const {
+    const std::shared_ptr<Piece<n>>& operator[](const Index<n>& i) const {
         return this -> board[i];
+    }
+
+    bool is_over() const {
+        return (this -> status > PROMOTING);
+    }
+
+    
+    Index<n> as_index(const Tup<n>& t) const {
+        return Index<n>(t, this -> board);
+    }
+
+    Index<n> as_index(Tup<n>&& t) const {
+        return Index<n>(std::move(t), this -> board);
+    }
+
+
+    friend std::ostream& operator<<(std::ostream& os, const Instance<n, p>& inst) {
+        index_t index = 0;
+        return inst.print_help(os, 0, index);
     }
 
     protected:
-        Grid<Piece<n>*, n> board;
+        Board<n> board;
         Tuple<Player<n>, p> players;
         Tuple<duration, p> times;
 
         std::vector<Tuple<Action<n>, p>> history;
-        Tuple<Action<n>>& round;
+        Tuple<Action<n>, p>* round;
 
         index_t turn;
         timestamp turn_start_time;
 
         Status status;
-        Piece<n>* promoting;
+        std::shared_ptr<Piece<n>> promoting;
 
         Instance(
-            Grid<Piece<n>*, n>&& board,
+            Board<n>&& board,
             Tuple<Player<n>, p>&& players,
             Tuple<duration, p>&& times,
             
@@ -289,69 +326,88 @@ struct game::Instance{
             timestamp turn_start_time,
 
             Status status,
-            Piece<n>* promoting,
-        ) : board(std::forward<Grid<Piece<n>*, n>>(board)), 
+            std::shared_ptr<Piece<n>> promoting
+        ) : board(std::forward<Board<n>>(board)), 
             players(std::forward<Tuple<Player<n>, n>>(players)), 
             times(std::forward<Tuple<duration, p>>(times)), 
             turn(turn), 
             turn_start_time(turn_start_time),
-            history(std::forward<Tuple<Action<n>, p>>(history)), 
+            history(std::forward<std::vector<Tuple<Action<n>, p>>>(history)), 
             status(status), 
-            promoting(promoting) {
-                
+            promoting(promoting) 
+        {
+            this -> set();
+
             if (this -> history.size() == 0){
                 this -> history.push_back(Tuple<Action<n>, p>());
             }
-            this -> round = this -> history.back();
+            this -> round = &(this -> history.back());
         }
 
-
+        // empties the board and calls .show on all players
+        void set() {
+            this -> board.fill(nullptr);
+            
+            for (index_t i = 0; i < p; i++){
+                this -> show(this -> players[i]);
+            }
+        }
         
         // shows the piece on the board.
-        void show(Piece<n>* piece) {
+        void show(const std::shared_ptr<Piece<n>>& piece) {
             if (piece != nullptr && !piece -> dead && !piece -> promoted){
                 this -> board[piece -> position] = piece;
+            }
+        }
+
+        // shows the piece on the board.
+        void show(Piece<n>& piece) {
+            if (!(piece.dead || piece.promoted)){
+                this -> board[piece.position] = &piece;
+            }
+        }
+
+        // shows all of this player's pieces on the board.
+        void show(Player<n>& player) {
+            for (const std::shared_ptr<Piece<n>>& piece : player.pieces){
+                this -> show(piece);
+            }
+            
+            for (const std::shared_ptr<Piece<n>>& monarch : player.monarchs){
+                this -> show(monarch);
             }
         }
         
         // adds the given piece to the board.
         // if the position is occupied, raises error.
         // adds the piece to the corresponding player and shows it on the board.
-        Piece<n>* add(Piece<n>&& piece){
-            if (this -> board[piece.position] != nullptr){
+        std::shared_ptr<Piece<n>> add(std::shared_ptr<Piece<n>> piece){
+            if (this -> board[piece -> position] != nullptr){
                 throw std::runtime_error("occupied");
             }
 
-            std::vector<Piece<n>>& pieces = this -> players[piece.player_index].pieces;
+            this -> players[piece -> player_index].pieces.push_back(piece);
+            this -> show(piece);
 
-            pieces.push_back(std::forward<Piece<n>>(piece));
-            Piece<n>* result = &pieces.back();
-
-            this -> show(result);
-
-            return result;
+            return piece;
         }
 
         // adds the given monarch to the board.
         // if the position is occupied, raises error.
         // adds the monarch to the corresponding player and shows it on the board.
-        Piece<n>* add_monarch(Piece<n>&& monarch){
-            if (this -> board[piece.position] != nullptr){
+        std::shared_ptr<Piece<n>> add_monarch(std::shared_ptr<Piece<n>> monarch){
+            if (this -> board[monarch -> position] != nullptr){
                 throw std::runtime_error("occupied");
             }
 
-            std::vector<Piece<n>>& monarchs = this -> players[monarch.player_index].monarchs;
+            this -> players[monarch -> player_index].monarchs.push_back(monarch);
+            this -> show(monarch);
 
-            monarchs.push_back(std::forward<Piece<n>>(monarch));
-            Piece<n>* result = &monarchs.back();
-
-            this -> show(result);
-
-            return result;
+            return monarch;
         }
 
         // sets piece -> dead to true and hides the piece from the board.
-        void kill(Piece<n>* piece) {
+        void kill(std::shared_ptr<Piece<n>> piece) {
             if (piece != nullptr && !piece -> dead && !piece -> promoted){
                 piece -> dead = true;
                 this -> board[piece -> position] = nullptr;
@@ -359,7 +415,7 @@ struct game::Instance{
         }
 
         // sets piece -> dead to false and shows the piece on the board.
-        void unkill(Piece<n>* piece) {
+        void unkill(std::shared_ptr<Piece<n>> piece) {
             if (piece != nullptr && piece -> dead && !piece -> promoted){
                 piece -> dead = false;
                 this -> board[piece -> position] = piece;
@@ -380,10 +436,19 @@ struct game::Instance{
 
 
 
+        void assert_status() const {
+            if (this -> status > ONGOING) {
+                std::string status{(char)(this -> status)};
+                std::string error_str("status ");
+                error_str += status;
+
+                throw std::runtime_error(error_str);
+            }
+        }
 
         
         void move(const Index<n>& start, const Index<n>& end) {
-            this -> make_move();
+            this -> make_move(start, end);
 
             if (this -> status != PROMOTING) {
                 this -> post_move();
@@ -391,25 +456,21 @@ struct game::Instance{
         }
         
         virtual void resolve_promotion(index_t i) {
-            if (this -> status != PROMOTING) {
-                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
-            }
+            this -> assert_status();
 
             this -> raw_promote(i);
             this -> post_move();
         }
 
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
-            if (this -> status > ONGOING) {
-                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
-            }
+            this -> assert_status();
 
-            Piece<n>* piece = this -> board[start];
+            std::shared_ptr<Piece<n>> piece = this -> board[start];
             const Move<n>* move = this -> validate_and_get_move(piece, end);
-            const Piece<n>* target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
+            const std::shared_ptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
 
-            this -> round[this -> turn] = Action<n>(start, end);
-            
+            this -> round -> operator[](this -> turn) = Action<n>(start, end);
+
             this -> update_promoting(piece);
         }
 
@@ -434,7 +495,7 @@ struct game::Instance{
         
         // if (piece, end) represent an illegal move, raises error.
         // otherwise, returns a pointer to the Move object corresponding to the given move.
-        const Move<n>* validate_and_get_move(const Piece<n>* piece, const Index<n>& end) const {
+        const Move<n>* validate_and_get_move(const std::shared_ptr<Piece<n>> piece, const Index<n>& end) const {
             if (piece == nullptr) {
                 throw std::runtime_error("empty");
             } else if (piece -> player_index != this -> turn){
@@ -443,7 +504,7 @@ struct game::Instance{
                 throw std::runtime_error("panic");
             }
 
-            const Move<n>* move = piece -> which_sees(end);
+            const Move<n>* move = piece -> which_sees(this -> board, end);
 
             if (move == nullptr){
                 throw std::runtime_error("illegal");
@@ -456,9 +517,9 @@ struct game::Instance{
         // i.e. -- captures any pieces that need to be captured, updates positions, etc...
         // if the given move "walks into" check, undoes everything and raises error.
         // otherwise, returns a pointer to the piece, if any, that was captured.
-        const Piece<n>* adjust_board_and_get_target(Piece<n>* piece, const Move<n>* move, const Index<n>& start, const Index<n>& end) {
-            Piece<n>* target_piece = this -> board[end + move -> relative_capture];
-            Piece<n>* end_piece = this -> board[end];
+        std::shared_ptr<Piece<n>> adjust_board_and_get_target(std::shared_ptr<Piece<n>> piece, const Move<n>* move, const Index<n>& start, const Index<n>& end) {
+            std::shared_ptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
+            std::shared_ptr<Piece<n>> end_piece = this -> board[end];
 
             this -> kill(target_piece);
 
@@ -483,13 +544,13 @@ struct game::Instance{
         bool in_check(index_t player_index) const {
             const Player<n>& player = this -> players[player_index];
 
-            if (player -> monarchs.size() == 1){
-                const Piece<n>& king = player -> monarchs[0];
+            if (player.monarchs.size() == 1){
+                const std::shared_ptr<Piece<n>>& king = player.monarchs[0];
 
                 for (index_t i = 0; i < p; i++){
                     if (i != player_index){
                         const Player<n>& opponent = this -> players[i];
-                        if (opponent.pieces_see(king.position)){
+                        if (opponent.pieces_see(this -> board, king -> position)){
                             return true;
                         }
                     }
@@ -504,7 +565,7 @@ struct game::Instance{
         // if the piece is on its promotion square, then:
         //    -  if the piece can only promote to one thing, automatically promotes and returns true.
         //    -  otherwise, caches the unfinished promotion, sets status to PROMOTING and returns false
-        bool update_promoting(Piece<n>* piece) {
+        bool update_promoting(std::shared_ptr<Piece<n>> piece) {
             if (piece -> promotion_list.size() != 0 && piece -> position[piece -> promotion_axis] == piece -> promotion_index){
                 if (piece -> promotion_list.size() == 1){
                     this -> raw_promote(0);
@@ -532,8 +593,8 @@ struct game::Instance{
 
         // updates the times, places the given action in history and calls .next_turn.
         // returns the duration of the move.
-        duration advance_turn(const Index<n>& start, const Index<n>& end){
-            timestamp turn_end_time = clock::now();
+        duration advance_turn(){
+            timestamp turn_end_time = timer::now();
 
             duration time_dif;
 
@@ -544,7 +605,7 @@ struct game::Instance{
             } 
 
             else if (this -> status == ONGOING) {
-                duration time_dif = turn_end_time - this -> turn_start_time;
+                time_dif = turn_end_time - this -> turn_start_time;
                 this -> times[this -> turn] -= time_dif;
             }
             
@@ -559,8 +620,9 @@ struct game::Instance{
             this -> turn = (this -> turn + 1) % p;
             
             if (this -> turn == 0){
-                this -> history.push_back(Tuple<Action<n>, p>());
-                this -> round = this -> history.back();
+                this -> round = nullptr;
+                this -> history.emplace_back();
+                this -> round = &(this -> history.back());
             }
         }
 
@@ -575,11 +637,64 @@ struct game::Instance{
                     this -> status = STALEMATE;
                 }
             } else {
-                this - > status = ONGOING;
+                this -> status = ONGOING;
             }
         }
 
-        bool no_legal_moves();
+        bool no_legal_moves() {
+            return false;
+        }
+
+
+
+        std::ostream& print_help(std::ostream& os, index_t axis, index_t& index) const {
+            if (axis == n-1){
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << '[';
+        
+                index_t last = this -> board.get_shape()[axis] - 1;
+                for(index_t i = 0; i < last; ++i){
+                    const std::shared_ptr<Piece<n>> a = this -> board[index++];
+
+                    if (a == nullptr){
+                        os << '.' << '\t';
+                    } else {
+                        os << a -> figure -> name[0] << (a -> player_index == 0 ? 'w' : 'b') << '\t';
+                    }
+                }
+
+                const std::shared_ptr<Piece<n>> a = this -> board[index++];
+
+                if (a == nullptr){
+                    os << '.' << ']';
+                } else {
+                    os << a -> figure -> name[0] << (a -> player_index == 0 ? 'w' : 'b') << ']';
+                }
+
+            } else {
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << '[' << std::endl;
+
+                index_t last = this -> board.get_shape()[axis] - 1;
+                for(index_t i = 0; i < last; ++i){
+                    this -> print_help(os, axis+1, index);
+                    os << ',' << std::endl;
+                }
+
+                this -> print_help(os, axis+1, index);
+                os << std::endl;
+                for (index_t k = 0; k < axis; ++k){
+                    os << indent;
+                }
+                os << ']';
+            }
+
+            return os;
+        }
 
 };
 

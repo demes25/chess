@@ -53,7 +53,6 @@ struct game::SerializableInstance : public Instance<n, p>{
 
     // SERIALIZATION
 
-    /*
     json serialize() const {
         json promoting;
 
@@ -61,12 +60,21 @@ struct game::SerializableInstance : public Instance<n, p>{
             promoting = nullptr;
         } else {
             promoting = this -> promoting -> position;
+        }  
+
+        json times = json::array();
+
+        for (index_t i = 0; i < p; i++){
+            times.push_back(this -> times[i].count());
         }
+
+        duration t = this -> turn_start_time.time_since_epoch();
 
         return {
             {"board", this -> board.get_shape()},
-            {"players", Instance::players_to_json(this -> players)},
-            //{"times", this -> times},
+            {"players", SerializableInstance::player_to_json(this -> players)},
+            {"times", times},
+            {"turn_start_time", t.count()},
 
             {"turn", this -> turn},
             {"history", this -> history},
@@ -78,33 +86,34 @@ struct game::SerializableInstance : public Instance<n, p>{
         };
     }
 
-    static Instance deserialize(const json& j) {
-        Grid<Piece<n>*, n> board(j.at("board").get<Tup<n>>());
-        Tuple<Player<n>, p> players = Instance::players_to_json(j.at("players"), board);
+    static SerializableInstance deserialize(const json& j) {
+        Board<n> board(j.at("board").get<Tup<n>>());
+        Tuple<Player<n>, p> players = SerializableInstance::players_from_json(j.at("players"), board);
 
+        Tuple<duration, p> times;
 
-        Instance result(
-            std::move(board), 
-            std::move(players), 
-            //j.at("times").get<Tuple<duration, p>>(),
-            j.at("turn").get<index_t>(),
-            j.at("history").get<std::vector<Tuple<Action<n>, p>>>(),
-            j.at("status").get<Status>(),
-            nullptr,
-            j.at("move_json")
-        );
+        json json_times = j.at("times");
 
         for (index_t i = 0; i < p; i++){
-            for (Piece<n>& piece : players[i].pieces){
-                result.show(&piece);
-            }
-
-            for (Piece<n>& monarch : players[i].monarchs){
-                result.show(&monarch);
-            }
+            times[i] = duration(json_times.at(i).get<double>());
         }
 
-        json& promoting = j.at("promoting");
+        timestamp turn_start_time(std::chrono::duration_cast<timer::duration>(duration{j.at("turn_start_time").get<double>()}));
+
+        SerializableInstance result(
+            std::move(board), 
+            std::move(players), 
+            std::move(times),
+            
+            j.at("history").get<std::vector<Tuple<Action<n>, p>>>(),
+            j.at("turn").get<index_t>(),
+            turn_start_time,
+
+            j.at("status").get<Status>(),
+            nullptr
+        );
+
+        const json& promoting = j.at("promoting");
 
         if (!promoting.is_null()){
             result.promoting = result.board[Index<n>(promoting.get<Tup<n>>(), board)];
@@ -112,16 +121,13 @@ struct game::SerializableInstance : public Instance<n, p>{
         
         return result;
     }
-    */
 
     private:
         json move_json;
 
 
         virtual void resolve_promotion(index_t i) {
-            if (this -> status != PROMOTING) {
-                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
-            }
+            this -> assert_status();
 
             this -> raw_promote(i);
             this -> move_json["promote"] = i;
@@ -130,13 +136,11 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
-            if (this -> status > ONGOING) {
-                throw std::runtime_error(std::string("status ") + std::string((char)(this -> status)));
-            }
+            this -> assert_status();
 
-            Piece<n>* piece = this -> board[start];
+            std::shared_ptr<Piece<n>> piece = this -> board[start];
             const Move<n>* move = this -> validate_and_get_move(piece, end);
-            const Piece<n>* target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
+            const std::shared_ptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
             
             Action<n> action(start, end);
 
@@ -144,12 +148,12 @@ struct game::SerializableInstance : public Instance<n, p>{
 
             bool auto_promote = this -> update_promoting(piece);
 
-            this -> move_json = {
-                {"label", "move"},
-                {"action", action}
-            };
+            this -> move_json = json::object();
             
-            if (target_piece) != nullptr{
+            this -> move_json["label"] = "move";
+            this -> move_json["action"] = "action";
+            
+            if (target_piece != nullptr){
                 this -> move_json["die"] = target_piece -> position;
             }
             if (auto_promote){
@@ -174,8 +178,14 @@ struct game::SerializableInstance : public Instance<n, p>{
 
             this -> update_game_status(next_in_check);
 
-            this -> move_json["times"] = this -> times;
-            this -> move_json["duration"] = time_dif;
+            json json_times = json::array();
+
+            for (index_t i = 0; i < p; i++){
+                json_times.push_back(this -> times[i].count());
+            }
+
+            this -> move_json["times"] = json_times;
+            this -> move_json["duration"] = time_dif.count();
 
             if (this -> status == CHECKMATE){
                 this -> move_json["end"] = "checkmate";
@@ -188,29 +198,28 @@ struct game::SerializableInstance : public Instance<n, p>{
 
         json drain_json() {
             json r = std::move(this -> move_json);
-            this -> move_json = nullptr;
+            this -> move_json.clear();
             return r;
         }
 
-        /*
 
-        static json piece_to_json(const Piece<n>& pi) {
+        static json piece_to_json(const std::shared_ptr<Piece<n>>& pi) {
             return {
-                {"position", pi.position},
-                {"figure", pi.figure -> key},
-                {"player_index", pi.player_index},
-                {"promotion_list", pi.promotion_list},
-                {"promotion_axis", pi.promotion_axis},
-                {"promotion_index", pi.promotion_index},
-                {"promoted", pi.promoted},
-                {"dead", pi.dead},
-                {"has_moved", pi.has_moved},
-                {"just_opened", pi.just_opened}
+                {"position", pi -> position},
+                {"figure", pi -> figure -> key},
+                {"player_index", pi -> player_index},
+                {"promotion_list", pi -> promotion_list},
+                {"promotion_axis", pi -> promotion_axis},
+                {"promotion_index", pi -> promotion_index},
+                {"promoted", pi -> promoted},
+                {"dead", pi -> dead},
+                {"has_moved", pi -> has_moved},
+                {"just_opened", pi -> just_opened}
             };
         }
 
-        static Piece<n> piece_from_json(const json& j, const Grid<Piece<n>*, n>& board) {
-            return Piece<n>(
+        static std::shared_ptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board) {
+            return std::make_shared<Piece<n>>(
                 Index<n>(std::move(j.at("position").get<Tup<n>>()), board),
                 Figure<n>::resolve(j.at("figure").get<std::string>()),
 
@@ -227,85 +236,116 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
 
-        json player_to_json(const Player<n>& pl) const {
+        static json player_to_json(const Player<n>& pl) {
             json pieces = json::array();
-            json pawns = json::array();
             json monarchs = json::array();
 
-            for (const Piece<n>& piece : pl.pieces){
-                pieces.push_back(this -> piece_to_json(piece));
+            for (const std::shared_ptr<Piece<n>>& piece : pl.pieces){
+                pieces.push_back(SerializableInstance::piece_to_json(piece));
             }
 
-            for (const Piece<n>& pawn : pl.pawns){
-                pawns.push_back(this -> piece_to_json(pawn));
-            }
-
-            for (const Piece<n>& monarch : pl.monarchs){
-                monarchs.push_back(this -> piece_to_json(monarch));
+            for (const std::shared_ptr<Piece<n>>& monarch : pl.monarchs){
+                monarchs.push_back(SerializableInstance::piece_to_json(monarch));
             }
 
             return {
                 {"index", pl.index},
                 {"material", pl.material},
-                {"pawns", pawns},
                 {"pieces", pieces},
                 {"monarchs", monarchs}
             };
         }
 
-        Player<n> player_from_json(const json& j) const {
-            std::vector<Piece<n>> pieces;
-            std::vector<Piece<n>> pawns;
-            std::vector<Piece<n>> monarchs;
+        static Player<n> player_from_json(const json& j, const Board<n>& board) {
+            std::vector<std::shared_ptr<Piece<n>>> pieces;
+            std::vector<std::shared_ptr<Piece<n>>> monarchs;
 
-            const json& jpieces = j["pieces"];
-            const json& jpawns = j["pawns"];
-            const json& jmonarchs = j["monarchs"];
+            const json& jpieces = j.at("pieces");
+            const json& jmonarchs = j.at("monarchs");
 
-            for (const auto& piece : jpieces){
-                pieces.push_back(this -> piece_from_json(piece));
+            for (const json& piece : jpieces){
+                pieces.push_back(SerializableInstance::piece_from_json(piece, board));
             }
 
-            for (const auto& pawn : jpawns){
-                pawns.push_back(this -> piece_from_json(pawn));
-            }
-
-            for (const auto& monarch : jmonarchs){
-                monarchs.push_back(this -> piece_from_json(monarch));
+            for (const json& monarch : jmonarchs){
+                monarchs.push_back(SerializableInstance::piece_from_json(monarch, board));
             }
 
             return Player<n>(
-                j["index"],
-                j["material"],
-                std::move(pawns),
+                j.at("index").get<index_t>(),
+                j.at("material").get<value_t>(),
                 std::move(pieces),
                 std::move(monarchs)
             );
         }
 
 
-        json players_to_json(const Tuple<Player<n>, p>& ps) const{
+        static json players_to_json(const Tuple<Player<n>, p>& ps){
             json j = json::array();
 
             for (index_t k; k < p; k++){
-                j.push_back(this -> player_to_json(ps[k]));
+                j.push_back(SerializableInstance::player_to_json(ps[k]));
             }
 
             return j;
         }
 
-        Tuple<Player<n>, p> players_from_json(const json& j) const{
+        static Tuple<Player<n>, p> players_from_json(const json& j, const Board<n>& board) {
             
             Tuple<Player<n>, p> ps;
 
             for (index_t k; k < p; k++){
-                ps[k] = this -> player_from_json(j[k]);
+                ps[k] = SerializableInstance::player_from_json(j[k], board);
             }
 
             return ps;
         }
-        */
-
+    
 };
 
 #endif
+
+
+#define INSTANCE_TEST
+
+#ifdef INSTANCE_TEST
+    
+#include"structs.cpp"
+#include"moves.cpp"
+#include<fstream>
+
+using namespace game;
+
+int main(){
+    json j;
+    json k;
+
+    std::ifstream file("figures.json");
+
+    file >> k;
+    Figure<2>::load(k);
+
+
+    file = std::ifstream("game.json");
+    if (!file) {
+        throw std::runtime_error("Could not open game.json");
+    }
+
+    file >> j;
+
+    SerializableInstance<2, 2> g = SerializableInstance<2, 2>::deserialize(j);
+
+    std::cout << g << std::endl;
+
+    while (!g.is_over()) {
+        std::string k;
+        std::cin >> k;
+
+        Index<2> start = g.as_index(Tup<2>(k[0] - 'a', k[1] - '1'));
+        Index<2> end = g.as_index(Tup<2>(k[2]-'a', k[3] - '1'));
+
+        std::cout << g.execute(start, end) << std::endl;
+        std::cout << g << std::endl;
+    }
+}
+#endif 
