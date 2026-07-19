@@ -81,8 +81,8 @@ struct moves::Move{
 
     protected:
         virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& target, index_t player_index) const {
-            const std::shared_ptr<game::Piece<n>>& piece_at = board[target];
-            const std::shared_ptr<game::Piece<n>>& takes_at = board[target + this -> relative_capture];
+            const sptr<game::Piece<n>>& piece_at = board[target];
+            const sptr<game::Piece<n>>& takes_at = board[target + this -> relative_capture];
 
             if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
@@ -281,31 +281,31 @@ struct moves::Figure {
     const std::string key;
     const value_t value;
 
-    const std::vector<Move<n>> move_list;
-    const std::vector<Move<n>> opener_list;
+    const std::vector<sptr<Move<n>>> move_list;
+    const std::vector<sptr<Move<n>>> opener_list;
 
     const bool open_exclusive;
 
-    static std::shared_ptr<Figure> define(const std::string& name, const std::string& key, value_t value, std::vector<Move<n>>&& move_list, std::vector<Move<n>>&& opener_list, bool open_exclusive){
-        std::shared_ptr<Figure> result = std::make_shared<Figure>(name, key, value, std::forward<std::vector<Move<n>>>(move_list), std::forward<std::vector<Move<n>>>(opener_list), open_exclusive);
+    static sptr<Figure> define(const std::string& name, const std::string& key, value_t value, std::vector<sptr<Move<n>>>&& move_list, std::vector<sptr<Move<n>>>&& opener_list, bool open_exclusive){
+        sptr<Figure> result = std::make_shared<Figure>(name, key, value, std::forward<std::vector<sptr<Move<n>>>>(move_list), std::forward<std::vector<sptr<Move<n>>>>(opener_list), open_exclusive);
         Figure::instances[key] = result;
         return result;
     }
 
     template<index_t i, index_t j>
-    static std::shared_ptr<Figure> define(const std::string& name, const std::string& key, value_t value, Tuple<Move<n>, i>&& move_list, Tuple<Move<n>, j>&& opener_list, bool open_exclusive){
+    static sptr<Figure> define(const std::string& name, const std::string& key, value_t value, Tuple<Move<n>, i>&& move_list, Tuple<Move<n>, j>&& opener_list, bool open_exclusive){
         return Figure::define(name, key, value, move_list.into_vector(), opener_list.into_vector(), open_exclusive);
     }
 
-    static std::shared_ptr<Figure> resolve(const std::string& key) {
+    static sptr<Figure> resolve(const std::string& key) {
         return Figure::instances[key];
     }
 
 
-    const Move<n>* which_opener(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
-        for (const Move<n>& m : this -> opener_list){
-            if (m.sees(board, position, target, player_index)){
-                return &m;
+    sptr<Move<n>> which_opener(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+        for (const sptr<Move<n>>& m : this -> opener_list){
+            if (m -> sees(board, position, target, player_index)){
+                return m;
             }
         }
 
@@ -313,15 +313,15 @@ struct moves::Figure {
     }
 
     virtual void populate_openers(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
-        for (const Move<n>& m : this -> opener_list){
-            m.populate(map, board, position, player_index);
+        for (const sptr<Move<n>>& m : this -> opener_list){
+            m -> populate(map, board, position, player_index);
         }
     }
 
-    const Move<n>* which_move(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
-        for (const Move<n>& m : this -> move_list){
-            if (m.sees(board, position, target, player_index)){
-                return &m;
+    sptr<Move<n>> which_move(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+        for (const sptr<Move<n>>& m : this -> move_list){
+            if (m -> sees(board, position, target, player_index)){
+                return m;
             }
         }
 
@@ -329,30 +329,30 @@ struct moves::Figure {
     }
 
     virtual void populate_moves(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
-        for (const Move<n>& m : this -> move_list){
-            m.populate(map, board, position, player_index);
+        for (const sptr<Move<n>>& m : this -> move_list){
+            m -> populate(map, board, position, player_index);
         }
     }
 
 
     // SERIALIZATION
 
-    static Move<n> deserialize(const json& m) {
+    static sptr<Move<n>> deserialize(const json& m) {
         if (m.contains("min_steps")){
-            return Span<n>(m);
+            return std::make_shared<Span<n>>(m);
         } else {
-            return Move<n>(m);
+            return std::make_shared<Move<n>>(m);
         }
     }
 
-    static std::shared_ptr<Figure> define(const json& j){
-        std::vector<Move<n>> move_list;
+    static sptr<Figure> define(const json& j){
+        std::vector<sptr<Move<n>>> move_list;
 
         for (const json& m : j.at("move_list")){
             move_list.push_back(deserialize(m));
         }
 
-        std::vector<Move<n>> opener_list;
+        std::vector<sptr<Move<n>>> opener_list;
         for (const json& o : j.at("opener_list")){
             opener_list.push_back(deserialize(o));
         }
@@ -375,13 +375,13 @@ struct moves::Figure {
 
     json serialize() {
         json move_arr = json::array();
-        for (const Move<n>& m : this -> move_list){
-            move_arr.push_back(m.serialize());
+        for (const sptr<Move<n>>& m : this -> move_list){
+            move_arr.push_back(m -> serialize());
         }
 
         json opener_arr = json::array();
-        for (const Move<n>& o : this -> opener_list){
-            opener_arr.push_back(o.serialize());
+        for (const sptr<Move<n>>& o : this -> opener_list){
+            opener_arr.push_back(o -> serialize());
         }
 
         return {
@@ -404,15 +404,15 @@ struct moves::Figure {
         return j;
     }
 
-    Figure(const std::string& name, const std::string& key, value_t value, std::vector<Move<n>>&& move_list, std::vector<Move<n>>&& opener_list, bool open_exclusive) : name(name), key(key), value(value), move_list(std::forward<std::vector<Move<n>>>(move_list)), opener_list(std::forward<std::vector<Move<n>>>(opener_list)), open_exclusive(open_exclusive) {}
+    Figure(const std::string& name, const std::string& key, value_t value, std::vector<sptr<Move<n>>>&& move_list, std::vector<sptr<Move<n>>>&& opener_list, bool open_exclusive) : name(name), key(key), value(value), move_list(std::forward<std::vector<sptr<Move<n>>>>(move_list)), opener_list(std::forward<std::vector<sptr<Move<n>>>>(opener_list)), open_exclusive(open_exclusive) {}
 
 
     private:
-        static std::unordered_map<std::string, std::shared_ptr<Figure>> instances; 
+        static std::unordered_map<std::string, sptr<Figure>> instances; 
 };
 
 template<index_t n>
-std::unordered_map<std::string, std::shared_ptr<moves::Figure<n>>>
+std::unordered_map<std::string, sptr<moves::Figure<n>>>
 moves::Figure<n>::instances{};
 
 #endif
@@ -524,10 +524,10 @@ int main(){
 
     file >> j;
 
-    std::shared_ptr<Figure<2>> ptr;
+    sptr<Figure<2>> ptr;
 
     for (const json& m : j){
-        std::shared_ptr<Figure<2>> ptr = Figure<2>::define(m);
+        sptr<Figure<2>> ptr = Figure<2>::define(m);
     }
 
     ptr;

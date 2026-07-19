@@ -138,13 +138,13 @@ struct game::SerializableInstance : public Instance<n, p>{
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
             this -> assert_status();
 
-            std::shared_ptr<Piece<n>> piece = this -> board[start];
-            const Move<n>* move = this -> validate_and_get_move(piece, end);
-            const std::shared_ptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
+            sptr<Piece<n>> piece = this -> board[start];
+            sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
+            const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
             
             Action<n> action(start, end);
-
-            this -> round[this -> turn] = action;
+            
+            this -> set_current_action(action);
 
             bool auto_promote = this -> update_promoting(piece);
 
@@ -201,7 +201,7 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
 
-        static json piece_to_json(const std::shared_ptr<Piece<n>>& pi) {
+        static json piece_to_json(const sptr<Piece<n>>& pi) {
             return {
                 {"position", pi -> position},
                 {"figure", pi -> figure -> key},
@@ -216,7 +216,7 @@ struct game::SerializableInstance : public Instance<n, p>{
             };
         }
 
-        static std::shared_ptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board) {
+        static sptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board) {
             return std::make_shared<Piece<n>>(
                 Index<n>(std::move(j.at("position").get<Tup<n>>()), board),
                 Figure<n>::resolve(j.at("figure").get<std::string>()),
@@ -238,11 +238,11 @@ struct game::SerializableInstance : public Instance<n, p>{
             json pieces = json::array();
             json monarchs = json::array();
 
-            for (const std::shared_ptr<Piece<n>>& piece : pl.pieces){
+            for (const sptr<Piece<n>>& piece : pl.pieces){
                 pieces.push_back(SerializableInstance::piece_to_json(piece));
             }
 
-            for (const std::shared_ptr<Piece<n>>& monarch : pl.monarchs){
+            for (const sptr<Piece<n>>& monarch : pl.monarchs){
                 monarchs.push_back(SerializableInstance::piece_to_json(monarch));
             }
 
@@ -255,8 +255,8 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
         static Player<n> player_from_json(const json& j, const Board<n>& board) {
-            std::vector<std::shared_ptr<Piece<n>>> pieces;
-            std::vector<std::shared_ptr<Piece<n>>> monarchs;
+            std::vector<sptr<Piece<n>>> pieces;
+            std::vector<sptr<Piece<n>>> monarchs;
 
             const json& jpieces = j.at("pieces");
             const json& jmonarchs = j.at("monarchs");

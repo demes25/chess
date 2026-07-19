@@ -21,12 +21,12 @@ struct structs::Tuple{
     Tuple(Args&&... args) : tup{static_cast<T>(std::forward<Args>(args))...} {}
 
     Tuple(const Tuple&) = default;
-    Tuple(Tuple&&) = default;
+    Tuple(Tuple&&) noexcept = default;
 
     ~Tuple() = default;
 
     Tuple& operator=(const Tuple&) = default;
-    Tuple& operator=(Tuple&&) = default;
+    Tuple& operator=(Tuple&&) noexcept = default;
 
     void fill(const T& t) {
         for (index_t i = 0; i < n; ++i){
@@ -139,43 +139,47 @@ struct structs::Grid{
     requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
     Grid(Args&&... k) : Grid(Tup<n>(std::move(k)...)) {}
 
-    Grid(Tup<n>&& shape) : shape(std::forward<Tup<n>>(shape)), sizes(0), capacity(1){
+    Grid(Tup<n>&& shape) : shape(std::make_shared<Tup<n>>(std::move(shape))), sizes(std::make_shared<Tup<n>>(0)), capacity(1){
         index_t i;
 
         for (i = 0; i < n; ++i){
-            if (shape[i] == 0){
+            index_t d = this -> axis_shape(i);
+            if (d == 0){
                 throw std::invalid_argument("Axis of size 0.");
             } else {
-                this -> capacity *= shape[i];
+                this -> capacity *= d;
             }
         }
 
         --i;
-        this -> sizes[i] = 1;
+        this -> sizes -> operator[](i) = 1;
 
         while(i > 0){
             --i;
-            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
+            this -> sizes -> operator[](i) = this -> axis_size(i+1)*this -> axis_shape(i+1); 
         }
 
         this -> arr = std::make_unique<T[]>(this -> capacity);
     }
 
-    Grid(const Tup<n>& shape) : shape(), sizes(0), capacity(1){
+    Grid(const Tup<n>& shape) : shape(std::make_shared<Tup<n>>(shape)), sizes(std::make_shared<Tup<n>>(0)), capacity(1){
         index_t i;
 
         for (i = 0; i < n; ++i){
             if (shape[i] == 0){
                 throw std::invalid_argument("Axis of size 0.");
             } else {
-                this -> shape[i] = shape[i];
+                this -> shape -> operator[](i) = shape[i];
                 this -> capacity *= shape[i];
             }
         }
 
+        --i;
+        this -> sizes -> operator[](i) = 1;
+
         while(i > 0){
             --i;
-            this -> sizes[i] = this -> sizes[i+1]*this->shape[i+1]; 
+            this -> sizes -> operator[](i) = this -> axis_size(i+1)*this -> axis_shape(i+1); 
         }
 
         
@@ -183,13 +187,14 @@ struct structs::Grid{
     }
 
     Grid(const Grid&) = default;
-    Grid(Grid&&) = default;
-
-    ~Grid() = default;
+    Grid(Grid&&) noexcept = default;
 
     Grid& operator=(const Grid&) = default;
-    Grid& operator=(Grid&&) = default;
+    Grid& operator=(Grid&&) noexcept = default;
+    
+    ~Grid() = default;
 
+    
 
     void fill(const T& f) {
         for (index_t i = 0; i < this -> capacity; ++i){
@@ -237,22 +242,7 @@ struct structs::Grid{
     }
 
     const T& operator[](const Tup<n>& index) const {
-        index_t i = 0;
-
-        for (index_t j = 1; j < n; ++j){
-            if (index[j-1] >= this -> shape[j-1]){
-                throw std::out_of_range("Index out of bounds.");
-            } else {
-                i += (this -> shape[j]*index[j-1]); 
-            }
-        }
-        
-        if (index[n-1] >= this -> shape[n-1]){
-            throw std::out_of_range("Index out of bounds.");
-        } else {
-            i += index[n-1]; 
-        }
-
+        index_t i = this -> collapse(index);
         return this -> at(i);
     }
 
@@ -284,14 +274,40 @@ struct structs::Grid{
         return false;
     }
 
+
+    // ACCESSORS
     
-    const Tup<n>& get_shape() const {
+    index_t axis_shape(index_t i) const {
+        return this -> shape -> operator[](i);
+    }
+
+    index_t axis_size(index_t i) const {
+        return this -> sizes -> operator[](i);
+    }
+
+
+    const sptr<Tup<n>>& shape_ptr() const {
         return this -> shape;
     }
 
-    const Tup<n>& get_sizes() const {
+    const sptr<Tup<n>>& sizes_ptr() const {
         return this -> sizes;
     }
+
+
+    const Tup<n>& get_shape() const {
+        return *(this -> shape);
+    }
+
+    const Tup<n>& get_sizes() const {
+        return *(this -> sizes);
+    }
+
+    
+    index_t get_capacity() const {
+        return this -> capacity;
+    }
+    
 
     friend std::ostream& operator<<(std::ostream& os, const Grid& g) {
         index_t index = 0;
@@ -299,8 +315,8 @@ struct structs::Grid{
     }
 
     protected:
-        Tup<n> shape;
-        Tup<n> sizes;
+        sptr<Tup<n>> shape;
+        sptr<Tup<n>> sizes;
 
         index_t capacity;
         std::unique_ptr<T[]> arr;
@@ -320,7 +336,7 @@ struct structs::Grid{
                 }
                 os << '[';
         
-                index_t last = this -> shape[axis] - 1;
+                index_t last = this -> axis_shape(axis) - 1;
                 for(index_t i = 0; i < last; ++i){
                     os << this -> at(index++) << ", ";
                 }
@@ -331,7 +347,7 @@ struct structs::Grid{
                 }
                 os << '[' << std::endl;
 
-                index_t last = this -> shape[axis] - 1;
+                index_t last = this -> axis_shape(axis) - 1;
                 for(index_t i = 0; i < last; ++i){
                     this -> print_help(os, axis+1, index);
                     os << ',' << std::endl;
@@ -353,10 +369,10 @@ struct structs::Grid{
             index_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                if (index[j] >= this -> shape[j]){
+                if (index[j] >= this -> axis_shape(j)){
                     throw std::out_of_range("Index out of bounds.");
                 } else {
-                    i += (this -> sizes[j]*index[j]); 
+                    i += (this -> axis_size(j)*index[j]); 
                 }
             }
 
@@ -378,24 +394,22 @@ struct structs::Grid{
 // (throws error if incrementing/decrementing invalid indices).
 template<index_t n>
 struct structs::Index : public Tup<n>{
-    const Tup<n>* limits;
-    const Tup<n>* sizes;
 
-    Index() : Tup<n>(), limits(nullptr), sizes(nullptr), collapsed(0), valid(false) {}
+    Index() : Tup<n>(), limits(), sizes(), collapsed(0), valid(false) {}
 
-    Index(Tup<n>&& value, const Tup<n>& limits, const Tup<n>& sizes) : Tup<n>(std::forward<Tup<n>>(value)), limits(&limits), sizes(&sizes), collapsed(0), valid(true) {
+    Index(Tup<n>&& value, const sptr<Tup<n>>& limits, const sptr<Tup<n>>& sizes) : Tup<n>(std::move(value)), limits(limits), sizes(sizes), collapsed(0), valid(true) {
         try {
-            this -> collapsed = this -> collapse(value);
+            this -> collapsed = this -> collapse();
         } catch(...) {
             this -> valid = false;
         }
     }
     
     template<typename T>
-    Index(const Grid<T, n>& grid) : Tup<n>(0), limits(&grid.get_shape()), sizes(&grid.get_sizes()), collapsed(0), valid(true) {}
+    Index(const Grid<T, n>& grid) : Tup<n>(0), limits(grid.shape_ptr()), sizes(grid.sizes_ptr()), collapsed(0), valid(true) {}
     
     template<typename T>
-    Index(Tup<n>&& value, const Grid<T, n>& grid) : Index(std::forward<Tup<n>>(value), grid.get_shape(), grid.get_sizes()) {}
+    Index(Tup<n>&& value, const Grid<T, n>& grid) : Index(std::move(value), grid.shape_ptr(), grid.sizes_ptr()) {}
 
 
     
@@ -412,13 +426,12 @@ struct structs::Index : public Tup<n>{
     }
 
     Index(const Index&) = default;
-    Index(Index&&) = default;
-
-    ~Index() = default;
+    Index(Index&&) noexcept = default;
 
     Index& operator=(const Index&) = default;
-    Index& operator=(Index&&) = default;
+    Index& operator=(Index&&) noexcept = default;
 
+    ~Index() = default;
 
     Index& set(const Tup<n>& value) {
         this -> valid = true;
@@ -430,6 +443,20 @@ struct structs::Index : public Tup<n>{
         }
 
         Tup<n>::operator=(value);
+        return *this;
+    }
+
+    Index& set(Tup<n>&& value) {
+        this -> valid = true;
+
+        Tup<n>::operator=(std::move(value));
+
+        try {
+            this -> collapsed = this -> collapse();
+        } catch(...) {
+            this -> valid = false;
+        }
+
         return *this;
     }
 
@@ -445,7 +472,7 @@ struct structs::Index : public Tup<n>{
         this -> collapsed = 0;
 
         for (index_t i = 0; i < n; ++i){
-            index_t lim = this ->  limits -> operator[](i);
+            index_t lim = this ->  axis_limit(i);
             this -> at(i) = lim - 1;
         }
 
@@ -467,7 +494,7 @@ struct structs::Index : public Tup<n>{
         index_t axis = n-1;
         ++(this -> at(axis));
 
-        if (this -> at(axis) >= this -> limits -> operator[](axis)) {
+        if (this -> at(axis) >= this -> axis_limit(axis)) {
             if (axis == 0) {
                 this -> valid = false;
                 return *this;
@@ -478,7 +505,7 @@ struct structs::Index : public Tup<n>{
 
                 ++(this -> at(axis));
                 
-                if (this -> at(axis) < this -> limits -> operator[](axis)){
+                if (this -> at(axis) < this -> axis_limit(axis)){
                     break;
                 } else if (axis==0){
                     this -> valid = false;
@@ -500,7 +527,7 @@ struct structs::Index : public Tup<n>{
         if (this -> at(n-1) == 0){
             index_t axis = n-2;
             while (true) {
-                this -> at(axis+1) = this -> limits -> operator[](axis+1)-1;
+                this -> at(axis+1) = this -> axis_limit(axis+1)-1;
 
                 if (this -> at(axis) > 0) {
                     --(this -> at(axis));
@@ -529,7 +556,7 @@ struct structs::Index : public Tup<n>{
         for(index_t i = 0; i < n; ++i){
             arith_t temp = (arith_t) this -> at(i) + v[i];
 
-            if (temp < 0 || temp >= this -> limits -> operator[](i)){
+            if (temp < 0 || temp >= this -> axis_limit(i)){
                 this -> valid = false;
                 return *this;
             }
@@ -549,7 +576,7 @@ struct structs::Index : public Tup<n>{
         for(index_t i = 0; i < n; ++i){
             arith_t temp = (arith_t)(this -> at(i)) -  v[i];
 
-            if (temp < 0 || temp >= this -> limits -> operator[](i)){
+            if (temp < 0 || temp >= this -> axis_limit(i)){
                 this -> valid = false;
                 return *this;
             }
@@ -602,6 +629,18 @@ struct structs::Index : public Tup<n>{
         index_t collapsed;
         bool valid;
 
+        sptr<Tup<n>> limits;
+        sptr<Tup<n>> sizes;
+
+        index_t axis_limit(index_t i) const {
+            return this -> limits -> operator[](i);
+        }
+
+        index_t axis_size(index_t i) const {
+            return this -> sizes -> operator[](i);
+        }
+
+
         index_t collapse() const {
             if (!this -> valid){
                 throw std::out_of_range("Index out of bounds.");
@@ -610,7 +649,7 @@ struct structs::Index : public Tup<n>{
             index_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes -> operator[](j)*this -> at(j)); 
+                i += (this -> axis_size(j)*this -> at(j)); 
             }
 
             return i;
@@ -620,10 +659,10 @@ struct structs::Index : public Tup<n>{
             index_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                if (index[j] >= this -> limits -> operator[](j)){
+                if (index[j] >= this -> axis_limit(j)){
                     throw std::out_of_range("Index out of bounds.");
                 } else {
-                    i += (this -> sizes -> operator[](j)*index[j]); 
+                    i += (this -> axis_size(j)*index[j]); 
                 }
             }
 
@@ -634,7 +673,7 @@ struct structs::Index : public Tup<n>{
             arith_t i = 0;
 
             for (index_t j = 0; j < n; ++j){
-                i += (this -> sizes -> operator[](j)*vector[j]);
+                i += (this -> axis_size(j)*vector[j]);
             }
 
             return i;
@@ -647,13 +686,13 @@ template<index_t n>
 struct structs::Vector : public Tuple<arith_t, n> {
     using Tuple<arith_t, n>::Tuple;
 
-    Vector(Vector&&) = default;
+    Vector(Vector&&) noexcept = default;
     Vector(const Vector&) = default;
 
     ~Vector() = default;
 
     Vector& operator=(const Vector&) = default;
-    Vector& operator=(Vector&&) = default;
+    Vector& operator=(Vector&&) noexcept = default;
 
     Vector operator+(const Vector& v) const {
         Vector result;

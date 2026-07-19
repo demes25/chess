@@ -14,7 +14,7 @@ template <index_t n>
 struct game::Piece{
     mutable Index<n> position;
 
-    const std::shared_ptr<Figure<n>> figure;
+    const sptr<Figure<n>> figure;
 
     const index_t player_index;
 
@@ -30,7 +30,7 @@ struct game::Piece{
 
     Piece(
         Index<n>&& position, 
-        std::shared_ptr<Figure<n>> figure, 
+        sptr<Figure<n>> figure, 
         index_t player_index, 
         std::vector<std::string>&& promotion_list, 
         index_t promotion_axis, 
@@ -52,7 +52,7 @@ struct game::Piece{
     
     Piece(
         Index<n>&& position, 
-        std::shared_ptr<Figure<n>> figure, 
+        sptr<Figure<n>> figure, 
         index_t player_index, 
         bool dead, 
         bool has_moved, 
@@ -89,13 +89,13 @@ struct game::Piece{
         return (this -> figure -> which_move(board, this -> position, target, this -> player_index) != nullptr);
     }
 
-    const Move<n>* which_sees(const Board<n>& board, const Index<n>& target) const {
+    sptr<Move<n>> which_sees(const Board<n>& board, const Index<n>& target) const {
         if (this -> dead || this -> promoted) {
             return nullptr;
         }
 
         if (!this -> has_moved){
-            const Move<n>* opener = this -> figure -> which_opener(board, this -> position, target, this -> player_index);
+            sptr<Move<n>> opener = this -> figure -> which_opener(board, this -> position, target, this -> player_index);
             if (opener != nullptr) {
                 return opener;
             } else if (this -> figure -> open_exclusive){
@@ -106,7 +106,7 @@ struct game::Piece{
         return this -> figure -> which_move(board, this -> position, target, this -> player_index);
     }
 
-    std::shared_ptr<Piece<n>> promoted_piece(index_t i) {
+    sptr<Piece<n>> promoted_piece(index_t i) {
         this -> promoted = true;
 
         const std::string& promotion_fig = this -> promotion_list[i];
@@ -128,18 +128,18 @@ struct game::Player{
 
     value_t material;
 
-    std::vector<std::shared_ptr<Piece<n>>> pieces;
-    std::vector<std::shared_ptr<Piece<n>>> monarchs;
+    std::vector<sptr<Piece<n>>> pieces;
+    std::vector<sptr<Piece<n>>> monarchs;
 
     Player(
         index_t index, 
         value_t material, 
-        std::vector<std::shared_ptr<Piece<n>>>&& pieces, 
-        std::vector<std::shared_ptr<Piece<n>>>&& monarchs
+        std::vector<sptr<Piece<n>>>&& pieces, 
+        std::vector<sptr<Piece<n>>>&& monarchs
     ) : index(index), 
         material(material), 
-        pieces(std::forward<std::vector<std::shared_ptr<Piece<n>>>>(pieces)), 
-        monarchs(std::forward<std::vector<std::shared_ptr<Piece<n>>>>(monarchs)) {}
+        pieces(std::forward<std::vector<sptr<Piece<n>>>>(pieces)), 
+        monarchs(std::forward<std::vector<sptr<Piece<n>>>>(monarchs)) {}
 
     Player() : index(0), material(0), pieces(), monarchs() {}
 
@@ -151,7 +151,7 @@ struct game::Player{
     Player& operator=(const Player&) = default;
 
     bool pieces_see(const Board<n>& board, const Index<n>& target) const {
-        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+        for (const sptr<Piece<n>>& piece : this -> pieces){
             if (piece -> sees(board, target)){
                 return true;
             }
@@ -161,7 +161,7 @@ struct game::Player{
     }
 
     bool monarchs_see(const Board<n>& board, const Index<n>& target) const {
-        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+        for (const sptr<Piece<n>>& monarch : this -> monarchs){
             if (monarch -> sees(board, target)){
                 return true;
             }
@@ -177,10 +177,10 @@ struct game::Player{
 
 
 
-    std::vector<std::shared_ptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& target) const {
-        std::vector<std::shared_ptr<Piece<n>>> result;
+    std::vector<sptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> result;
 
-        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+        for (const sptr<Piece<n>>& piece : this -> pieces){
             if (piece -> sees(board, target)){
                 result.push_back(&piece);
             }
@@ -189,10 +189,10 @@ struct game::Player{
         return result;
     }
 
-    std::vector<std::shared_ptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& target) const {
-        std::vector<std::shared_ptr<Piece<n>>> result;
+    std::vector<sptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> result;
 
-        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+        for (const sptr<Piece<n>>& monarch : this -> monarchs){
             if (monarch -> sees(board, target)){
                 result.push_back(&monarch);
             }
@@ -201,16 +201,16 @@ struct game::Player{
         return result;
     }
 
-    std::vector<std::shared_ptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& target) const {
-        std::vector<std::shared_ptr<Piece<n>>> result;
+    std::vector<sptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> result;
 
-        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+        for (const sptr<Piece<n>>& piece : this -> pieces){
             if (piece -> sees(board, target)){
                 result.push_back(&piece);
             }
         }
 
-        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+        for (const sptr<Piece<n>>& monarch : this -> monarchs){
             if (monarch -> sees(board, target)){
                 result.push_back(&monarch);
             }
@@ -224,7 +224,7 @@ struct game::Player{
     index_t how_many_pieces_see(const Board<n>& board, const Index<n>& target) const {
         index_t N = 0;
 
-        for (const std::shared_ptr<Piece<n>>& piece : this -> pieces){
+        for (const sptr<Piece<n>>& piece : this -> pieces){
             if (piece -> sees(board, target)){
                 N++;
             }
@@ -236,7 +236,7 @@ struct game::Player{
     index_t how_many_monarchs_see(const Board<n>& board, const Index<n>& target) const {
         index_t N = 0;
 
-        for (const std::shared_ptr<Piece<n>>& monarch : this -> monarchs){
+        for (const sptr<Piece<n>>& monarch : this -> monarchs){
             if (monarch -> sees(board, target)){
                 N++;
             }
@@ -275,11 +275,11 @@ struct game::Instance{
     Instance& operator=(Instance&&) = default;
     ~Instance() = default;
 
-    std::shared_ptr<Piece<n>>& operator[](const Index<n>& i) {
+    sptr<Piece<n>>& operator[](const Index<n>& i) {
         return this -> board[i];
     }
 
-    const std::shared_ptr<Piece<n>>& operator[](const Index<n>& i) const {
+    const sptr<Piece<n>>& operator[](const Index<n>& i) const {
         return this -> board[i];
     }
 
@@ -314,7 +314,7 @@ struct game::Instance{
         timestamp turn_start_time;
 
         Status status;
-        std::shared_ptr<Piece<n>> promoting;
+        sptr<Piece<n>> promoting;
 
         Instance(
             Board<n>&& board,
@@ -326,7 +326,7 @@ struct game::Instance{
             timestamp turn_start_time,
 
             Status status,
-            std::shared_ptr<Piece<n>> promoting
+            sptr<Piece<n>> promoting
         ) : board(std::forward<Board<n>>(board)), 
             players(std::forward<Tuple<Player<n>, n>>(players)), 
             times(std::forward<Tuple<duration, p>>(times)), 
@@ -354,7 +354,7 @@ struct game::Instance{
         }
         
         // shows the piece on the board.
-        void show(const std::shared_ptr<Piece<n>>& piece) {
+        void show(const sptr<Piece<n>>& piece) {
             if (piece != nullptr && !piece -> dead && !piece -> promoted){
                 this -> board[piece -> position] = piece;
             }
@@ -369,11 +369,11 @@ struct game::Instance{
 
         // shows all of this player's pieces on the board.
         void show(Player<n>& player) {
-            for (const std::shared_ptr<Piece<n>>& piece : player.pieces){
+            for (const sptr<Piece<n>>& piece : player.pieces){
                 this -> show(piece);
             }
             
-            for (const std::shared_ptr<Piece<n>>& monarch : player.monarchs){
+            for (const sptr<Piece<n>>& monarch : player.monarchs){
                 this -> show(monarch);
             }
         }
@@ -381,7 +381,7 @@ struct game::Instance{
         // adds the given piece to the board.
         // if the position is occupied, raises error.
         // adds the piece to the corresponding player and shows it on the board.
-        std::shared_ptr<Piece<n>> add(std::shared_ptr<Piece<n>> piece){
+        sptr<Piece<n>> add(sptr<Piece<n>> piece){
             if (this -> board[piece -> position] != nullptr){
                 throw std::runtime_error("occupied");
             }
@@ -395,7 +395,7 @@ struct game::Instance{
         // adds the given monarch to the board.
         // if the position is occupied, raises error.
         // adds the monarch to the corresponding player and shows it on the board.
-        std::shared_ptr<Piece<n>> add_monarch(std::shared_ptr<Piece<n>> monarch){
+        sptr<Piece<n>> add_monarch(sptr<Piece<n>> monarch){
             if (this -> board[monarch -> position] != nullptr){
                 throw std::runtime_error("occupied");
             }
@@ -407,7 +407,7 @@ struct game::Instance{
         }
 
         // sets piece -> dead to true and hides the piece from the board.
-        void kill(std::shared_ptr<Piece<n>> piece) {
+        void kill(sptr<Piece<n>> piece) {
             if (piece != nullptr && !piece -> dead && !piece -> promoted){
                 piece -> dead = true;
                 this -> board[piece -> position] = nullptr;
@@ -415,7 +415,7 @@ struct game::Instance{
         }
 
         // sets piece -> dead to false and shows the piece on the board.
-        void unkill(std::shared_ptr<Piece<n>> piece) {
+        void unkill(sptr<Piece<n>> piece) {
             if (piece != nullptr && piece -> dead && !piece -> promoted){
                 piece -> dead = false;
                 this -> board[piece -> position] = piece;
@@ -465,11 +465,11 @@ struct game::Instance{
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
             this -> assert_status();
 
-            std::shared_ptr<Piece<n>> piece = this -> board[start];
-            const Move<n>* move = this -> validate_and_get_move(piece, end);
-            const std::shared_ptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
+            sptr<Piece<n>> piece = this -> board[start];
+            sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
+            const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
 
-            this -> round -> operator[](this -> turn) = Action<n>(start, end);
+            this -> set_current_action(Action<n>(start, end));
 
             this -> update_promoting(piece);
         }
@@ -491,11 +491,13 @@ struct game::Instance{
             this -> update_game_status(next_in_check);
         }
 
-        
-        
+        void set_current_action(const Action<n>& a) {
+            this -> round -> operator[](this -> turn) = a;
+        }
+
         // if (piece, end) represent an illegal move, raises error.
         // otherwise, returns a pointer to the Move object corresponding to the given move.
-        const Move<n>* validate_and_get_move(const std::shared_ptr<Piece<n>> piece, const Index<n>& end) const {
+        sptr<Move<n>> validate_and_get_move(const sptr<Piece<n>> piece, const Index<n>& end) const {
             if (piece == nullptr) {
                 throw std::runtime_error("empty");
             } else if (piece -> player_index != this -> turn){
@@ -504,7 +506,7 @@ struct game::Instance{
                 throw std::runtime_error("panic");
             }
 
-            const Move<n>* move = piece -> which_sees(this -> board, end);
+            sptr<Move<n>> move = piece -> which_sees(this -> board, end);
 
             if (move == nullptr){
                 throw std::runtime_error("illegal");
@@ -517,9 +519,9 @@ struct game::Instance{
         // i.e. -- captures any pieces that need to be captured, updates positions, etc...
         // if the given move "walks into" check, undoes everything and raises error.
         // otherwise, returns a pointer to the piece, if any, that was captured.
-        std::shared_ptr<Piece<n>> adjust_board_and_get_target(std::shared_ptr<Piece<n>> piece, const Move<n>* move, const Index<n>& start, const Index<n>& end) {
-            std::shared_ptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
-            std::shared_ptr<Piece<n>> end_piece = this -> board[end];
+        sptr<Piece<n>> adjust_board_and_get_target(sptr<Piece<n>> piece, sptr<Move<n>> move, const Index<n>& start, const Index<n>& end) {
+            sptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
+            sptr<Piece<n>> end_piece = this -> board[end];
 
             this -> kill(target_piece);
 
@@ -545,7 +547,7 @@ struct game::Instance{
             const Player<n>& player = this -> players[player_index];
 
             if (player.monarchs.size() == 1){
-                const std::shared_ptr<Piece<n>>& king = player.monarchs[0];
+                const sptr<Piece<n>>& king = player.monarchs[0];
 
                 for (index_t i = 0; i < p; i++){
                     if (i != player_index){
@@ -565,7 +567,7 @@ struct game::Instance{
         // if the piece is on its promotion square, then:
         //    -  if the piece can only promote to one thing, automatically promotes and returns true.
         //    -  otherwise, caches the unfinished promotion, sets status to PROMOTING and returns false
-        bool update_promoting(std::shared_ptr<Piece<n>> piece) {
+        bool update_promoting(sptr<Piece<n>> piece) {
             if (piece -> promotion_list.size() != 0 && piece -> position[piece -> promotion_axis] == piece -> promotion_index){
                 if (piece -> promotion_list.size() == 1){
                     this -> raw_promote(0);
@@ -656,7 +658,7 @@ struct game::Instance{
         
                 index_t last = this -> board.get_shape()[axis] - 1;
                 for(index_t i = 0; i < last; ++i){
-                    const std::shared_ptr<Piece<n>> a = this -> board[index++];
+                    const sptr<Piece<n>> a = this -> board[index++];
 
                     if (a == nullptr){
                         os << '.' << '\t';
@@ -665,7 +667,7 @@ struct game::Instance{
                     }
                 }
 
-                const std::shared_ptr<Piece<n>> a = this -> board[index++];
+                const sptr<Piece<n>> a = this -> board[index++];
 
                 if (a == nullptr){
                     os << '.' << ']';

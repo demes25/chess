@@ -25,6 +25,12 @@ using timer = std::chrono::system_clock;
 using duration = std::chrono::duration<double>;
 using timestamp = timer::time_point;
 
+template <typename T>
+using sptr = std::shared_ptr<T>;
+
+template <typename T>
+using uptr = std::unique_ptr<T>;
+
 const char* indent = "  ";
 
 namespace structs {
