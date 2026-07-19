@@ -106,6 +106,23 @@ struct game::Piece{
         return this -> figure -> which_move(board, this -> position, target, this -> player_index);
     }
 
+    virtual void populate(MoveMap<n>& map, const game::Board<n>& board) const {
+        if (this -> dead || this -> promoted) {
+            return;
+        }
+
+        if (!this -> has_moved){
+            this -> figure -> populate_openers(map, board, this -> position, this -> player_index);
+
+            if (this -> figure -> open_exclusive){
+                return;
+            }
+        }
+
+        this -> figure -> populate_moves(map, board, this -> position, this -> player_index);
+    }
+
+
     sptr<Piece<n>> promoted_piece(index_t i) {
         this -> promoted = true;
 
@@ -435,6 +452,90 @@ struct game::Instance{
         }
 
 
+        // returns a std::vector containing the indices of all the players that are currently in check.
+        std::vector<index_t> get_checks() {
+            std::vector<index_t> checks;
+
+            for (index_t i = 0; i < p; i++){
+                if (i != this -> turn && this -> in_check(i)){
+                    checks.push_back(i);
+                }
+            }
+
+            return std::move(checks);
+        }
+
+        // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
+        bool in_check(index_t player_index) const {
+            const Player<n>& player = this -> players[player_index];
+
+            if (player.monarchs.size() == 1){
+                const sptr<Piece<n>>& king = player.monarchs[0];
+
+                for (index_t i = 0; i < p; i++){
+                    if (i != player_index){
+                        const Player<n>& opponent = this -> players[i];
+                        if (opponent.pieces_see(this -> board, king -> position)){
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+
+        // returns a BitMap containing all the **legal** moves that the piece at the given index can make.
+        // i.e., enforces checks
+        MoveMap<n> legal_moves(const sptr<Piece<n>>& piece) {
+            if (piece == nullptr){
+                throw std::runtime_error("empty");
+            }
+
+            MoveMap<n> result(this -> board.get_shape());
+
+            piece -> populate(result, this -> board);
+
+            for (Index<n> j(result); j.is_valid(); ++j){
+                if (result[j] != nullptr){
+                    if (this -> walks_into_check(piece, j)){
+                        result[j] = nullptr;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // returns true if the given move walks into check.
+        bool walks_into_check(const sptr<Piece<n>>& at_i, const Index<n>& j) {
+            sptr<Piece<n>> at_j = this -> board[j];
+
+            Index<n> i = at_i -> position;
+
+            this -> board[i] = nullptr;
+            this -> kill(at_j);
+
+            this -> board[j] = at_i;
+            at_i -> position = j;
+
+            bool result = this -> in_check(at_i -> player_index);
+
+            at_i -> position = i;
+            this -> board[i] = at_i;
+
+            if (at_j == nullptr){
+                this -> board[j] = nullptr;
+            } else {
+                this -> unkill(at_j);
+            }
+
+            return result;
+        }
+
+
+
 
         void assert_status() const {
             if (this -> status > ONGOING) {
@@ -453,6 +554,8 @@ struct game::Instance{
             if (this -> status != PROMOTING) {
                 this -> post_move();
             }
+
+            std::cout << this -> board << std::endl;
         }
         
         virtual void resolve_promotion(index_t i) {
@@ -542,27 +645,6 @@ struct game::Instance{
             return target_piece;
         }
 
-        // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
-        bool in_check(index_t player_index) const {
-            const Player<n>& player = this -> players[player_index];
-
-            if (player.monarchs.size() == 1){
-                const sptr<Piece<n>>& king = player.monarchs[0];
-
-                for (index_t i = 0; i < p; i++){
-                    if (i != player_index){
-                        const Player<n>& opponent = this -> players[i];
-                        if (opponent.pieces_see(this -> board, king -> position)){
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            return false;
-        }
-
-
         // if the piece is not on its promotion square, returns false.
         // if the piece is on its promotion square, then:
         //    -  if the piece can only promote to one thing, automatically promotes and returns true.
@@ -580,19 +662,6 @@ struct game::Instance{
             return false;
         }
         
-        // returns a std::vector containing the indices of all the players that are currently in check.
-        std::vector<index_t> get_checks() {
-            std::vector<index_t> checks;
-
-            for (index_t i = 0; i < p; i++){
-                if (i != this -> turn && this -> in_check(i)){
-                    checks.push_back(i);
-                }
-            }
-
-            return std::move(checks);
-        }
-
         // updates the times, places the given action in history and calls .next_turn.
         // returns the duration of the move.
         duration advance_turn(){
@@ -632,7 +701,30 @@ struct game::Instance{
         // if the next player is not in check but has no legal moves, sets status to STALEMATE
         // otherwise sets the status to ONGOING.
         void update_game_status(bool next_in_check) {
-            if (this -> no_legal_moves()){
+
+            bool legal_moves = false;
+
+            const Player<n>& player = this -> players[this -> turn];
+            
+            for (const sptr<Piece<n>>& monarch : player.monarchs){
+                BitMap<n> moves = this -> legal_moves(monarch).to_bitmap();
+
+                if (moves.any()){
+                    legal_moves = true;
+                    break;
+                }
+            }
+
+            for (const sptr<Piece<n>>& piece : player.pieces) {
+                BitMap<n> moves = this -> legal_moves(piece).to_bitmap();
+
+                if (moves.any()){
+                    legal_moves = true;
+                    break;
+                }
+            }
+
+            if (!legal_moves){
                 if (next_in_check){
                     this -> status = CHECKMATE;
                 } else {
@@ -641,10 +733,6 @@ struct game::Instance{
             } else {
                 this -> status = ONGOING;
             }
-        }
-
-        bool no_legal_moves() {
-            return false;
         }
 
 

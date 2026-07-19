@@ -464,6 +464,8 @@ struct structs::Index : public Tup<n>{
         this -> valid = true;
         this -> fill(0);
 
+        this -> collapsed = 0;
+
         return *this;
     }
 
@@ -584,7 +586,7 @@ struct structs::Index : public Tup<n>{
             this -> at(i) = (index_t)temp;
         }
 
-        this -> collapsed = (index_t)((arith_t)(this -> collapsed) + this -> collapse(v));;
+        this -> collapsed = (index_t)((arith_t)(this -> collapsed) - this -> collapse(v));;
         return *this;
     }
 
