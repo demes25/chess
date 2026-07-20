@@ -26,13 +26,16 @@ struct game::SerializableInstance : public Instance<n, p>{
             if (this -> status != PROMOTING) {
                 return this -> drain_json();
             } else {
-                return nullptr;
+                return {
+                    {"__type__", "Request"},
+                    {"content", "promote"}
+                };
             }
 
         } catch(const std::exception& e){
             this -> move_json = nullptr;
             return {
-                {"label", "error"},
+                {"__type__", "Error"},
                 {"content", e.what()}
             };
         }
@@ -44,14 +47,60 @@ struct game::SerializableInstance : public Instance<n, p>{
             return this -> drain_json();
         } catch (const std::exception& e) {
             return {
-                {"label", "error"},
+                {"__type__", "Error"},
                 {"content", e.what()}
             };
         }
     }
 
+    json process(const json& a) {
+        if (a["__type__"] == "Action"){
+            Index<n> start = this -> as_index(a["start"]);
+            Index<n> end = this -> as_index(a["end"]);
+            return this -> execute(start, end);
+        } else if (a["__type__"] == "Promotion") {
+            return this -> promote(a["index"]);
+        }
+    }
 
     // SERIALIZATION
+
+    json layout() const {
+        json k = json::array();
+
+        for (index_t i = 0; i < p; i++){
+            const Player<n>& player = this -> players[i];
+
+            json arr = json::array();
+
+            for (const sptr<Piece<n>>& piece : player.pieces) {
+                if (!(piece -> dead || piece -> promoted)){
+                    arr.push_back({
+                        {"name", piece -> figure -> name},
+                        {"position", piece -> position},
+                        {"promotion_list", piece -> promotion_list}
+                    });
+                }
+            }
+
+            for (const sptr<Piece<n>>& piece : player.monarchs) {
+                if (!(piece -> dead || piece -> promoted)){
+                    arr.push_back({
+                        {"name", piece -> figure -> name},
+                        {"position", piece -> position},
+                        {"promotion_list", piece -> promotion_list}
+                    });
+                }
+            }
+
+            k.push_back(arr);
+        }
+
+        return {
+            {"shape", this -> board.get_shape()},
+            {"pieces", k}
+        };
+    }
 
     json serialize() const {
         json promoting;
@@ -72,7 +121,7 @@ struct game::SerializableInstance : public Instance<n, p>{
 
         return {
             {"board", this -> board.get_shape()},
-            {"players", SerializableInstance::player_to_json(this -> players)},
+            {"players", SerializableInstance::players_to_json(this -> players)},
             {"times", times},
             {"turn_start_time", t.count()},
 
@@ -98,22 +147,28 @@ struct game::SerializableInstance : public Instance<n, p>{
             times[i] = duration(json_times.at(i).get<double>());
         }
 
-        timestamp turn_start_time(std::chrono::duration_cast<timer::duration>(duration{j.at("turn_start_time").get<double>()}));
+        json j_start_time = j.value("turn_start_time", json(nullptr));
+        timestamp turn_start_time;
 
+        if (j_start_time.is_null()){
+            turn_start_time = timestamp(timer::duration(0));
+        } else {
+            turn_start_time = timestamp(std::chrono::duration_cast<timer::duration>(duration{j.at("turn_start_time").get<double>()}));
+        }
         SerializableInstance result(
             std::move(board), 
             std::move(players), 
             std::move(times),
             
-            j.at("history").get<std::vector<Tuple<Action<n>, p>>>(),
-            j.at("turn").get<index_t>(),
+            j.value("history", json::array()).get<std::vector<Tuple<Action<n>, p>>>(),
+            j.value("turn", json(0)).get<index_t>(),
             turn_start_time,
 
-            j.at("status").get<Status>(),
+            j.value("status", json(UNBEGUN)).get<Status>(),
             nullptr
         );
 
-        const json& promoting = j.at("promoting");
+        const json& promoting = j.value("promoting", json(nullptr));
 
         if (!promoting.is_null()){
             result.promoting = result.board[Index<n>(promoting.get<Tup<n>>(), board)];
@@ -154,7 +209,7 @@ struct game::SerializableInstance : public Instance<n, p>{
 
             this->move_json = json::object();
             
-            this -> move_json["label"] = "move";
+            this -> move_json["__type__"] = "Event";
             this -> move_json["action"] = action;
             
             if (target_piece != nullptr){
@@ -220,20 +275,20 @@ struct game::SerializableInstance : public Instance<n, p>{
             };
         }
 
-        static sptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board) {
+        static sptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board, index_t player_index) {
             return std::make_shared<Piece<n>>(
                 Index<n>(std::move(j.at("position").get<Tup<n>>()), board),
                 Figure<n>::resolve(j.at("figure").get<std::string>()),
+                j.value("player_index", json(player_index)).get<index_t>(),
 
-                j.at("player_index").get<index_t>(),
-                j.at("promotion_list").get<std::vector<std::string>>(),
-                j.at("promotion_axis").get<index_t>(),
-                j.at("promotion_index").get<index_t>(),
+                j.value("promotion_list", json::array()).get<std::vector<std::string>>(),
+                j.value("promotion_axis", json(0)).get<index_t>(),
+                j.value("promotion_index", json(0)).get<index_t>(),
                 
-                j.at("promoted").get<bool>(),
-                j.at("dead").get<bool>(),
-                j.at("has_moved").get<bool>(),
-                j.at("just_opened").get<bool>()
+                j.value("promoted", json(false)).get<bool>(),
+                j.value("dead", json(false)).get<bool>(),
+                j.value("has_moved", json(false)).get<bool>(),
+                j.value("just_opened", json(false)).get<bool>()
             );
         }
 
@@ -258,7 +313,7 @@ struct game::SerializableInstance : public Instance<n, p>{
             };
         }
 
-        static Player<n> player_from_json(const json& j, const Board<n>& board) {
+        static Player<n> player_from_json(const json& j, const Board<n>& board, index_t index) {
             std::vector<sptr<Piece<n>>> pieces;
             std::vector<sptr<Piece<n>>> monarchs;
 
@@ -266,15 +321,15 @@ struct game::SerializableInstance : public Instance<n, p>{
             const json& jmonarchs = j.at("monarchs");
 
             for (const json& piece : jpieces){
-                pieces.push_back(SerializableInstance::piece_from_json(piece, board));
+                pieces.push_back(SerializableInstance::piece_from_json(piece, board, index));
             }
 
             for (const json& monarch : jmonarchs){
-                monarchs.push_back(SerializableInstance::piece_from_json(monarch, board));
+                monarchs.push_back(SerializableInstance::piece_from_json(monarch, board, index));
             }
 
             return Player<n>(
-                j.at("index").get<index_t>(),
+                j.value("index", json(index)).get<index_t>(),
                 j.at("material").get<value_t>(),
                 std::move(pieces),
                 std::move(monarchs)
@@ -297,7 +352,7 @@ struct game::SerializableInstance : public Instance<n, p>{
             Tuple<Player<n>, p> ps;
 
             for (index_t k; k < p; k++){
-                ps[k] = SerializableInstance::player_from_json(j[k], board);
+                ps[k] = SerializableInstance::player_from_json(j[k], board, k);
             }
 
             return ps;
@@ -325,7 +380,7 @@ json follow(SerializableInstance<2, 2>& g, const std::string& s) {
 
     json result = g.execute(start, end);
 
-    if (result.is_null()){
+    if (result["__type__"] == "Request" && result["content"] == "promote"){
         index_t i;
         std::cin >> i;
 
@@ -362,6 +417,8 @@ int main(){
     for (const std::string& s : premoves){
         follow(g, s);
     }
+
+    std::cout << g.serialize() << std::endl;
 
     std::cout << g << std::endl;
 

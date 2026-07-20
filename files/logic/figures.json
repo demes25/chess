@@ -142,7 +142,7 @@
     },
 
     "Knight" : {
-        "name" : "Kight",
+        "name" : "Knight",
         "key" : "Knight",
         "value" : 3.0,
         "move_list" : [

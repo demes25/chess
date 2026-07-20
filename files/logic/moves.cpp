@@ -301,7 +301,7 @@ struct moves::Figure {
         return Figure::instances[key];
     }
 
-
+    
     sptr<Move<n>> which_opener(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
         for (const sptr<Move<n>>& m : this -> opener_list){
             if (m -> sees(board, position, target, player_index)){
@@ -363,7 +363,7 @@ struct moves::Figure {
             j.at("value").get<value_t>(),
             std::move(move_list),
             std::move(opener_list),
-            j.at("open_exclusive").get<bool>()
+            j.value("open_exclusive", json(false)).get<bool>()
         );
     }
 
