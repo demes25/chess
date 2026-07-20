@@ -1,0 +1,208 @@
+{
+    "board" : [8, 8],
+
+    "players" : [
+        {
+            "material" : 39.0,
+            "pieces" : [
+                {
+                    "position" : [0, 0],
+                    "figure" : "Rook"
+                },
+                {
+                    "position" : [1, 0],
+                    "figure" : "Knight"
+                },
+                {
+                    "position" : [2, 0],
+                    "figure" : "Bishop"
+                },
+                {
+                    "position" : [3, 0],
+                    "figure" : "Queen"
+                },
+                {
+                    "position" : [5, 0],
+                    "figure" : "Bishop"
+                },
+                {
+                    "position" : [6, 0],
+                    "figure" : "Knight"
+                },
+                {
+                    "position" : [7, 0],
+                    "figure" : "Rook"
+                },
+
+                {
+                    "position" : [0, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [1, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [2, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [3, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [4, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [5, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [6, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                },
+                {
+                    "position" : [7, 1],
+                    "figure" : "WhitePawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 7
+                }
+            ],
+            "monarchs" : [
+                {
+                    "position" : [4, 0],
+                    "figure" : "King",
+                    "promotion_list" : [],
+                    "promotion_axis" : 0,
+                    "promotion_index" : 0,
+                    "promoted" : false,
+                    "dead" : false,
+                    "has_moved" : false,
+                    "just_opened" : false
+                }
+            ]
+        },
+
+        {
+            "material" : 39.0,
+            "pieces" : [
+                {
+                    "position" : [0, 7],
+                    "figure" : "Rook"
+                },
+                {
+                    "position" : [1, 7],
+                    "figure" : "Knight"
+                },
+                {
+                    "position" : [2, 7],
+                    "figure" : "Bishop"
+                },
+                {
+                    "position" : [3, 7],
+                    "figure" : "Queen"
+                },
+                {
+                    "position" : [5, 7],
+                    "figure" : "Bishop"
+                },
+                {
+                    "position" : [6, 7],
+                    "figure" : "Knight"
+                },
+                {
+                    "position" : [7, 7],
+                    "figure" : "Rook"
+                },
+
+                {
+                    "position" : [0, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [1, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [2, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [3, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [4, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [5, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [6, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                },
+                {
+                    "position" : [7, 6],
+                    "figure" : "BlackPawn",
+                    "promotion_list" : ["Queen", "Rook", "Bishop", "Knight"],
+                    "promotion_axis" : 1,
+                    "promotion_index" : 0
+                }
+            ],
+            "monarchs" : [
+                {
+                    "position" : [4, 7],
+                    "figure" : "King"
+                }
+            ]
+        }
+    ],
+
+    "times" : [600.0, 600.0]
+}
