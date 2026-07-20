@@ -210,7 +210,6 @@ struct moves::Span : public Move<n>{
                 if (scaling < 0) {
                     for (Index<n> i(position - v); i != target; i -= v) {
                         if (board[i] != nullptr) {
-                            std::cout << board << std::endl;
                             num_obstacles++;
                         }
 

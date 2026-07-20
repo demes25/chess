@@ -122,12 +122,14 @@ struct game::SerializableInstance : public Instance<n, p>{
         return result;
     }
 
-    private:
+    protected:
         json move_json;
 
 
         virtual void resolve_promotion(index_t i) {
-            this -> assert_status();
+            if (this -> status != PROMOTING) {
+                this -> status_error();
+            }
 
             this -> raw_promote(i);
             this -> move_json["promote"] = i;
@@ -136,7 +138,9 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
-            this -> assert_status();
+            if (this -> status > ONGOING) {
+                this -> status_error();
+            }
 
             sptr<Piece<n>> piece = this -> board[start];
             sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
@@ -314,6 +318,23 @@ struct game::SerializableInstance : public Instance<n, p>{
 
 using namespace game;
 
+
+json follow(SerializableInstance<2, 2>& g, const std::string& s) {
+    Index<2> start = g.as_index(Tup<2>(s[0] - 'a', s[1] - '1'));
+    Index<2> end = g.as_index(Tup<2>(s[2]-'a', s[3] - '1'));
+
+    json result = g.execute(start, end);
+
+    if (result.is_null()){
+        index_t i;
+        std::cin >> i;
+
+        result = g.promote(i);
+    }
+
+    return result;
+}
+
 int main(){
     json j;
     json k;
@@ -333,16 +354,23 @@ int main(){
 
     SerializableInstance<2, 2> g = SerializableInstance<2, 2>::deserialize(j);
 
+    std::vector<std::string> premoves = {
+        "d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
+    };
+
+    for (const std::string& s : premoves){
+        follow(g, s);
+    }
+
     std::cout << g << std::endl;
 
     while (!g.is_over()) {
-        std::string k;
-        std::cin >> k;
+        std::string s;
+        std::cin >> s;
 
-        Index<2> start = g.as_index(Tup<2>(k[0] - 'a', k[1] - '1'));
-        Index<2> end = g.as_index(Tup<2>(k[2]-'a', k[3] - '1'));
+        json result = follow(g, s);
 
-        std::cout << g.execute(start, end) << std::endl;
+        std::cout << result << std::endl;
         std::cout << g << std::endl;
     }
 }

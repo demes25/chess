@@ -409,6 +409,16 @@ struct game::Instance{
             return piece;
         }
 
+        // adds the given piece to the board.
+        // if the position is occupied, overwrites.
+        // adds the piece to the corresponding player and shows it on the board.
+        sptr<Piece<n>> overwrite(sptr<Piece<n>> piece){
+            this -> players[piece -> player_index].pieces.push_back(piece);
+            this -> show(piece);
+
+            return piece;
+        }
+
         // adds the given monarch to the board.
         // if the position is occupied, raises error.
         // adds the monarch to the corresponding player and shows it on the board.
@@ -417,6 +427,16 @@ struct game::Instance{
                 throw std::runtime_error("occupied");
             }
 
+            this -> players[monarch -> player_index].monarchs.push_back(monarch);
+            this -> show(monarch);
+
+            return monarch;
+        }
+
+        // adds the given monarch to the board.
+        // if the position is overwrites.
+        // adds the monarch to the corresponding player and shows it on the board.
+        sptr<Piece<n>> overwrite_monarch(sptr<Piece<n>> monarch){
             this -> players[monarch -> player_index].monarchs.push_back(monarch);
             this -> show(monarch);
 
@@ -443,8 +463,7 @@ struct game::Instance{
         // otherwise, sets promoting -> promoted = true, and calls .add on the promoted piece
         void raw_promote(index_t promotion_index) {
             if (promoting != nullptr) {
-                promoting -> promoted = true;
-                this -> add(promoting -> promoted_piece(promotion_index));
+                this -> overwrite(promoting -> promoted_piece(promotion_index));
                 promoting = nullptr;
             } else {
                 throw std::runtime_error("no promoting");
@@ -536,14 +555,12 @@ struct game::Instance{
 
 
 
-        void assert_status() const {
-            if (this -> status > ONGOING) {
-                std::string status{(char)(this -> status)};
-                std::string error_str("status ");
-                error_str += status;
+        void status_error() const {
+            std::string status{(char)(this -> status)};
+            std::string error_str("status ");
+            error_str += status;
 
-                throw std::runtime_error(error_str);
-            }
+            throw std::runtime_error(error_str);
         }
  
         void move(const Index<n>& start, const Index<n>& end) {
@@ -552,19 +569,21 @@ struct game::Instance{
             if (this -> status != PROMOTING) {
                 this -> post_move();
             }
-
-            std::cout << this -> board << std::endl;
         }
         
         virtual void resolve_promotion(index_t i) {
-            this -> assert_status();
+            if (this -> status != PROMOTING) {
+                this -> status_error();
+            }
 
             this -> raw_promote(i);
             this -> post_move();
         }
 
         virtual void make_move(const Index<n>& start, const Index<n>& end) {
-            this -> assert_status();
+            if (this -> status > ONGOING) {
+                this -> status_error();
+            }
 
             sptr<Piece<n>> piece = this -> board[start];
             sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
@@ -700,25 +719,25 @@ struct game::Instance{
         // otherwise sets the status to ONGOING.
         void update_game_status(bool next_in_check) {
 
-            bool legal_moves = false;
+            bool has_legal_moves = false;
 
             const Player<n>& player = this -> players[this -> turn];
             
             for (const sptr<Piece<n>>& monarch : player.monarchs){
                 if (this -> legal_moves(monarch).any()){
-                    legal_moves = true;
+                    has_legal_moves = true;
                     break;
                 }
             }
 
             for (const sptr<Piece<n>>& piece : player.pieces) {
                 if (this -> legal_moves(piece).any()){
-                    legal_moves = true;
+                    has_legal_moves = true;
                     break;
                 }
             }
 
-            if (!legal_moves){
+            if (!has_legal_moves){
                 if (next_in_check){
                     this -> status = CHECKMATE;
                 } else {

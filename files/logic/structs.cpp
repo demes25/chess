@@ -981,6 +981,20 @@ template <typename T, index_t n>
 struct structs::PointerMap : public Grid<T*, n>{
     using Grid<T*, n>::Grid;
 
+    template<typename... Args>
+    requires (sizeof...(Args) == n && (std::convertible_to<Args, index_t> && ...)) 
+    PointerMap(Args&&... k) : Grid<T*, n>(Tup<n>(std::move(k)...)) {
+        this -> fill(nullptr);
+    }
+
+    PointerMap(Tup<n>&& shape) : Grid<T*, n>(std::forward<Tup<n>>(shape)) {
+        this -> fill(nullptr);
+    }
+
+    PointerMap(const Tup<n>& shape) : Grid<T*, n>(shape) {
+        this -> fill(nullptr);
+    }
+
     PointerMap(PointerMap&&) = default;
     PointerMap(const PointerMap&) = default;
 
