@@ -485,7 +485,6 @@ struct game::Instance{
             return false;
         }
 
-
         // returns a BitMap containing all the **legal** moves that the piece at the given index can make.
         // i.e., enforces checks
         MoveMap<n> legal_moves(const sptr<Piece<n>>& piece) {
@@ -546,8 +545,7 @@ struct game::Instance{
                 throw std::runtime_error(error_str);
             }
         }
-
-        
+ 
         void move(const Index<n>& start, const Index<n>& end) {
             this -> make_move(start, end);
 
@@ -707,18 +705,14 @@ struct game::Instance{
             const Player<n>& player = this -> players[this -> turn];
             
             for (const sptr<Piece<n>>& monarch : player.monarchs){
-                BitMap<n> moves = this -> legal_moves(monarch).to_bitmap();
-
-                if (moves.any()){
+                if (this -> legal_moves(monarch).any()){
                     legal_moves = true;
                     break;
                 }
             }
 
             for (const sptr<Piece<n>>& piece : player.pieces) {
-                BitMap<n> moves = this -> legal_moves(piece).to_bitmap();
-
-                if (moves.any()){
+                if (this -> legal_moves(piece).any()){
                     legal_moves = true;
                     break;
                 }

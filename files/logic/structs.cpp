@@ -989,6 +989,34 @@ struct structs::PointerMap : public Grid<T*, n>{
     PointerMap& operator=(const PointerMap&) = default;
     PointerMap& operator=(PointerMap&&) = default;
 
+    bool all() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (this -> at(i) == nullptr){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool none() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (this -> at(i) != nullptr){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool any() const {
+        for (index_t i = 0; i < this -> capacity; i++){
+            if (this -> at(i) != nullptr){
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     BitMap<n> to_bitmap() const {
         BitMap<n> b(this -> get_shape());
         b.fill(false);
