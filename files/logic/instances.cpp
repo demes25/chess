@@ -355,7 +355,8 @@ int main(){
     SerializableInstance<2, 2> g = SerializableInstance<2, 2>::deserialize(j);
 
     std::vector<std::string> premoves = {
-        "d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
+        //"d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
+        "d2d4", "e7e5", "d4e5", "d7d6", "e5d6", "d8e7", "d6e7", "c7c6"
     };
 
     for (const std::string& s : premoves){

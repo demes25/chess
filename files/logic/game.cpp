@@ -692,7 +692,7 @@ struct game::Instance{
                 time_dif = duration(0);
             } 
 
-            else if (this -> status == ONGOING) {
+            else {
                 time_dif = turn_end_time - this -> turn_start_time;
                 this -> times[this -> turn] -= time_dif;
             }
