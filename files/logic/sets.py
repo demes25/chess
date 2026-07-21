@@ -5,7 +5,7 @@
 from typing import Type, Dict, Tuple, List
 from files.logic.figures import Figures
 from netlib.serialization import Serializable
-from files.logic.game import Game, Piece, Player
+from files.logic.logic import Game, Piece, Player
 
 import numpy as np
 from abc import ABC, abstractmethod

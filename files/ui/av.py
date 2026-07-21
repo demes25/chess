@@ -2,25 +2,28 @@
 # Chess
 # AudioVisuals
 
-from typing import List, Tuple, Dict, Sequence
+from typing import List, Sequence
+from collections.abc import Iterator
+from dataclasses import dataclass
 
-
-from files.media.assets import Assets
 
 from applib import objects
 from applib.text import TextEntry, TextRecord
 from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
+from applib.controls import Controllable, EventUI, fetch
 
-from files.logic.game import Piece 
+from netlib.serialization import Serializable
+
+from files.media.assets import Assets
+from files.logic.pyutils import Index, Grid, Text, Chat, Response, Request, Action, Promotion, Event, InMessage, OutMessage
 
 import pygame as pg
 
 
 Dimensions = tuple[int | float, int | float]
-IntPair = tuple[int, int]
 
 # TODO: make CHAT HISTORY communicable.
-
+        
 # a wrapper class for audiovisuals given the necessary assets (see Assets).
 
 # BY DEFAULT: the argument 'dims' is in terms of TILES. so dims (5, 4) corresponds to shape (5*tile_width, 4*tile_height)
@@ -33,19 +36,69 @@ class AudioVisuals:
         this.assets = assets
         tile_width, tile_height = assets.tile_shape
         
-        # The Game Board -- takes care of drawing the board and plaques.
-        class GameBoard(objects.Object):
+
+        class Piece(objects.Object, Serializable):
+            def __init__(
+                self,
+                name : str,
+                position : Index,
+                promotion_list : Sequence[str],
+                player_index : int
+            ):
+                self.name = name
+                self.player_index = player_index 
+
+                super().__init__(assets.colored_figures[player_index][name])
+
+                self.promotion_list = promotion_list
+
+                self.board_pos = position            
+
+
+            def resolve_move(self, target_index : Index):
+                self.board_pos = target_index
+                self.topleft = assets.tiles_to_coords(target_index)
+
+            def resolve_promote(self, index : int):
+                self.surface = self.promotion_list[index]
+                self.promotion_list = []
+            
+            # serialization
+
+            def to_dict(self):
+                return {
+                    "name" : self.name,
+                    "position" : self.board_pos,
+                    "promotion_list" : self.promotion_list,
+                    "player_index" : self.player_index
+                }
+        
+
+        @dataclass
+        class Cache:
+            action : Action
+
+            start_piece : Piece
+            end_piece : Piece | None = None
+         
+
+        class Board(objects.Structure, Serializable, Controllable):    
             def __init__(
                 self, 
-                dims : Sequence[int] = (8, 8), # dimensions of the game board, in tiles
-                num_players : int = 2,
-
-                player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black),
-                origin : Vector = ZERO_VEC # gives the position of the topleft corner of the board
+                dims : Index, # dimensions of the game board, in tiles
+                armies : Sequence[list[Piece]], # the pieces involved 
+                player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black)
+                enforce_player : bool = True
             ):
                 self.rank = len(dims)
-                self.num_players = num_players
+                self.num_players = len(armies)
                 self.player_index = player_index
+
+                self.enforce_player = enforce_player
+
+                self.armies = armies
+
+                self.play_sound_if_next_error = True 
 
                 # TODO: generalize tile dimensions and board rank. right now only supports rank-2 [n x m] boards
                 # and 2 players
@@ -53,82 +106,157 @@ class AudioVisuals:
                 assert self.num_players == 2
 
                 self.COLS, self.ROWS = self.dims = dims
-                super().__init__(assets.tiles_to_coords(dims), origin)
-
-                self.board = self.surface.copy()
+                super().__init__(assets.tiles_to_coords(dims))
 
                 for i in range(self.ROWS):
                     for j in range(self.COLS):
                         # Alternate color based on position
-                        tile = assets.colored_tiles[(i+j + player_index) % 2]
+                        tile = assets.colored_tiles[(i+j + player_index) % self.num_players]
 
-                        self.board.blit(tile, assets.tiles_to_coords((j, i)))
+                        self.surface.blit(tile, assets.tiles_to_coords((j, i)))
+                
+
+                self.grid : Grid[Piece] = Grid(dims)
+
+                for army in armies:
+                    for piece in army:
+                        self._wrap(piece)
+                        self.grid[piece.board_pos] = piece
+                        piece.topleft = self.coords(piece.board_pos, to_global=False)
+                
+                self.cache : Cache | None = None
 
                 self.selected_piece : Piece | None = None 
                 self.hold_selected : bool = False 
                 self.selected_squares : List[objects.Object] = [] 
 
+                self.promotion_plaque : objects.Array | None = None
 
-                class PromotionPlaque(objects.Array):
-                    from files.logic.figures import Figure 
-                    def __init__(plq, figures : List[Figure], player_index : int, board_pos : IntPair, origin : Vector = ZERO_VEC):
-                        plq.figures = figures
-
-                        # rudimentary: for now, the default is that the promotion plaque 
-                        # extends rightwards from the promotion square, unless that clashes with 
-                        # board dimensions, in which case we go leftwards.
-                        # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
-                        if (self.dims[0]-board_pos[0]) < len(figures):
-                            disp = -tile_width
-                            left = self.topleft[0] + tile_width * (board_pos[0] - len(figures) + 1)
-                            x_init = tile_width * (len(figures)-1)
-                        else:
-                            disp = tile_width
-                            left = self.topleft[0] + tile_width * board_pos[0]
-                            x_init = 0
-
-                        plaque = assets.make_plaque(
-                            shape=(len(figures) * tile_width, tile_height),
-                            small_corners=True
-                        )
-
-                        super().__init__(
-                            plaque, 
-                            origin = origin
-                        )
-                        
-                        sprites = assets.colored_figures[player_index]
-                        
-                        x = x_init
-                        
-                        for fig in figures:
-                            sprite = sprites[fig.name]
-                            
-                            object = objects.Object(sprite)
-                            plq.append(object)
-
-                            object.topleft = (x, 0)
-                            x += disp
-
-                        top = self.top if player_index==self.player_index else self.bottom - tile_height
-                        
-                        plq.topleft = (
-                            left,
-                            top
-                        )
-
-
-                self.make_promotion_plaque = PromotionPlaque
+                self.last_click : Coords | None = None 
+                self.end_plaque : objects.Environment | None = None
                 
+
+
+
+
+
+            def __iter__(self) -> Iterator[objects.Object]:
+                yield from self.selected_squares
+                
+                for piece in self.grid:
+                    if piece is not self.selected_piece:
+                        yield piece
+                
+                if self.promotion_plaque is not None:
+                    yield self.promotion_plaque
+
+                if self.selected_piece is not None:
+                    yield self.selected_piece
+            
+
+            # serialization
+            def to_dict(self):
+                return {
+                    "dims" : self.dims,
+                    "armies" : self.armies,
+                    "player_index" : self.player_index
+                }
+            
+
+
+            def make_promotion_plaque(self, piece : Piece, board_pos : Index):
+                figures = piece.promotion_list
+                player_index = piece.player_index
+
+                # rudimentary: for now, the default is that the promotion plaque 
+                # extends rightwards from the promotion square, unless that clashes with 
+                # board dimensions, in which case we go leftwards.
+                # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
+                if (self.dims[0]-board_pos[0]) < len(figures):
+                    disp = -tile_width
+                    left = self.topleft[0] + tile_width * (board_pos[0] - len(figures) + 1)
+                    x_init = tile_width * (len(figures)-1)
+                else:
+                    disp = tile_width
+                    left = self.topleft[0] + tile_width * board_pos[0]
+                    x_init = 0
+
+                plaque = assets.make_plaque(
+                    shape=(len(figures) * tile_width, tile_height),
+                    small_corners=True
+                )
+
+                result = objects.Array(plaque)
+                
+                sprites = assets.colored_figures[player_index]
+                
+                x = x_init
+                
+                for piece in figures:
+                    sprite = sprites[piece.name]
+                    
+                    object = objects.Object(sprite)
+                    object.topleft = (x, 0)
+                    x += disp
+
+                    result.append(object)
+
+                top = self.top if player_index==self.player_index else self.bottom - tile_height
+                
+                result.topleft = (
+                    left,
+                    top
+                )
+
+                self._wrap(result)
+                self.promotion_plaque = result
+
+            def make_end_plaque(
+                self,
+                dims : Dimensions = (5, 3),
+                label : str = 'checkmate',
+                
+                label_color : Color | None = None
+            ):
+                
+                plaque = assets.make_plaque(shape=assets.tiles_to_coords(dims))
+
+                result = objects.Environment(plaque)
+
+                if label_color is None:
+                    label_color = assets.scheme.__getattribute__(label.lower()) 
+
+                dx_r = self.width // 5
+                dx_q = self.width // 4
+                dy = self.height // 7
+
+                x, y = self.midpoint
+
+                label_object = objects.Object(assets.title_font.render(label.upper(), label_color))
+                label_object.center = (x, y - dy)
+                result['label'] = label_object
+
+                reset_button = objects.Object(assets.half_title_font.render('RESET', assets.scheme.text))
+                reset_button.rect.center = (x + dx_r, y + dy)
+                result['reset'] = reset_button
+
+                quit_button = objects.Object(assets.half_title_font.render('QUIT', assets.scheme.text))
+                quit_button.rect.center = (x-dx_q, y + dy)
+                result['quit'] = quit_button
+
+                self._wrap(result)
+                self.end_plaque = result
+
+
             # translates a point on the screen to a square on the board
-            # if offset is true, takes into account that topleft may not be (0, 0).
+            # if from_global is true, takes into account that topleft may not be (0, 0).
             # otherwise treats as if topleft if (0, 0)
             #
-            # usually we'd use offset = False for internal operations, offset = True for external ones
-            def board_pos(self, coords : Coords, offset = True) -> Sequence[int]:
+            # usually we'd use from_global = False for internal operations, from_global = True for external ones
+            def board_pos(self, coords : Coords, from_global = True) -> Index:
                 i, j = coords 
                 
-                if offset:
+                if from_global:
                     i -= (self.origin[0] + self.topleft[0])
                     j -= (self.origin[1] + self.topleft[1])
 
@@ -140,11 +268,11 @@ class AudioVisuals:
                 return I, J
 
             # translates a square on the board to its center point on the screen
-            # if offset is true, takes into account that topleft may not be (0, 0).
+            # if to_global is true, takes into account that topleft may not be (0, 0).
             # otherwise treats as if topleft if (0, 0)
             #
-            # usually we'd use offset = False for internal operations, offset = True for external ones
-            def coords(self, board_pos : Sequence[int], offset = True, center_point = False) -> Coords:
+            # usually we'd use to_global = False for internal operations, to_global = True for external ones
+            def coords(self, board_pos : Index, to_global = True, center_point = False) -> Coords:
                 I, J = board_pos
 
                 if self.player_index == 1:
@@ -159,38 +287,40 @@ class AudioVisuals:
                 i = int(tile_width * I)
                 j = int(self.height - J*tile_height)
 
-                if offset:
+                if to_global:
                     i += (self.origin[0] + self.topleft[0])
                     j += (self.origin[1] + self.topleft[1])
 
                 return i, j 
             
 
-            def select_piece(self, piece : Piece | None):
+        
+            # INTERNALS
+
+            def select_piece(self, piece : Piece):
                 if piece is not None:
                     self.selected_piece = piece
-                    self.selected_sprite = objects.Object(assets.colored_figures[piece.player.index][piece.figure.name])
-                    
-                    self.select_square(piece.position)
+
+                    self.select_square(piece.board_position)
                     self.hold_selected = True
                 else:
                     self.deselect_squares()
             
-            def select_square(self, position : Sequence[int]):
+            def select_square(self, position : Index):
                 j, i = position
-                w, h = assets.tile_shape 
 
                 obj = objects.Object(assets.selected_tile) 
 
                 if self.player_index == 0:
                     i = self.dims[1] - i - 1 
                 
-                obj.rect.topleft = (j * w, i * h)
+                obj.topleft = assets.tiles_to_coords((j, i))
+                self._wrap(obj)
                 self.selected_squares.append(obj) 
 
             def deselect_piece(self):
+                self.selected_piece.topleft = self.coords(self.selected_piece.board_pos)
                 self.selected_piece = None
-                self.selected_sprite = None
                 self.hold_selected = False 
 
             def deselect_squares(self):
@@ -199,30 +329,190 @@ class AudioVisuals:
             def play(self, sound_name : str):
                 assets.sounds[sound_name].play()
 
-            # draws the given game to a surface
-            def draw(self, pieces : List[Dict[int, Piece]]) -> Surface:
-                self.surface.blit(self.board.copy(), (0, 0))
-
-                for square in self.selected_squares:
-                    square.blit_onto(self.surface)
                 
-                for piece_dict, sprite_dict in zip(pieces, assets.colored_figures):
-                    for piece in piece_dict.values():
-                        sprite = sprite_dict[piece.figure.name]
-                        if not (piece is self.selected_piece and self.hold_selected):
-                            self.surface.blit(sprite, self.coords(piece.position, offset=False, center_point=False))
-                
-                return self.surface
-                           
 
+            # COMMUNICATION
+            
+            def _request_move(self, start : Index, end : Index) -> Action:
+                action = Action(
+                    start=start,
+                    end=end
+                )
+
+                start_piece=self.grid[start]
+                end_piece=self.grid[end]
+
+                self.cache = Cache(
+                    action=action,
+                    start_piece=start_piece,
+                    end_piece=end_piece
+                )
+
+                self.grid[start] = None
+                self.grid[end] = start_piece 
+
+                return action
+
+            def _request_promote(self, start_coords : Coords, end_coords : Coords, from_global : bool = True) -> Promotion | None:
+                index = self.promotion_plaque.which_hits(start_coords, end_coords, from_global=from_global)
+                if index == -1:
+                    return None
+                return Promotion(index)
+
+
+            def revert_cache(self):
+                if self.cache is not None:
+                    action = self.cache.action 
+
+                    self.grid[action.start] = self.cache.start_piece
+                    self.grid[action.end] = self.cache.end_piece
+
+                    self.cache = None
+            
+
+            def register(self, event : Event | Response) -> tuple[int, Piece] | None:
+                result = None 
+
+                if isinstance(event, Event):
+                    self.revert_cache()
+
+                    action = event.action
+
+                    piece : Piece = self.grid[action.start]
+                    player_index = piece.player_index
+                    piece.resolve_move(action.end)
+
+                    if event.die is not None:
+                        die = self.grid[event.die]
+                        result = (player_index, die)
+
+                        self.armies[die.player_index].remove(result)
+                        self.grid[event.die] = None
+
+                        self.play("take")
+                    else:
+                        self.play("move")
+                    
+                    if event.promote is not None:
+                        piece.resolve_promote(event.promote)
+                        self.promotion_plaque = None
+
+                        self.play("promote")
+                    
+                    if event.end is not None:
+                        self.make_end_plaque(label=event.end)
+
+                        self.play("end")
+                    
+                elif isinstance(event, Response):
+                    if self.cache is not None and event.label == "promote":
+                        self.make_promotion_plaque(
+                            self.cache.start_piece, self.cache.action.end
+                        )
+                    elif event.label == "error":
+                        self.revert_cache()
+                        
+                        if self.play_sound_if_next_error:
+                            self.play('illegal')
+
+                        print(event.content)
+                        self.deselect_squares()
+                
+                self.play_sound_if_next_error = True
+
+                return result
+
+            # CONTROLS
+
+            def _handle_ingame(self, event : EventUI) -> OutMessage | None:
+                result = None 
+
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    # selects the piece
+                    pos = self.board_pos(event.pos)
+                    target = self.grid[pos]
+                    selected = self.selected_piece
+
+                    overall_condition = target is None or not self.enforce_player or (target.player_index == self.player_index)
+
+                    if overall_condition:
+                        if selected is None or (target is not None and target.player_index == selected.player_index):
+                            self.deselect_squares()
+                            self.select_piece(target)
+                        elif target != selected:
+                            result = self._request_move(selected.board_pos, pos, from_global=True)
+                            self.select_square(pos)    
+                            self.deselect_piece()
+                            self.play_sound_if_next_error = False 
+                
+                if event.type == pg.MOUSEBUTTONUP:
+                    selected = self.selected_piece
+
+                    if selected is not None:
+                        pos = self.board_pos(event.pos)
+
+                        if pos != selected.board_pos:
+                            result = self._request_move(selected.board_pos, pos)
+                            self.select_square(pos)
+                            self.play_sound_if_next_error = True
+
+                        else:
+                            self.hold_selected = False 
+                
+                return result
+                    
+            def _handle_gameover(self, event : EventUI) -> OutMessage | None:
+                result = None
+                    
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    self.last_click = event.pos
+                
+                if event.type == pg.MOUSEBUTTONUP and self.last_click is not None:
+                    button = self.end_plaque.which_hits(event.pos, self.last_click)
+
+                    if button == 'reset': 
+                        result = Request(index=self.player_index, content='reset')
+                        self.end_plaque = None 
+
+                    elif button == 'quit':
+                        result = Request(index=self.player_index, content="quit")
+                    
+                    self.last_click = None 
+                
+                return result
+            
+            def _handle_promotion(self, event : EventUI) -> OutMessage | None:
+                result = None
+
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    self.last_click = event.pos
+                
+                if event.type == pg.MOUSEBUTTONUP and self.last_click is not None:
+                    result = self._request_promote(event.pos, self.last_click)
+                
+                return result
+            
+
+            def handle(self, event : EventUI, queue : list[OutMessage]): 
+                if self.end_plaque is not None:
+                    handle = self._handle_gameover
+                elif self.promotion_plaque is not None:
+                    handle = self._handle_promotion
+                else:
+                    handle = self._handle_ingame
+
+                result = handle(event)
+                if result is not None:
+                    queue.append(result)
+            
+
+                        
         # The Timer -- a clock, basically
         class Timer(objects.Object):
             def __init__(
                 self,
                 margin : int = 3,
                 player_index : int = 0,
-
-                origin : Vector = ZERO_VEC
             ):
                 clock_color = assets.scheme.tiles[player_index]
                 num_color = assets.scheme.chat_texts[1-player_index]
@@ -235,42 +525,54 @@ class AudioVisuals:
                     text_shape[1] + margins[1] * 2
                 )
 
-                self.background = assets.make_plaque(shape, small_corners=True, color=clock_color)
+                background = assets.make_plaque(shape, small_corners=True, color=clock_color)
                 self.margins = margins
+                self.time_surface = None
 
                 self.num_color = num_color
 
                 self.previous_time = 0
+                self.current_time = 0
 
-                super().__init__(self.background, origin=origin)
+                super().__init__(background)
+
+            def set_time(self, time_s : float):
+                self.previous_time = self.current_time
+                self.current_time = time_s
+
+                if time_s != self.previous_time:
+                    rounded_time = round(time_s)
+                    minutes =  rounded_time//60
+                    assert minutes <= 99 
+                    seconds = rounded_time % 60
+
+                    minute_str = f'{minutes}' if minutes >= 10 else f'0{minutes}'
+                    second_str = f'{seconds}' if seconds >= 10 else f'0{seconds}'
+
+                    time_str = f'{minute_str}:{second_str}'
+                    
+                    self.time_surface = assets.text_font.render(time_str, self.num_color)
 
 
-            def draw(self, time_s : float) -> Surface:
-                # check if we already printed this time:
-                if time_s == self.previous_time:
-                    return self.surface 
-                
-                rounded_time = round(time_s)
-                minutes =  rounded_time//60
-                assert minutes <= 99 
-                seconds = rounded_time % 60
+            def blit_onto(self, dest : Surface | objects.Object):
+                if self.time_surface is not None:
+                    super().blit_onto(dest)
+                else:
+                    surface = self.surface.copy()
+                    surface.blit(self.time_surface, self.margins)
 
-                minute_str = f'{minutes}' if minutes >= 10 else f'0{minutes}'
-                second_str = f'{seconds}' if seconds >= 10 else f'0{seconds}'
+                    if isinstance(dest, objects.Object):
+                        dest.surface.blit(surface, self.rect)
+                    else:
+                        dest.blit(surface, self.rect)
 
-                time_str = f'{minute_str}:{second_str}'
-                
-                time_surface = assets.text_font.render(time_str, self.num_color)
-
-                self.surface = self.background.copy()
-                self.surface.blit(time_surface, self.margins)
-
-                return self.surface 
         
 
         # An array of figures:
         # to represent captured figures.
-        class FigureArray(objects.Object):
+        #TODO: CONTINUE FROM HERE -- making these intrinsic instead of needing to "draw" each frame.
+        # that way everything works under blit_onto. 
+        class FigureArray(objects.Array):
             def __init__(
                 self, 
                 
@@ -283,8 +585,6 @@ class AudioVisuals:
 
                 plaque_opacity : int = 64,
                 player_opacity : int = 196,
-
-                origin : Vector = ZERO_VEC
             ):
                 self.margins = assets.pixels_to_coords(margin)
 
@@ -296,79 +596,44 @@ class AudioVisuals:
                     int(self.margins[1] * 2 + figures_per_col*assets.captured_fig_shape[1])
                 )
 
-                self.background = assets.make_raw_plaque(shape=shape)
+                background = assets.make_raw_plaque(shape=shape)
 
-                plaque_tint = phase(self.background, color=assets.scheme.plaque.new_opacity(plaque_opacity))
-                player_tint = phase(self.background, color=assets.scheme.players[player_index].new_opacity(player_opacity))
+                plaque_tint = phase(background, color=assets.scheme.plaque.new_opacity(plaque_opacity))
+                player_tint = phase(background, color=assets.scheme.players[player_index].new_opacity(player_opacity))
                 
-                self.background.blit(plaque_tint, (0,0))
-                self.background.blit(player_tint, (0,0))
+                background.blit(plaque_tint, (0,0))
+                background.blit(player_tint, (0,0))
 
                 self.INIT_X = self.margins[0]
                 self.MAX_X = self.INIT_X + (figures_per_row-1)*assets.captured_fig_shape[0]
 
-                super().__init__(self.background, origin)
+                self.CURRENT_X = self.INIT_X
+                self.CURRENT_Y = self.margins[1]
 
+                super().__init__(background)
 
-            # pieces: list of [player_index, piece_name]
-            def draw(self, pieces : List[Tuple[int, str]] | None = None):
-                self.surface = self.background.copy()
-
-                CURR_Y = self.margins[1]
-                CURR_X = self.INIT_X
+            def add(self, piece : Piece | tuple[str, int]):
+                if isinstance(piece, Piece):
+                    sprite = assets.colored_capt_figs[piece.player_index][piece.name]
+                elif isinstance(piece, tuple):
+                    name, index = piece
+                    sprite = assets.colored_capt_figs[index][name]
+                else:
+                    raise TypeError(piece.__class__.__name__)
                 
-                if pieces:
-                    for player, piece_name in pieces:
-                        obj = assets.colored_capt_figs[player][piece_name]
-                        self.surface.blit(obj, (CURR_X, CURR_Y))
-
-                        CURR_X += (assets.captured_fig_shape[0])
+                obj = objects.Object(sprite)
+                obj.topleft = (self.CURRENT_X, self.CURRENT_Y)
+                
+                self.CURRENT_X += (assets.captured_fig_shape[0])
                         
-                        if CURR_X > self.MAX_X:
-                            CURR_X = self.INIT_X
-                            CURR_Y += (assets.captured_fig_shape[1])
-                
-                return self.surface
+                if self.CURRENT_X > self.MAX_X:
+                    self.CURRENT_X = self.INIT_X
+                    self.CURRENT_Y += (assets.captured_fig_shape[1])
+
+                self.append(obj)
 
 
-        class GameOverPlaque(objects.Environment):
-            def __init__(
-                self,
-                dims : Dimensions = (5, 3),
-                label : str = 'checkmate',
-                
-                label_color : Color | None = None,
-
-                origin : Vector = ZERO_VEC
-            ):
-                
-                plaque = assets.make_plaque(shape=assets.tiles_to_coords(dims))
-
-                super().__init__(plaque, origin=origin)
-
-                if label_color is None:
-                    label_color = assets.scheme.__getattribute__(label.lower()) 
-
-                dx_r = self.width // 5
-                dx_q = self.width // 4
-                dy = self.height // 7
-
-                x, y = self.midpoint
-
-                label_object = objects.Object(assets.title_font.render(label.upper(), label_color))
-                label_object.center = (x, y - dy)
-                self['label'] = label_object
-
-                reset_button = objects.Object(assets.half_title_font.render('RESET', assets.scheme.text))
-                reset_button.rect.center = (x + dx_r, y + dy)
-                self['reset'] = reset_button
-
-                quit_button = objects.Object(assets.half_title_font.render('QUIT', assets.scheme.text))
-                quit_button.rect.center = (x-dx_q, y + dy)
-                self['quit'] = quit_button
-
-
-        class GameSideBar(objects.Environment):
+        class SideBar(objects.Environment):
             def __init__(
                 self,
                 
@@ -446,16 +711,16 @@ class AudioVisuals:
                 self['black_array'] = self.arrs[1]
 
             
-            def draw(self, times_s : List[int], captured_pieces : List[List[Tuple[int, str]]]):
-                assert len(times_s) == len(captured_pieces), 'player numbers must match'
-                for clock, time_s in zip(self.clocks, times_s):
-                    clock.draw(time_s=time_s)
-                
-                for arr, pieces in zip(self.arrs, captured_pieces):
-                    arr.draw(pieces=pieces)
+            def set_times(self, times_s : Sequence[float]):
+                for time_s, clock in zip(times_s, self.clocks):
+                    clock.set_time(time_s)
+
+
+            def add(self, player_index : int, piece : Piece | tuple[str, int]):
+                self.arrs[player_index].add(piece)
 
         
-        class ChatSideBar(objects.Environment):
+        class ChatBar(objects.Environment, Controllable):
             def __init__(
                 self,
                 
@@ -505,7 +770,10 @@ class AudioVisuals:
 
                 font = assets.quarter_text_font
                 
-                self.text_color = assets.scheme.chat_texts[player_index]
+                self.player_index = player_index
+
+                self.text_colors = assets.scheme.chat_texts
+                self.outgoing_color = self.text_colors[player_index]
 
                 self.text_margins = assets.pixels_to_coords(text_margin)
 
@@ -518,7 +786,7 @@ class AudioVisuals:
                 #    for chat, i in chat_history:
                 #        chat_box.register(chat, i, color=assets.scheme.chat_texts[i])
 
-                entry_box = TextEntry(font=font, width=entry_view_shape[0], color=self.text_color)
+                entry_box = TextEntry(font=font, width=entry_view_shape[0], color=self.outgoing_color)
                 
                 chat_view = objects.View(chat_plaque, chat_box)
                 chat_box.topleft = self.text_margins
@@ -534,14 +802,178 @@ class AudioVisuals:
                 self['chat'] = chat_view
                 self['entry'] = entry_view
 
-        this.GameBoard = GameBoard
+
+            def focus(self):
+                self.entry_box.show_pointer()
+
+            def defocus(self):
+                self.entry_box.hide_pointer()
+
+            def register(self, text_or_chat : Text | Chat):
+                if isinstance(text_or_chat, Text):
+                    self.chat_box.register(text_or_chat.content, color=self.text_colors[text_or_chat.index])
+                else:
+                    for text in text_or_chat.content:
+                        self.chat_box.register(text.content, color=self.text_colors[text.index])
+            
+            def drain(self) -> Text | None:
+                content = self.entry_box.clear()
+
+                if content == '':
+                    return None
+                
+                text = Text(
+                    content=content,
+                    index=self.player_index 
+                )
+
+                self.register(text)
+
+                return text
+            
+
+            def handle(self, event : EventUI, queue : list[OutMessage]):
+                result = None 
+
+                if event.type == pg.TEXTINPUT:
+                    text = event.text
+                    self.entry_box.register(text)
+                
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_BACKSPACE:
+                        self.entry_box.backspace()
+                    
+                    if event.key == pg.K_RETURN:
+                        result = self.drain()
+
+                    if event.key == pg.K_LEFT:
+                        self.entry_box.move_ptr_left()
+                    
+                    if event.key == pg.K_RIGHT:
+                        self.entry_box.move_ptr_right()
+                
+                if result is not None:
+                    queue.append(result)
+
+
+        class GameWindow(objects.Environment, Controllable):
+            def __init__(
+                self,
+                
+                board : Board,
+
+                # TODO: GENERALIZE FOR SIDEBAR SIZES
+                player_index : int = 0,
+            ):
+                chatbar = ChatBar(env_height = board.shape[1], player_index=player_index)
+                statbar = SideBar(env_height = board.shape[1], player_index=player_index)
+
+                board.topleft = chatbar.topright
+                statbar.topleft = board.topright
+
+                shape = (
+                    chatbar.shape[0] + board.shape[0] + statbar.shape[0],
+                    board.shape[1]
+                )
+
+                super().__init__(shape)
+
+                self.board = self['board'] = board
+                self.chatbar = self['chatbar'] = chatbar
+                self.statbar = self['statbar'] = statbar
+
+                self.player_index = player_index
+                
+                self.text_colors = assets.scheme.chat_texts
+
+                self.running = True
+
+                self.end_plaque = None
+                self.promotion_plaque = None 
+
+                self.focus : Controllable | None = None
+            
+
+            def adjust_focus(self, coords : Coords):
+                focus_key = self.which_hits(coords)
+
+                if focus_key is None:
+                    self.focus = None 
+                    return
+                
+                focus = self[focus_key]
+
+                if focus is not self.focus:
+                    if focus is self.statbar:
+                        self.focus = None
+                        return
+                    
+                    if focus is self.chatbar:
+                        self.chatbar.focus()
+                    else:
+                        self.chatbar.defocus()
+
+                self.focus = focus
+
+
+            def register(self, msg : InMessage):
+                if isinstance(msg, (Event, Response)):
+                    result = self.board.register(msg)
+                    if result is not None:
+                        self.statbar.add(*result)
+
+                elif isinstance(msg, (Text, Chat)):
+                    self.chatbar.register(msg)
+                
+                if isinstance(msg, Response):
+                    pass
+
+
+            # checks if the pygame event is global and executes
+            # this is defined because it will be used across all event loops
+            def global_handler(self, event : EventUI, queue : list[OutMessage]):
+                result = None 
+                if event.type == pg.QUIT:
+                    result = self._quit()
+                
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    self.adjust_focus(event.pos)
+                
+                if event.type == pg.MOUSEBUTTONUP and not self.focus.hits(event.pos):
+                    self.focus = None
+                
+                if result is not None:
+                    queue.append(result)
+
+
+            # handles the event.
+            # subhandlers are defined above for text, ingame, game_over, and promotion environments    
+            def handle(self, event : EventUI, queue : list[OutMessage]):
+                self.focus.handle(event, queue)
+
+
+            def reset(self, board : Board):
+                self.board = board 
+                self.promotion_plaque = None 
+                self.end_plaque = None 
+                self.timeout = False
+                self.running = True
+
+            def _quit(self) -> Event:
+                self.running = False 
+                return Event('quit', index=self.player_index)
+
+        
+        this.Piece = Piece
+        this.Board = Board
 
         this.Timer = Timer 
         this.FigureArray = FigureArray
 
-        this.GameSideBar = GameSideBar
-        this.GameOverPlaque = GameOverPlaque
-        this.ChatSideBar = ChatSideBar
+        this.SideBar = SideBar
+        this.ChatBar = ChatBar
+
+        this.GameWindow = GameWindow
 
 
 def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):

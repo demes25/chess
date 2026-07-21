@@ -17,8 +17,10 @@ struct game::SerializableInstance : public Instance<n, p>{
     SerializableInstance& operator=(SerializableInstance&&) = default;
     ~SerializableInstance() = default;
 
-    // COMMANDS
+    // EXTERNAL SERIALIZATION
 
+    // the following map to python Serializable objects (see netlib)
+    // defined in AV.
     json execute(const Index<n>& start, const Index<n>& end) {
         try {
             this -> move(start, end);
@@ -27,15 +29,16 @@ struct game::SerializableInstance : public Instance<n, p>{
                 return this -> drain_json();
             } else {
                 return {
-                    {"__type__", "Request"},
-                    {"content", "promote"}
+                    {"__type__", "Response"},
+                    {"label", "promote"}
                 };
             }
 
         } catch(const std::exception& e){
             this -> move_json = nullptr;
             return {
-                {"__type__", "Error"},
+                {"__type__", "Response"},
+                {"label", "error"},
                 {"content", e.what()}
             };
         }
@@ -47,12 +50,17 @@ struct game::SerializableInstance : public Instance<n, p>{
             return this -> drain_json();
         } catch (const std::exception& e) {
             return {
-                {"__type__", "Error"},
+                {"__type__", "Response"},
+                {"label", "error"},
                 {"content", e.what()}
             };
         }
     }
+    
 
+    // EXPOSED SERIALIZATION
+
+    // the following are exposed to python
     json process(const json& a) {
         if (a["__type__"] == "Action"){
             Index<n> start = this -> as_index(a["start"]);
@@ -63,9 +71,7 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
     }
 
-    // SERIALIZATION
-
-    json layout() const {
+    json layout(index_t player_index) const {
         json k = json::array();
 
         for (index_t i = 0; i < p; i++){
@@ -78,7 +84,9 @@ struct game::SerializableInstance : public Instance<n, p>{
                     arr.push_back({
                         {"name", piece -> figure -> name},
                         {"position", piece -> position},
-                        {"promotion_list", piece -> promotion_list}
+                        {"promotion_list", piece -> promotion_list},
+                        {"player_index", i},
+                        {"__type__", "Piece"}
                     });
                 }
             }
@@ -88,7 +96,9 @@ struct game::SerializableInstance : public Instance<n, p>{
                     arr.push_back({
                         {"name", piece -> figure -> name},
                         {"position", piece -> position},
-                        {"promotion_list", piece -> promotion_list}
+                        {"promotion_list", piece -> promotion_list},
+                        {"player_index", i},
+                        {"__type__", "Piece"}
                     });
                 }
             }
@@ -97,10 +107,16 @@ struct game::SerializableInstance : public Instance<n, p>{
         }
 
         return {
-            {"shape", this -> board.get_shape()},
-            {"pieces", k}
+            {"dims", this -> board.get_shape()},
+            {"armies", k},
+            {"player_index", player_index},
+            {"__type__", "Board"}
         };
     }
+
+
+
+    // INTERNAL SERIALIZATION 
 
     json serialize() const {
         json promoting;
@@ -201,16 +217,18 @@ struct game::SerializableInstance : public Instance<n, p>{
             sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
             const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
             
-            Action<n> action(start, end);
-            
-            this -> set_current_action(action);
+            this -> set_current_action(start, end);
 
             bool auto_promote = this -> update_promoting(piece);
 
             this->move_json = json::object();
             
             this -> move_json["__type__"] = "Event";
-            this -> move_json["action"] = action;
+            this -> move_json["action"] = {
+                {"__type__", "Action"}
+                {"start", start},
+                {"end", end}
+            };
             
             if (target_piece != nullptr){
                 this -> move_json["die"] = target_piece -> position;

@@ -10,7 +10,7 @@ from netlib.serialization import serialize, deserialize
 from netlib.server import Server, SenderClient, Address
 from netlib import logs
 
-from files.logic.game import Event
+from files.logic.logic import Event
 from files.logic.sets import GameSet
 import random
 
@@ -144,7 +144,7 @@ class OnlineGame(Server):
 
 
 from files.ui.windows import GameWindow
-from files.logic.game import Event, Game
+from files.logic.logic import Event, Game
 from files.ui.av import AVType, to_AV, new_window
 import pygame as pg
 

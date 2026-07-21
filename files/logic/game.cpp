@@ -123,6 +123,7 @@ struct game::Piece{
     }
 
 
+    // TODO: instead of true/false, make promoted hold a pointer to the piece it promoted to.
     sptr<Piece<n>> promoted_piece(index_t i) {
         this -> promoted = true;
 
@@ -589,7 +590,7 @@ struct game::Instance{
             sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
             const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
 
-            this -> set_current_action(Action<n>(start, end));
+            this -> set_current_action(start, end);
 
             this -> update_promoting(piece);
         }
@@ -611,8 +612,8 @@ struct game::Instance{
             this -> update_game_status(next_in_check);
         }
 
-        void set_current_action(const Action<n>& a) {
-            this -> round -> operator[](this -> turn) = a;
+        void set_current_action(const Index<n>& start, const Index<n>& end) {
+            this -> round -> operator[](this -> turn) = Action<n>(start, end);
         }
 
         // if (piece, end) represent an illegal move, raises error.

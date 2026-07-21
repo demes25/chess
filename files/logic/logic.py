@@ -1,6 +1,6 @@
 # Demetre Seturidze
 # Chess
-# Game
+# Logic
 
 from files.logic.figures import Move, Castle, Vector, Figures
 from typing import Dict, Tuple, List, Callable, Optional

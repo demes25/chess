@@ -11,7 +11,7 @@ from netlib.serialization import serialize, deserialize, Message
 from applib.utils import Coords, Vector, ZERO_VEC
 from applib.objects import Environment
 
-from files.logic.game import Game, Status, Event
+from files.logic.logic import Game, Status, Event
 from files.logic.sets import GameSet
 from files.ui.av import AVType, to_AV, new_window
 
@@ -45,9 +45,9 @@ class GameWindow(Environment):
 
         self.av = av = to_AV(av)
 
-        board = av.GameBoard(dims=game_set.dimensions, num_players=2, player_index=player_index)
-        chatbar = av.ChatSideBar(env_height = board.shape[1], player_index=player_index)
-        statbar = av.GameSideBar(env_height = board.shape[1], player_index=player_index)
+        board = av.Board(dims=game_set.dimensions, num_players=2, player_index=player_index)
+        chatbar = av.ChatBar(env_height = board.shape[1], player_index=player_index)
+        statbar = av.SideBar(env_height = board.shape[1], player_index=player_index)
 
         board.topleft = chatbar.topright
         statbar.topleft = board.topright
@@ -75,7 +75,7 @@ class GameWindow(Environment):
 
         self.var_settings = VarSettings()
 
-        self.game_over_plaque = None
+        self.end_plaque = None
         self.promotion_plaque = None 
 
         self.text_mode = False
@@ -163,11 +163,11 @@ class GameWindow(Environment):
             self.var_settings.click_pos = event.pos
         
         if event.type == pg.MOUSEBUTTONUP and self.var_settings.click_pos is not None:
-            button = self.game_over_plaque.which_hits(event.pos, self.var_settings.click_pos)
+            button = self.end_plaque.which_hits(event.pos, self.var_settings.click_pos)
 
             if button == 'reset': 
                 result = Event(label='reset', index=self.player_index)
-                self.game_over_plaque = None 
+                self.end_plaque = None 
 
             elif button == 'quit':
                 result = self._quit()
@@ -291,17 +291,17 @@ class GameWindow(Environment):
                 self.promotion_plaque = self.board.make_promotion_plaque(piece.promotion_list, piece.player.index, piece.position)
             self.promotion_plaque.blit_onto(dest)
         else:
-            if self.game_over_plaque is None:
+            if self.end_plaque is None:
                 label = 'checkmate' if status == Status.CHECKMATE else 'stalemate' if status == Status.STALEMATE else 'timeout'
-                self.game_over_plaque = self.av.GameOverPlaque(label=label)
-                self.game_over_plaque.center = self.board.center
-            self.game_over_plaque.blit_onto(dest)
+                self.end_plaque = self.av.EndPlaque(label=label)
+                self.end_plaque.center = self.board.center
+            self.end_plaque.blit_onto(dest)
 
         
     def clear(self):
         self.board.selected_piece = None 
         self.promotion_plaque = None 
-        self.game_over_plaque = None 
+        self.end_plaque = None 
         self.timeout = False 
 
         self.var_settings = VarSettings()
