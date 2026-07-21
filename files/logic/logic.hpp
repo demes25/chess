@@ -115,17 +115,16 @@ namespace game {
     struct Instance;
 
     template<index_t n, index_t p>
+    struct Set;
+}
+
+
+namespace bind {
+    template<index_t n, index_t p>
     struct SerializableInstance;
 
     template<index_t n, index_t p>
-    void to_json(json& j, const game::SerializableInstance<n, p>& g);
-
-    template<index_t n, index_t p>
-    void from_json(json& j, game::SerializableInstance<n, p>& g);
-
-
-    template<index_t n, index_t p>
-    struct Set;
+    struct Engine;
 }
 
 

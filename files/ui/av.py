@@ -87,12 +87,11 @@ class AudioVisuals:
                 self, 
                 dims : Index, # dimensions of the game board, in tiles
                 armies : Sequence[list[Piece]], # the pieces involved 
-                player_index : int = 0, # gives the player index whose perspective we are looking from (0 if white, 1 if black)
                 enforce_player : bool = True
             ):
                 self.rank = len(dims)
                 self.num_players = len(armies)
-                self.player_index = player_index
+                self.player_index = 0
 
                 self.enforce_player = enforce_player
 
@@ -107,13 +106,6 @@ class AudioVisuals:
 
                 self.COLS, self.ROWS = self.dims = dims
                 super().__init__(assets.tiles_to_coords(dims))
-
-                for i in range(self.ROWS):
-                    for j in range(self.COLS):
-                        # Alternate color based on position
-                        tile = assets.colored_tiles[(i+j + player_index) % self.num_players]
-
-                        self.surface.blit(tile, assets.tiles_to_coords((j, i)))
                 
 
                 self.grid : Grid[Piece] = Grid(dims)
@@ -162,6 +154,15 @@ class AudioVisuals:
                     "player_index" : self.player_index
                 }
             
+            def set_player(self, player_index : int):
+                self.player_index = player_index
+
+                for i in range(self.ROWS):
+                    for j in range(self.COLS):
+                        # Alternate color based on position
+                        tile = assets.colored_tiles[(i+j + player_index) % self.num_players]
+
+                        self.surface.blit(tile, assets.tiles_to_coords((j, i)))
 
 
             def make_promotion_plaque(self, piece : Piece, board_pos : Index):
@@ -370,57 +371,56 @@ class AudioVisuals:
                     self.cache = None
             
 
-            def register(self, event : Event | Response) -> tuple[int, Piece] | None:
+            def register_event(self, event : Event) -> tuple[int, Piece] | None:
                 result = None 
 
-                if isinstance(event, Event):
+                self.revert_cache()
+
+                action = event.action
+
+                piece : Piece = self.grid[action.start]
+                player_index = piece.player_index
+                piece.resolve_move(action.end)
+
+                if event.die is not None:
+                    die = self.grid[event.die]
+                    result = (player_index, die)
+
+                    self.armies[die.player_index].remove(result)
+                    self.grid[event.die] = None
+
+                    self.play("take")
+                else:
+                    self.play("move")
+                
+                if event.promote is not None:
+                    piece.resolve_promote(event.promote)
+                    self.promotion_plaque = None
+
+                    self.play("promote")
+                
+                if event.end is not None:
+                    self.make_end_plaque(label=event.end)
+
+                    self.play("end")
+            
+            def register_response(self, response : Response):
+                    
+                if self.cache is not None and response.label == "promote":
+                    self.make_promotion_plaque(
+                        self.cache.start_piece, self.cache.action.end
+                    )
+                elif response.label == "error":
                     self.revert_cache()
-
-                    action = event.action
-
-                    piece : Piece = self.grid[action.start]
-                    player_index = piece.player_index
-                    piece.resolve_move(action.end)
-
-                    if event.die is not None:
-                        die = self.grid[event.die]
-                        result = (player_index, die)
-
-                        self.armies[die.player_index].remove(result)
-                        self.grid[event.die] = None
-
-                        self.play("take")
-                    else:
-                        self.play("move")
                     
-                    if event.promote is not None:
-                        piece.resolve_promote(event.promote)
-                        self.promotion_plaque = None
+                    if self.play_sound_if_next_error:
+                        self.play('illegal')
 
-                        self.play("promote")
-                    
-                    if event.end is not None:
-                        self.make_end_plaque(label=event.end)
-
-                        self.play("end")
-                    
-                elif isinstance(event, Response):
-                    if self.cache is not None and event.label == "promote":
-                        self.make_promotion_plaque(
-                            self.cache.start_piece, self.cache.action.end
-                        )
-                    elif event.label == "error":
-                        self.revert_cache()
-                        
-                        if self.play_sound_if_next_error:
-                            self.play('illegal')
-
-                        print(event.content)
-                        self.deselect_squares()
+                    print(response.content)
+                    self.deselect_squares()
                 
                 self.play_sound_if_next_error = True
 
-                return result
 
             # CONTROLS
 
@@ -809,12 +809,12 @@ class AudioVisuals:
             def defocus(self):
                 self.entry_box.hide_pointer()
 
-            def register(self, text_or_chat : Text | Chat):
-                if isinstance(text_or_chat, Text):
-                    self.chat_box.register(text_or_chat.content, color=self.text_colors[text_or_chat.index])
-                else:
-                    for text in text_or_chat.content:
-                        self.chat_box.register(text.content, color=self.text_colors[text.index])
+            def register_text(self, text : Text):
+                self.chat_box.register(text.content, color=self.text_colors[text.index])
+                
+            def register_chat(self, chat : Chat):
+                for text in chat.content:
+                    self.chat_box.register(text.content, color=self.text_colors[text.index])
             
             def drain(self) -> Text | None:
                 content = self.entry_box.clear()
@@ -878,7 +878,9 @@ class AudioVisuals:
 
                 super().__init__(shape)
 
+                board.set_player(player_index)
                 self.board = self['board'] = board
+                
                 self.chatbar = self['chatbar'] = chatbar
                 self.statbar = self['statbar'] = statbar
 
@@ -916,17 +918,27 @@ class AudioVisuals:
                 self.focus = focus
 
 
-            def register(self, msg : InMessage):
-                if isinstance(msg, (Event, Response)):
-                    result = self.board.register(msg)
+            def register(self, msg : InMessage | Board):
+                if isinstance(msg, Board):
+                    msg.set_player(self.player_index)
+                    self.board = msg
+                    self['board'] = msg
+            
+                elif isinstance(msg, Response):
+                    self.board.register_response(msg)
+                    if msg.label == "times":
+                        self.statbar.set_times(msg.content)
+                
+                elif isinstance(msg, Event):
+                    result = self.board.register_event(msg)
                     if result is not None:
                         self.statbar.add(*result)
 
-                elif isinstance(msg, (Text, Chat)):
-                    self.chatbar.register(msg)
+                elif isinstance(msg, Text):
+                    self.chatbar.register_text(msg)
                 
-                if isinstance(msg, Response):
-                    pass
+                elif isinstance(msg, Chat):
+                    self.chatbar.register_chat(msg)
 
 
             # checks if the pygame event is global and executes
