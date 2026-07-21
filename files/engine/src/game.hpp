@@ -331,6 +331,10 @@ namespace game{
             return inst.print_help(os, 0, index);
         }
 
+        const Board<n>& look() const {
+            return this -> board;
+        }
+
         protected:
             Board<n> board;
             Tuple<Player<n>, p> players;

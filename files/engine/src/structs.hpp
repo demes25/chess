@@ -504,12 +504,10 @@ namespace structs {
             arith_t result = 0;
 
             for (index_t i = 0; i < n; ++i){
-                if (unit[i] == 0) {
-                    if (this -> at(i) != 0){
-                        return 0;
-                    } else {
-                        continue;
-                    }
+                if ((unit[i] == 0) != (this -> at(i) == 0)) {
+                    return 0;
+                } else if (unit[i] == 0){
+                    continue;
                 } else {
                     arith_t scale = (this -> at(i)/unit[i]);
 
@@ -834,7 +832,7 @@ namespace structs {
                 arith_t i = 0;
 
                 for (index_t j = 0; j < n; ++j){
-                    i += (this -> axis_size(j)*vector[j]);
+                    i += (((arith_t)(this -> axis_size(j)))*vector[j]);
                 }
 
                 return i;

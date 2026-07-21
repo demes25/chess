@@ -38,11 +38,15 @@ while True:
     for outward in out_queue:
         if isinstance(outward, Request) and outward.content == 'quit':
             quit()
-        in_queue.append(deserialize(engine.process(serialize(outward))))
+        in_queue.append(engine.process(serialize(outward)))
+
+        print("OUT " + serialize(outward))
     
-    in_queue.append(deserialize(engine.times()))
     for inward in in_queue:
-        frontend.register(inward)
+        print("IN " + inward)
+        frontend.register(deserialize(inward))
+
+    frontend.register(deserialize(engine.times()))
     
     in_queue = []
 

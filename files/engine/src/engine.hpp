@@ -127,8 +127,9 @@ struct SerializableInstance : public Instance<n, p>{
                 times.push_back(
                     (this -> times[i] - elapsed_time).count()
                 );
+            } else {
+                times.push_back(this -> times[i].count());
             }
-            times.push_back(this -> times[i].count());
         }
 
         return times;
