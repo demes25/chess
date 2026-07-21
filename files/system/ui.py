@@ -9,13 +9,13 @@ from dataclasses import dataclass
 
 from applib import objects
 from applib.text import TextEntry, TextRecord
-from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
+from applib.utils import Color, Coords, Surface, Sound, new_surface, Vector, ZERO_VEC, phase
 from applib.controls import Controllable, EventUI
 
 from netlib.serialization import Serializable
 
 from files.media.assets import Assets
-from files.logic.pyutils import Index, Grid, Text, Chat, Response, Request, Action, Promotion, Event, InMessage, OutMessage
+from files.engine.pyutils import Index, Grid, Text, Chat, Response, Request, Action, Promotion, Event, InMessage, OutMessage
 
 import pygame as pg
 
@@ -55,10 +55,6 @@ class UserInterface:
                 self.board_pos = position            
 
 
-            def resolve_move(self, target_index : Index):
-                self.board_pos = target_index
-                self.topleft = assets.tiles_to_coords(target_index)
-
             def resolve_promote(self, index : int):
                 self.surface = self.promotion_list[index]
                 self.promotion_list = []
@@ -82,7 +78,7 @@ class UserInterface:
             end_piece : Piece | None = None
          
 
-        class Board(objects.Structure, Serializable, Controllable):    
+        class Board(objects.Structure, Serializable, Controllable[OutMessage]):    
             def __init__(
                 self, 
                 dims : Index, # dimensions of the game board, in tiles
@@ -266,7 +262,7 @@ class UserInterface:
                 if self.player_index == 1:
                     J = self.dims[1] - J - 1
 
-                return I, J
+                return int(I), int(J)
 
             # translates a square on the board to its center point on the screen
             # if to_global is true, takes into account that topleft may not be (0, 0).
@@ -292,7 +288,7 @@ class UserInterface:
                     i += (self.origin[0] + self.topleft[0])
                     j += (self.origin[1] + self.topleft[1])
 
-                return i, j 
+                return int(i), int(j) 
             
 
         
@@ -302,7 +298,7 @@ class UserInterface:
                 if piece is not None:
                     self.selected_piece = piece
 
-                    self.select_square(piece.board_position)
+                    self.select_square(piece.board_pos)
                     self.hold_selected = True
                 else:
                     self.deselect_squares()
@@ -320,7 +316,7 @@ class UserInterface:
                 self.selected_squares.append(obj) 
 
             def deselect_piece(self):
-                self.selected_piece.topleft = self.coords(self.selected_piece.board_pos)
+                self.selected_piece.topleft = self.coords(self.selected_piece.board_pos, to_global=False)
                 self.selected_piece = None
                 self.hold_selected = False 
 
@@ -375,34 +371,48 @@ class UserInterface:
                 result = None 
 
                 self.revert_cache()
+                self.deselect_piece()
+
+                sounds : list[Sound] = []
 
                 action = event.action
 
                 piece : Piece = self.grid[action.start]
-                player_index = piece.player_index
-                piece.resolve_move(action.end)
+
+                piece.board_pos = action.end
+                piece.topleft = self.coords(action.end, to_global=False)
 
                 if event.die is not None:
                     die = self.grid[event.die]
-                    result = (player_index, die)
+                    result = (piece.player_index, die)
 
-                    self.armies[die.player_index].remove(result)
+                    self.armies[die.player_index].remove(die)
                     self.grid[event.die] = None
 
-                    self.play("take")
+                    sounds.append("take")
                 else:
-                    self.play("move")
+                    sounds.append("move")
+
+                
+                
+                self.grid[action.start] = None
+                self.grid[action.end] = piece
                 
                 if event.promote is not None:
                     piece.resolve_promote(event.promote)
                     self.promotion_plaque = None
 
-                    self.play("promote")
+                    sounds.append("promote")
                 
                 if event.end is not None:
                     self.make_end_plaque(label=event.end)
 
-                    self.play("end")
+                    sounds.append("end")
+                
+                for sound in sounds:
+                    self.play(sound)
+                
+                return result
             
             def register_response(self, response : Response):
                     
@@ -415,6 +425,9 @@ class UserInterface:
                     
                     if self.play_sound_if_next_error:
                         self.play('illegal')
+                        self.deselect_piece()
+                    else:
+                        self.hold_selected = False
 
                     print(response.content)
                     self.deselect_squares()
@@ -440,7 +453,7 @@ class UserInterface:
                             self.deselect_squares()
                             self.select_piece(target)
                         elif target != selected:
-                            result = self._request_move(selected.board_pos, pos, from_global=True)
+                            result = self._request_move(selected.board_pos, pos)
                             self.select_square(pos)    
                             self.deselect_piece()
                             self.play_sound_if_next_error = False 
@@ -459,6 +472,9 @@ class UserInterface:
                         else:
                             self.hold_selected = False 
                 
+                if self.selected_piece is not None and self.hold_selected:
+                    self.selected_piece.global_center = pg.mouse.get_pos()
+
                 return result
                     
             def _handle_gameover(self, event : EventUI) -> OutMessage | None:
@@ -555,7 +571,7 @@ class UserInterface:
 
 
             def blit_onto(self, dest : Surface | objects.Object):
-                if self.time_surface is not None:
+                if self.time_surface is None:
                     super().blit_onto(dest)
                 else:
                     surface = self.surface.copy()
@@ -827,7 +843,7 @@ class UserInterface:
                     index=self.player_index 
                 )
 
-                self.register(text)
+                self.register_text(text)
 
                 return text
             
@@ -943,7 +959,7 @@ class UserInterface:
 
             # checks if the pygame event is global and executes
             # this is defined because it will be used across all event loops
-            def global_handler(self, event : EventUI, queue : list[OutMessage]):
+            def global_handle(self, event : EventUI, queue : list[OutMessage]):
                 result = None 
                 if event.type == pg.QUIT:
                     result = self._quit()
@@ -951,7 +967,7 @@ class UserInterface:
                 if event.type == pg.MOUSEBUTTONDOWN:
                     self.adjust_focus(event.pos)
                 
-                if event.type == pg.MOUSEBUTTONUP and not self.focus.hits(event.pos):
+                if event.type == pg.MOUSEBUTTONUP and self.focus is not None and not self.focus.hits(event.pos):
                     self.focus = None
                 
                 if result is not None:
@@ -961,7 +977,8 @@ class UserInterface:
             # handles the event.
             # subhandlers are defined above for text, ingame, game_over, and promotion environments    
             def handle(self, event : EventUI, queue : list[OutMessage]):
-                self.focus.handle(event, queue)
+                if self.focus is not None:
+                    self.focus.handle(event, queue)
 
 
             def reset(self, board : Board):
@@ -973,7 +990,7 @@ class UserInterface:
 
             def _quit(self) -> Event:
                 self.running = False 
-                return Event('quit', index=self.player_index)
+                return Request(index=self.player_index, content='quit')
 
         
         this.Piece = Piece

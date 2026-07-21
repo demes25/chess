@@ -19,7 +19,7 @@ class Grid(Generic[T], Iterable[T]):
 
         self._rank = len(dims)
         self._shape = tuple(dims)
-        _sizes = self._rank
+        _sizes = [1] * self._rank
 
         for i in range(self._rank-2, -1, -1):
             _sizes[i] = self._shape[i+1]*_sizes[i+1]

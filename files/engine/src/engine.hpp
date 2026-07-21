@@ -6,14 +6,14 @@
 #ifndef ENGINE
 #define ENGINE
 
-#include"logic.hpp"
+#include"game.hpp"
 
 using namespace structs;
 using namespace game;
 using namespace moves;
 
 template <index_t n, index_t p>
-struct engine::SerializableInstance : public Instance<n, p>{
+struct SerializableInstance : public Instance<n, p>{
     using Instance<n, p>::Instance;
 
     SerializableInstance(SerializableInstance&&) = default;
@@ -122,6 +122,12 @@ struct engine::SerializableInstance : public Instance<n, p>{
         json times = json::array();
 
         for (index_t i = 0; i < p; i++){
+            if (i == this -> turn && this -> status > UNBEGUN){
+                duration elapsed_time = std::chrono::duration_cast<duration>(timer::now() - this -> turn_start_time);
+                times.push_back(
+                    (this -> times[i] - elapsed_time).count()
+                );
+            }
             times.push_back(this -> times[i].count());
         }
 
@@ -366,7 +372,7 @@ struct engine::SerializableInstance : public Instance<n, p>{
         static json players_to_json(const Tuple<Player<n>, p>& ps){
             json j = json::array();
 
-            for (index_t k; k < p; k++){
+            for (index_t k = 0; k < p; k++){
                 j.push_back(SerializableInstance::player_to_json(ps[k]));
             }
 
@@ -377,7 +383,7 @@ struct engine::SerializableInstance : public Instance<n, p>{
             
             Tuple<Player<n>, p> ps;
 
-            for (index_t k; k < p; k++){
+            for (index_t k = 0; k < p; k++){
                 ps[k] = SerializableInstance::player_from_json(j[k], board, k);
             }
 
@@ -388,7 +394,7 @@ struct engine::SerializableInstance : public Instance<n, p>{
 
 
 template <index_t n, index_t p>
-struct engine::Engine {
+struct Engine {
 
     Engine(const std::string& j_str) : setup(json::parse(j_str)) {}
 
@@ -452,8 +458,10 @@ struct engine::Engine {
     }
 
 
-    friend std::ostream& operator<<(std::ostream& os, const Engine& e){
-        return os << *(e.instance);
+    std::string to_str() const {
+        std::ostringstream oss;
+        oss << *(this -> instance);
+        return oss.str();
     }
 
     // STATIC LOADING/DEFINITIONS
@@ -466,104 +474,3 @@ struct engine::Engine {
 };
 
 #endif
-
-
-#ifdef ENGINE_TEST
-    
-#include"structs.cpp"
-#include"moves.cpp"
-#include"game.cpp"
-#include<fstream>
-
-using namespace engine;
-
-
-json follow(Engine<2, 2>& e, const std::string& s) {
-    if (s == "reset"){
-        json request = {
-            {"__type__", "Request"},
-            {"label", "reset"}
-        };
-
-        json response = json::parse(
-            e.process(request.dump())
-        );
-
-        return response;
-    }
-
-    json action = {
-        {"start", {s[0] - 'a', s[1] - '1'}},
-        {"end", {s[2] - 'a', s[3] - '1'}},
-        {"__type__", "Action"}
-    };
-
-    json result = json::parse(
-        e.process(action.dump())
-    );
-
-    if (result["__type__"] == "Response" && result["label"] == "promote"){
-        index_t i;
-        std::cin >> i;
-
-        json response = {
-            {"__type__", "Promotion"},
-            {"index", i}
-        };
-
-        result = json::parse(e.process(
-            response.dump()
-        ));
-    }
-
-    return result;
-}
-
-int main(){
-    json j;
-    json k;
-
-    std::ifstream file("figures.json");
-
-    file >> k;
-    Figure<2>::load(k);
-
-
-    file = std::ifstream("game.json");
-    if (!file) {
-        throw std::runtime_error("Could not open game.json");
-    }
-
-    file >> j;
-
-    Engine<2, 2> e(j);
-    
-    std::vector<std::string> premoves = {
-        //"d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
-        "d2d4", "e7e5", "d4e5", "d7d6", "e5d6", "d8e7", "d6e7", "c7c6"
-    };
-
-
-    std::cout << e.begin() << std::endl;
-
-    for (const std::string& s : premoves){
-        follow(e, s);
-    }
-
-    std::cout << e << std::endl;
-
-    while (e.is_on()) {
-        std::string s;
-        std::cin >> s;
-
-        if (s == "restart"){
-            e.begin();
-        } else {
-            json result = follow(e, s);  
-            std::cout << result << std::endl;
-        }
-
-        std::cout << e << std::endl;
-    }
-}
-#endif 

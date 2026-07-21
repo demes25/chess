@@ -1,4 +1,6 @@
-files/logic/__pycache__
+files/engine/__pycache__
+files/engine/build
+
 files/media/__pycache__
 files/system/__pycache__
 files/ui/__pycache__
