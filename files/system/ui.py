@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from applib import objects
 from applib.text import TextEntry, TextRecord
 from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
-from applib.controls import Controllable, EventUI, fetch
+from applib.controls import Controllable, EventUI
 
 from netlib.serialization import Serializable
 
@@ -28,7 +28,7 @@ Dimensions = tuple[int | float, int | float]
 
 # BY DEFAULT: the argument 'dims' is in terms of TILES. so dims (5, 4) corresponds to shape (5*tile_width, 4*tile_height)
 #             margins are in terms of PIXELS. so margin 5 corresponds to shape (5*pixel_width, 5*pixel_height)
-class AudioVisuals:
+class UserInterface:
     def __init__(
         this,
         assets : Assets 
@@ -856,7 +856,7 @@ class AudioVisuals:
                     queue.append(result)
 
 
-        class GameWindow(objects.Environment, Controllable):
+        class GameInterface(objects.Environment, Controllable):
             def __init__(
                 self,
                 
@@ -985,7 +985,7 @@ class AudioVisuals:
         this.SideBar = SideBar
         this.ChatBar = ChatBar
 
-        this.GameWindow = GameWindow
+        this.GameInterface = GameInterface
 
 
 def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):
@@ -1001,12 +1001,12 @@ def new_window(size : Coords, caption : str | None = None, icon : Surface | obje
         
 
 
-AVType = AudioVisuals | Assets | Coords | tuple[float, float] | Dimensions | int | float
+UIType = UserInterface | Assets | Coords | tuple[float, float] | Dimensions | int | float
 
-def to_AV(obj : AVType):
-    if isinstance(obj, AudioVisuals):
+def to_UI(obj : UIType):
+    if isinstance(obj, UserInterface):
         return obj
     if isinstance(obj, Assets):
-        return AudioVisuals(assets=obj)
+        return UserInterface(assets=obj)
     else:
-        return AudioVisuals(assets=Assets(scaling=obj))
+        return UserInterface(assets=Assets(scaling=obj))

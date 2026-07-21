@@ -145,7 +145,7 @@ class OnlineGame(Server):
 
 from files.ui.windows import GameWindow
 from files.logic.logic import Event, Game
-from files.ui.av import AVType, to_AV, new_window
+from files.system.ui import AVType, to_AV, new_window
 import pygame as pg
 
 class OnlinePlayer(SenderClient):

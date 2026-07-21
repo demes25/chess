@@ -1,6 +1,6 @@
 // Demetre Seturidze
 // Chess
-// Instances
+// Engine
 
 
 #ifndef ENGINE
@@ -10,6 +10,7 @@
 
 using namespace structs;
 using namespace game;
+using namespace moves;
 
 template <index_t n, index_t p>
 struct engine::SerializableInstance : public Instance<n, p>{
@@ -70,6 +71,8 @@ struct engine::SerializableInstance : public Instance<n, p>{
             return this -> execute(start, end);
         } else if (a["__type__"] == "Promotion") {
             return this -> promote(a["index"]);
+        } else {
+            throw std::invalid_argument("Invalid json.");
         }
     }
 
@@ -230,7 +233,7 @@ struct engine::SerializableInstance : public Instance<n, p>{
             
             this -> move_json["__type__"] = "Event";
             this -> move_json["action"] = {
-                {"__type__", "Action"}
+                {"__type__", "Action"},
                 {"start", start},
                 {"end", end}
             };
@@ -387,8 +390,7 @@ struct engine::SerializableInstance : public Instance<n, p>{
 template <index_t n, index_t p>
 struct engine::Engine {
 
-    Engine(const json& j) : setup(j) {}
-
+    Engine(const std::string& j_str) : setup(json::parse(j_str)) {}
 
     Engine(const std::string& name, double timer) : setup(json::parse(Engine::sets[name])) {
         json times = json::array();
@@ -396,14 +398,14 @@ struct engine::Engine {
             times.push_back(timer);
         }
 
-        setup["times"] = times
+        setup["times"] = times;
     }
 
 
     std::string begin() {
-        SerializableInstance<n, p> inst = SerializableInstance<n, p>::deserialize(this -> setup)
+        SerializableInstance<n, p> inst = SerializableInstance<n, p>::deserialize(this -> setup);
         this -> instance = std::make_unique<SerializableInstance<n, p>>(std::move(inst));
-        return this -> layout()
+        return this -> layout();
     }
 
     std::string layout() const{
@@ -411,21 +413,21 @@ struct engine::Engine {
     }
 
     std::string times() const {
-        return {
+        return json({
             {"label", "times"},
             {"content", this -> instance -> serialize_times()},
             {"__type__", "Response"}
-        };
+        }).dump();
     }
 
     std::string process(const std::string& j_str){
-        json j = json::parse(str);
+        json j = json::parse(j_str);
         
         if (j["__type__"] == "Request"){
             if (j["label"] == "reset"){
                 return this -> begin();
             } else if (j["label"] == "quit"){
-                //TODO
+                // TODO
             }
         } 
 
@@ -433,18 +435,26 @@ struct engine::Engine {
         return result.dump();
     }
 
+    bool is_on() const {
+        return !(this -> instance == nullptr || this -> instance -> is_over());
+    }
+
 
     std::string save() const {
         return this -> instance -> serialize().dump();
     }
 
-    std::string load(const std::string& s) const {
-        json setup = json::parse(s);
-        SerializableInstance<n, p> inst = SerializableInstance<n, p>::deserialize(setup)
+    std::string load(const std::string& j_str) {
+        json setup = json::parse(j_str);
+        SerializableInstance<n, p> inst = SerializableInstance<n, p>::deserialize(setup);
         this -> instance = std::make_unique<SerializableInstance<n, p>>(std::move(inst));
-        return this -> layout()
+        return this -> layout();
     }
 
+
+    friend std::ostream& operator<<(std::ostream& os, const Engine& e){
+        return os << *(e.instance);
+    }
 
     // STATIC LOADING/DEFINITIONS
 
@@ -458,8 +468,6 @@ struct engine::Engine {
 #endif
 
 
-#define ENGINE_TEST
-
 #ifdef ENGINE_TEST
     
 #include"structs.cpp"
@@ -470,17 +478,42 @@ struct engine::Engine {
 using namespace engine;
 
 
-json follow(SerializableInstance<2, 2>& g, const std::string& s) {
-    Index<2> start = g.as_index(Tup<2>(s[0] - 'a', s[1] - '1'));
-    Index<2> end = g.as_index(Tup<2>(s[2]-'a', s[3] - '1'));
+json follow(Engine<2, 2>& e, const std::string& s) {
+    if (s == "reset"){
+        json request = {
+            {"__type__", "Request"},
+            {"label", "reset"}
+        };
 
-    json result = g.execute(start, end);
+        json response = json::parse(
+            e.process(request.dump())
+        );
 
-    if (result["__type__"] == "Request" && result["content"] == "promote"){
+        return response;
+    }
+
+    json action = {
+        {"start", {s[0] - 'a', s[1] - '1'}},
+        {"end", {s[2] - 'a', s[3] - '1'}},
+        {"__type__", "Action"}
+    };
+
+    json result = json::parse(
+        e.process(action.dump())
+    );
+
+    if (result["__type__"] == "Response" && result["label"] == "promote"){
         index_t i;
         std::cin >> i;
 
-        result = g.promote(i);
+        json response = {
+            {"__type__", "Promotion"},
+            {"index", i}
+        };
+
+        result = json::parse(e.process(
+            response.dump()
+        ));
     }
 
     return result;
@@ -503,29 +536,34 @@ int main(){
 
     file >> j;
 
-    SerializableInstance<2, 2> g = SerializableInstance<2, 2>::deserialize(j);
-
+    Engine<2, 2> e(j);
+    
     std::vector<std::string> premoves = {
         //"d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
         "d2d4", "e7e5", "d4e5", "d7d6", "e5d6", "d8e7", "d6e7", "c7c6"
     };
 
+
+    std::cout << e.begin() << std::endl;
+
     for (const std::string& s : premoves){
-        follow(g, s);
+        follow(e, s);
     }
 
-    std::cout << g.serialize() << std::endl;
+    std::cout << e << std::endl;
 
-    std::cout << g << std::endl;
-
-    while (!g.is_over()) {
+    while (e.is_on()) {
         std::string s;
         std::cin >> s;
 
-        json result = follow(g, s);
+        if (s == "restart"){
+            e.begin();
+        } else {
+            json result = follow(e, s);  
+            std::cout << result << std::endl;
+        }
 
-        std::cout << result << std::endl;
-        std::cout << g << std::endl;
+        std::cout << e << std::endl;
     }
 }
 #endif 
