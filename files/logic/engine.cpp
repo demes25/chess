@@ -12,7 +12,7 @@ using namespace structs;
 using namespace game;
 
 template <index_t n, index_t p>
-struct bind::SerializableInstance : public Instance<n, p>{
+struct engine::SerializableInstance : public Instance<n, p>{
     using Instance<n, p>::Instance;
 
     SerializableInstance(SerializableInstance&&) = default;
@@ -385,10 +385,10 @@ struct bind::SerializableInstance : public Instance<n, p>{
 
 
 template <index_t n, index_t p>
-struct bind::Engine {
+struct engine::Engine {
 
     Engine(const json& j) : setup(j) {}
-    
+
 
     Engine(const std::string& name, double timer) : setup(json::parse(Engine::sets[name])) {
         json times = json::array();
@@ -434,6 +434,18 @@ struct bind::Engine {
     }
 
 
+    std::string save() const {
+        return this -> instance -> serialize().dump();
+    }
+
+    std::string load(const std::string& s) const {
+        json setup = json::parse(s);
+        SerializableInstance<n, p> inst = SerializableInstance<n, p>::deserialize(setup)
+        this -> instance = std::make_unique<SerializableInstance<n, p>>(std::move(inst));
+        return this -> layout()
+    }
+
+
     // STATIC LOADING/DEFINITIONS
 
     private:
@@ -455,7 +467,7 @@ struct bind::Engine {
 #include"game.cpp"
 #include<fstream>
 
-using namespace bind;
+using namespace engine;
 
 
 json follow(SerializableInstance<2, 2>& g, const std::string& s) {

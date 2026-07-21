@@ -119,7 +119,7 @@ namespace game {
 }
 
 
-namespace bind {
+namespace engine {
     template<index_t n, index_t p>
     struct SerializableInstance;
 
