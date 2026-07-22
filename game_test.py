@@ -18,9 +18,8 @@ with open("files/engine/game.json") as f:
 
 engine = Engine(game)
 board = deserialize(engine.begin())
-board.enforce_player = False
 
-frontend = ui.GameInterface(board, 0)
+frontend = ui.GameInterface(board, 0, False)
 
 pg.init()
 pg.display.init()

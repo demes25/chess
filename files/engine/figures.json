@@ -6,23 +6,26 @@
         "move_list" : [
             {
                 "directions" : [[0, 1]],
-                "relative_capture" : [0, 0],
                 "captures" : false,
-                "moves" : true
+                "__move__" : "Move"
             },
             {
                 "directions" : [[1, 1], [-1, 1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : false
+                "moves" : false,
+                "__move__" : "Move"
+            },
+            {
+                "directions" : [[1, 1], [-1, 1]],
+                "relative_capture" : [0, -1],
+                "__move__" : "EnPassant"
             }
         ],
         "opener_list" : [
             {
                 "directions" : [[0, 2]],
-                "relative_capture" : [0, 0],
                 "captures" : false,
-                "moves" : true
+                "only_opens" : true,
+                "__move__" : "Move"
             }
         ],
         "open_exclusive" : false
@@ -35,23 +38,26 @@
         "move_list" : [
             {
                 "directions" : [[0, -1]],
-                "relative_capture" : [0, 0],
                 "captures" : false,
-                "moves" : true
+                "__move__" : "Move"
             },
             {
                 "directions" : [[1, -1], [-1, -1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : false
+                "moves" : false,
+                "__move__" : "Move"
+            },
+            {
+                "directions" : [[1, -1], [-1, -1]],
+                "relative_capture" : [0, 1],
+                "__move__" : "EnPassant"
             }
         ],
         "opener_list" : [
             {
                 "directions" : [[0, -2]],
-                "relative_capture" : [0, 0],
                 "captures" : false,
-                "moves" : true
+                "only_opens" : true,
+                "__move__" : "Move"
             }
         ],
         "open_exclusive" : false
@@ -64,13 +70,13 @@
         "move_list" : [
             {
                 "directions" : [[0, 1], [1, 0], [1, 1], [1, -1], [0, -1], [-1, 0], [-1, -1], [-1, 1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : true
+                "__move__" : "Move"
             }
         ],
         "opener_list" : [
-            
+            {
+                "__move__" : "Castle"
+            }
         ],
         "open_exclusive" : false
     },
@@ -82,13 +88,7 @@
         "move_list" : [
             {
                 "directions" : [[0, 1], [1, 0], [1, 1], [1, -1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : true,
-                "min_steps" : 1,
-                "max_steps" : -1,
-                "min_obstacles" : 0,
-                "max_obstacles" : 0
+                "__move__" : "Span"
             }
         ],
         "opener_list" : [
@@ -104,13 +104,7 @@
         "move_list" : [
             {
                 "directions" : [[0, 1], [1, 0]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : true,
-                "min_steps" : 1,
-                "max_steps" : -1,
-                "min_obstacles" : 0,
-                "max_obstacles" : 0
+                "__move__" : "Span"
             }
         ],
         "opener_list" : [
@@ -126,13 +120,7 @@
         "move_list" : [
             {
                 "directions" : [[1, 1], [1, -1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : true,
-                "min_steps" : 1,
-                "max_steps" : -1,
-                "min_obstacles" : 0,
-                "max_obstacles" : 0
+                "__move__" : "Span"
             }
         ],
         "opener_list" : [
@@ -148,9 +136,7 @@
         "move_list" : [
             {
                 "directions" : [[1, 2], [1, -2], [-1, 2], [-1, -2], [2, 1], [2, -1], [-2, 1], [-2, -1]],
-                "relative_capture" : [0, 0],
-                "captures" : true,
-                "moves" : true
+                "__move__" : "Move"
             }
         ],
         "opener_list" : [

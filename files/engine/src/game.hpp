@@ -27,7 +27,7 @@ namespace game{
         mutable bool dead;
 
         mutable bool has_moved;
-        mutable bool just_opened;
+        mutable bool just_opened; // JUST_OPENED marks a piece that played its first move in the current round, and the first move was marked "ONLY_OPENS".
 
         Piece(
             Index<n>&& position, 
@@ -150,15 +150,19 @@ namespace game{
         std::vector<sptr<Piece<n>>> pieces;
         std::vector<sptr<Piece<n>>> monarchs;
 
+        std::vector<sptr<Piece<n>>> just_opened; // a list of pieces that were JUST_OPENED
+
         Player(
             index_t index, 
             value_t material, 
             std::vector<sptr<Piece<n>>>&& pieces, 
-            std::vector<sptr<Piece<n>>>&& monarchs
+            std::vector<sptr<Piece<n>>>&& monarchs,
+            std::vector<sptr<Piece<n>>>&& just_opened = std::move(std::vector<sptr<Piece<n>>>())
         ) : index(index), 
             material(material), 
             pieces(std::forward<std::vector<sptr<Piece<n>>>>(pieces)), 
-            monarchs(std::forward<std::vector<sptr<Piece<n>>>>(monarchs)) {}
+            monarchs(std::forward<std::vector<sptr<Piece<n>>>>(monarchs)),
+            just_opened(std::forward<std::vector<sptr<Piece<n>>>>(just_opened)) {}
 
         Player() : index(0), material(0), pieces(), monarchs() {}
 
@@ -168,6 +172,18 @@ namespace game{
 
         Player& operator=(Player&&) = default;
         Player& operator=(const Player&) = default;
+
+        // PREPS FOR THE NEXT TURN
+        // i.e. all pieces that JUST_OPENED in the last turn will have JUST_OPENED set to false
+        void drain_last_opened() {
+            if (!this -> just_opened.empty()){
+                for (sptr<Piece<n>>& piece : this -> just_opened){
+                    piece -> just_opened = false;
+                }
+
+                this -> just_opened = std::vector<sptr<Piece<n>>>();
+            }
+        }
 
         bool pieces_see(const Board<n>& board, const Index<n>& target) const {
             for (const sptr<Piece<n>>& piece : this -> pieces){
@@ -499,6 +515,19 @@ namespace game{
 
                 return std::move(checks);
             }
+            
+            // returns true if any OTHER players see the given square
+            bool is_unsafe(const Index<n>& square, index_t player_index) const {
+                for (index_t i = 0; i < p; i++){
+                    if (i != player_index){
+                        const Player<n>& opponent = this -> players[i];
+                        if (opponent.pieces_see(this -> board, square)){
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
 
             // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
             bool in_check(index_t player_index) const {
@@ -507,13 +536,8 @@ namespace game{
                 if (player.monarchs.size() == 1){
                     const sptr<Piece<n>>& king = player.monarchs[0];
 
-                    for (index_t i = 0; i < p; i++){
-                        if (i != player_index){
-                            const Player<n>& opponent = this -> players[i];
-                            if (opponent.pieces_see(this -> board, king -> position)){
-                                return true;
-                            }
-                        }
+                    if (this -> is_unsafe(king -> position, player_index)){
+                        return true;
                     }
                 }
 
@@ -532,8 +556,29 @@ namespace game{
                 piece -> populate(result, this -> board);
 
                 for (Index<n> j(result); j.is_valid(); ++j){
-                    if (result[j] != nullptr){
-                        if (this -> walks_into_check(piece, j)){
+                    const Move<n>* sp = result[j];        
+                    if (sp != nullptr){
+                        if (sp -> type_str() == "Castle"){
+                            Vector<n> displacement = j - (piece -> position);
+                            Vector<n> unit = sp -> operator[](0);
+
+                            arith_t scaling = displacement | unit;
+
+                            Vector<n> direction = (scaling < 0) ? -unit : unit;
+                            index_t lim = (scaling < 0) ? -scaling : scaling;
+                            
+                            Index<n> tracker = piece -> position;
+
+                            for (index_t t = 0; t <= lim; t++){
+                                if (this -> is_unsafe(tracker, piece -> player_index)){
+                                    result[j] = nullptr;
+                                    break;
+                                }
+
+                                tracker += direction;
+                            }
+
+                        } else if (this -> walks_into_check(piece, j)){
                             result[j] = nullptr;
                         }
                     }
@@ -568,6 +613,16 @@ namespace game{
                 return result;
             }
 
+            // updates the internal flags of the given piece depending on the move
+            void abide(const sptr<Piece<n>>& piece, const sptr<Move<n>>& move) {
+                if (!piece -> has_moved){
+                    piece -> has_moved = true;
+                    if (move -> only_opens) {
+                        piece -> just_opened = move -> only_opens;
+                        this -> players[piece -> player_index].just_opened.push_back(piece);
+                    }
+                } 
+            }
 
 
 
@@ -655,27 +710,78 @@ namespace game{
             // i.e. -- captures any pieces that need to be captured, updates positions, etc...
             // if the given move "walks into" check, undoes everything and raises error.
             // otherwise, returns a pointer to the piece, if any, that was captured.
+            //
+            // IF the given move is a castle, then checks for castle validity (i.e. not to castle through check) and returns the partner piece (i.e. the rook)
             sptr<Piece<n>> adjust_board_and_get_target(sptr<Piece<n>> piece, sptr<Move<n>> move, const Index<n>& start, const Index<n>& end) {
-                sptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
-                sptr<Piece<n>> end_piece = this -> board[end];
+                if (move -> type_str() == "Castle"){
+                    Vector<n> displacement = end - start;
+                    Vector<n> unit = move -> operator[](0);
 
-                this -> kill(target_piece);
+                    index_t axis = unit.first_nonzero();
 
-                piece -> position = end;
-                this -> board[start] = nullptr;
-                this -> board[end] = piece;
+                    arith_t scaling = displacement | unit;
 
-                if (this -> in_check(this -> turn)) {
-                    piece -> position = start;
-                    this -> board[start] = piece;
-                    this -> board[end] = end_piece;
+                    Vector<n> direction = (scaling < 0) ? -unit : unit;
+                    index_t lim = (scaling < 0) ? -scaling : scaling;
+                    
+                    Index<n> tracker = start;
 
-                    this -> unkill(target_piece);
+                    for (index_t t = 0; t <= lim; t++){
+                        if (this -> is_unsafe(tracker, piece -> player_index)){
+                            throw std::runtime_error("check");
+                        }
 
-                    throw std::runtime_error("check");
+                        tracker += direction;
+                    }
+
+                    // WE HAVE TO ACCESS THE ROOK
+                    Index<n> partner_index = start;
+                    if (scaling < 0){
+                        partner_index.zero_out(axis);
+                    } else {
+                        partner_index.max_out(axis);
+                    }
+
+                    piece -> position = end;
+                    this -> abide(piece, move);
+                    
+
+                    this -> board[start] = nullptr;
+                    this -> board[end] = piece;
+
+                    Index<n> partner_end = end-direction;
+                    sptr<Piece<n>> partner = this -> board[partner_index];
+                    
+                    partner -> position = partner_end;
+                    this -> abide(piece, move);
+                    this -> board[partner_index] = nullptr;
+                    this -> board[partner_end] = partner;
+
+                    return partner;
+                } else {
+                    sptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
+                    sptr<Piece<n>> end_piece = this -> board[end];
+
+                    this -> kill(target_piece);
+
+                    piece -> position = end;
+                    this -> board[start] = nullptr;
+                    this -> board[end] = piece;
+
+                    if (this -> in_check(this -> turn)) {
+                        piece -> position = start;
+                        this -> board[start] = piece;
+                        this -> board[end] = end_piece;
+
+                        this -> unkill(target_piece);
+
+                        throw std::runtime_error("check");
+                    }
+
+                    this -> abide(piece, move);
+
+                    return target_piece;
                 }
-
-                return target_piece;
             }
 
             // if the piece is not on its promotion square, returns false.
@@ -728,6 +834,8 @@ namespace game{
                     this -> history.emplace_back();
                     this -> round = &(this -> history.back());
                 }
+
+                this -> players[this -> turn].drain_last_opened();
             }
 
             // if the next player is in check and has no legal moves, sets status to CHECKMATE

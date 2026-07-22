@@ -244,10 +244,31 @@ struct SerializableInstance : public Instance<n, p>{
                 {"start", start},
                 {"end", end}
             };
-            
-            if (target_piece != nullptr){
+
+            if (move -> type_str() == "Castle"){
+                //TODO: LOTS of recalculating scaling with castles. not too big a deal but try to optimize at some point.
+                Vector<n> direction = move -> operator[](0);
+
+                arith_t scaling = (end - start) | direction;
+                Index<n> partner_start = target_piece -> position;
+
+                index_t axis = direction.first_nonzero();
+
+                if(scaling < 0){
+                    partner_start.zero_out(axis);
+                } else {
+                    partner_start.max_out(axis);
+                }
+
+                this -> move_json["coaction"] = {
+                    {"__type__", "Action"},
+                    {"start", partner_start},
+                    {"end", target_piece -> position}
+                };
+            } else if (target_piece != nullptr){
                 this -> move_json["die"] = target_piece -> position;
             }
+
             if (auto_promote){
                 this -> move_json["promote"] = 0;
             }
@@ -275,7 +296,8 @@ struct SerializableInstance : public Instance<n, p>{
             for (index_t i = 0; i < p; i++){
                 json_times.push_back(this -> times[i].count());
             }
-
+            
+            this -> move_json["checks"] = checks;
             this -> move_json["times"] = json_times;
             this -> move_json["duration"] = time_dif.count();
 
@@ -329,6 +351,7 @@ struct SerializableInstance : public Instance<n, p>{
         static json player_to_json(const Player<n>& pl) {
             json pieces = json::array();
             json monarchs = json::array();
+            json just_opened = json::array();
 
             for (const sptr<Piece<n>>& piece : pl.pieces){
                 pieces.push_back(SerializableInstance::piece_to_json(piece));
@@ -349,23 +372,31 @@ struct SerializableInstance : public Instance<n, p>{
         static Player<n> player_from_json(const json& j, const Board<n>& board, index_t index) {
             std::vector<sptr<Piece<n>>> pieces;
             std::vector<sptr<Piece<n>>> monarchs;
+            std::vector<sptr<Piece<n>>> just_opened;
 
             const json& jpieces = j.at("pieces");
             const json& jmonarchs = j.at("monarchs");
 
             for (const json& piece : jpieces){
                 pieces.push_back(SerializableInstance::piece_from_json(piece, board, index));
+                if (pieces.back() -> just_opened){
+                    just_opened.push_back(pieces.back());
+                }
             }
 
             for (const json& monarch : jmonarchs){
                 monarchs.push_back(SerializableInstance::piece_from_json(monarch, board, index));
+                if (monarchs.back() -> just_opened){
+                    just_opened.push_back(monarchs.back());
+                }
             }
 
             return Player<n>(
                 j.value("index", json(index)).get<index_t>(),
                 j.at("material").get<value_t>(),
                 std::move(pieces),
-                std::move(monarchs)
+                std::move(monarchs),
+                std::move(just_opened)
             );
         }
 
@@ -431,9 +462,9 @@ struct Engine {
         json j = json::parse(j_str);
         
         if (j["__type__"] == "Request"){
-            if (j["label"] == "reset"){
+            if (j["content"] == "reset"){
                 return this -> begin();
-            } else if (j["label"] == "quit"){
+            } else if (j["content"] == "quit"){
                 // TODO
             }
         } 
@@ -465,6 +496,9 @@ struct Engine {
         return oss.str();
     }
 
+    const uptr<SerializableInstance<n, p>>& unwrap() const {
+        return this -> instance;
+    }
     // STATIC LOADING/DEFINITIONS
 
     private:

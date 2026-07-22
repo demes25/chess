@@ -31,26 +31,22 @@ namespace moves {
         
         const bool captures;
         const bool moves;
-
-        Move(Move&&) = default;
-
+        const bool only_opens;
+        
         ~Move() = default;
 
-        Move(std::vector<Vector<n>>&& directions, bool captures, bool moves, Vector<n>&& relative_capture) : directions(std::forward<std::vector<Vector<n>>>(directions)),  captures(captures), moves(moves), relative_capture(relative_capture) {}
-
-        Move(std::vector<Vector<n>>&& directions, bool captures, bool moves) : directions(std::forward<std::vector<Vector<n>>>(directions)),  captures(captures), moves(moves), relative_capture(0) {}
+        Move(std::vector<Vector<n>>&& directions, bool captures = true, bool moves = true, bool only_opens=false, Vector<n>&& relative_capture = Vector<n>(0)) : directions(std::forward<std::vector<Vector<n>>>(directions)),  captures(captures), moves(moves), only_opens(only_opens), relative_capture(std::forward<Vector<n>>(relative_capture)) {}
 
         template<index_t k>
-        Move(Tuple<Vector<n>, k>&& directions, bool captures, bool moves, Vector<n>&& relative_capture) : directions(directions.into_vector()), captures(captures), moves(moves), relative_capture(relative_capture) {}
-        
-        template<index_t k>
-        Move(Tuple<Vector<n>, k>&& directions, bool captures, bool moves) : directions(directions.into_vector()), captures(captures), moves(moves), relative_capture(0) {}
-
-
-        Move& operator=(Move&&) = default;
+        Move(Tuple<Vector<n>, k>&& directions, bool captures = true, bool moves = true, bool only_opens=false, Vector<n>&& relative_capture = Vector<n>(0)) : directions(std::move(directions).into_vector()), captures(captures), moves(moves), only_opens(only_opens), relative_capture(std::forward<Vector<n>>(relative_capture)) {}
+       
 
         const Vector<n>& operator[](index_t i) const {
             return this -> directions[i];
+        }
+
+        virtual std::string type_str() const {
+            return "Move";
         }
 
         virtual bool sees(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
@@ -80,21 +76,25 @@ namespace moves {
 
         Move(const json& j) : 
             directions(j.at("directions").get<std::vector<Vector<n>>>()),
-            captures(j.at("captures").get<bool>()),
-            moves(j.at("moves").get<bool>()),
-            relative_capture(j.at("relative_capture").get<Vector<n>>()) {}
+            captures(j.value("captures", json(true)).get<bool>()),
+            moves(j.value("moves", json(true)).get<bool>()),
+            only_opens(j.value("only_opens", json(false)).get<bool>()),
+            relative_capture(j.value("relative_capture", json(Vector<n>(0))).get<Vector<n>>()) {}
 
         virtual json serialize() const {
             return {
                 {"directions", this -> directions},
                 {"captures", this -> captures},
                 {"moves", this -> moves},
-                {"relative_capture", this -> relative_capture}
+                {"only_opens", this -> only_opens},
+                {"relative_capture", this -> relative_capture},
+                {"__move__", this -> type_str()}
             };
         }
 
 
         protected:
+
             virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& target, index_t player_index) const {
                 const sptr<game::Piece<n>>& piece_at = board[target];
                 const sptr<game::Piece<n>>& takes_at = board[target + this -> relative_capture];
@@ -127,6 +127,51 @@ namespace moves {
             }
     };
 
+    template <index_t n>
+    struct EnPassant : public Move<n> {
+        const std::string target_name;
+
+        EnPassant(std::vector<Vector<n>>&& directions, Vector<n>&& relative_capture, const std::string& target_name = "Pawn") : Move<n>(std::forward<std::vector<Vector<n>>>(directions), true, false, false, std::forward<Vector<n>>(relative_capture)), target_name(target_name) {}
+
+        template<index_t k>
+        EnPassant(Tuple<Vector<n>, k>&& directions, Vector<n>&& relative_capture, const std::string& target_name = "Pawn") : Move<n>(std::forward<std::vector<Vector<n>>>(directions), true, false, false, std::forward<Vector<n>>(relative_capture)), target_name(target_name) {}
+        
+        virtual std::string type_str() const {
+            return "EnPassant";
+        }
+
+        // SERIALIZATION
+
+        EnPassant(const json& j) : 
+            EnPassant(j.at("directions").get<std::vector<Vector<n>>>(),
+                      j.at("relative_capture").get<Vector<n>>(),
+                      j.value("target_name", json("Pawn")).get<std::string>()) {}
+
+        virtual json serialize() const {
+            return {
+                {"directions", this -> directions},
+                {"relative_capture", this -> relative_capture},
+                {"target_name", this -> target_name},
+                {"__move__", this -> type_str()}
+            };
+        }
+
+
+        protected:
+            virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& target, index_t player_index) const {
+                const sptr<game::Piece<n>>& piece_at = board[target];
+                const sptr<game::Piece<n>>& takes_at = board[target + this -> relative_capture];
+
+                if (piece_at != nullptr || takes_at == nullptr || takes_at -> player_index == player_index){
+                    return false;
+                } else if (takes_at -> figure -> name == this -> target_name && takes_at -> just_opened){
+                    return true;
+                }
+
+                return false;
+            }
+    };
+
     template<index_t n>
     struct Span : public Move<n>{
         const arith_t min_steps;
@@ -135,16 +180,14 @@ namespace moves {
         const arith_t min_obstacles;
         const arith_t max_obstacles;
 
-        Span(std::vector<Vector<n>>&& directions, bool captures, bool moves) : Move<n>(std::forward<std::vector<Vector<n>>>(directions), captures, moves), min_steps(1), max_steps(-1), min_obstacles(0), max_obstacles(0) {}
-
         Span(
             std::vector<Vector<n>>&& directions, 
-            bool captures, 
-            bool moves, 
-            arith_t min_steps, 
-            arith_t max_steps, 
-            arith_t min_obstacles, 
-            arith_t max_obstacles
+            bool captures = true, 
+            bool moves = true, 
+            arith_t min_steps = 1, 
+            arith_t max_steps = -1, 
+            arith_t min_obstacles = 0, 
+            arith_t max_obstacles = 0
         ) : Move<n>(std::forward<std::vector<Vector<n>>>(directions), captures, moves), 
             min_steps(min_steps), 
             max_steps(max_steps), 
@@ -152,24 +195,25 @@ namespace moves {
             max_obstacles(max_obstacles) {}
 
         template<index_t k>
-        Span(Tuple<Vector<n>, k>&& directions, bool captures, bool moves) : Move<n>(directions.into_vector(), captures, moves), min_steps(1), max_steps(-1), min_obstacles(0), max_obstacles(0) {}
-
-        template<index_t k>
         Span(
             Tuple<Vector<n>, k>&& directions, 
-            bool captures, 
-            bool moves, 
-            arith_t min_steps, 
-            arith_t max_steps, 
-            arith_t min_obstacles, 
-            arith_t max_obstacles
-        ) : Move<n>(directions.into_vector(), captures, moves), 
+            bool captures = true, 
+            bool moves = true, 
+            arith_t min_steps = 1, 
+            arith_t max_steps = -1, 
+            arith_t min_obstacles = 0, 
+            arith_t max_obstacles = 0
+        ) : Move<n>(std::move(directions).into_vector(), captures, moves), 
             min_steps(min_steps), 
             max_steps(max_steps), 
             min_obstacles(min_obstacles), 
             max_obstacles(max_obstacles) {}
 
         
+        virtual std::string type_str() const {
+            return "Span";
+        }
+
         virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
             for (const Vector<n>& di : this -> directions){
                 this -> positive_span(map, board, position, player_index, di);
@@ -181,21 +225,23 @@ namespace moves {
 
         Span(const json& j) : 
             Move<n>(j),
-            min_steps(j.at("min_steps").get<arith_t>()),
-            max_steps(j.at("max_steps").get<arith_t>()),
-            min_obstacles(j.at("min_obstacles").get<arith_t>()),
-            max_obstacles(j.at("max_obstacles").get<arith_t>()) {}
+            min_steps(j.value("min_steps", json(1)).get<arith_t>()),
+            max_steps(j.value("max_steps", json(-1)).get<arith_t>()),
+            min_obstacles(j.value("min_obstacles", json(0)).get<arith_t>()),
+            max_obstacles(j.value("max_obstacles", json(0)).get<arith_t>()) {}
 
 
         json serialize() const override {
-            json result = Move<n>::serialize();
-
-            result["min_steps"] = this -> min_steps;
-            result["max_steps"] = this -> max_steps;
-            result["min_obstacles"] = this -> min_obstacles;
-            result["max_obstacles"] = this -> max_obstacles;
-
-            return result;
+            return {
+                {"directions", this -> directions},
+                {"captures", this -> captures},
+                {"moves", this -> moves},
+                {"min_steps", this -> min_steps},
+                {"max_steps", this -> max_steps},
+                {"min_obstacles", this -> min_obstacles},
+                {"max_obstacles", this -> max_obstacles},
+                {"__move__", this -> type_str()}
+            };
         }
 
 
@@ -222,25 +268,15 @@ namespace moves {
                     
                     arith_t num_obstacles(0);
 
-                    if (scaling < 0) {
-                        for (Index<n> i(position - v); i != target; i -= v) {
-                            if (board[i] != nullptr) {
-                                num_obstacles++;
-                            }
-
-                            if (num_obstacles > this -> max_obstacles){
-                                return false;
-                            }
+                    Vector<n> di = (scaling < 0) ? -v : v;
+                
+                    for (Index<n> i(position + di); i != target; i += di) {
+                        if (board[i] != nullptr) {
+                            num_obstacles++;
                         }
-                    } else {
-                        for (Index<n> i(position + v); i != target; i += v) {
-                            if (board[i] != nullptr) {
-                                num_obstacles++;
-                            }
 
-                            if (num_obstacles > this -> max_obstacles){
-                                return false;
-                            }
+                        if (num_obstacles > this -> max_obstacles){
+                            return false;
                         }
                     }
 
@@ -288,6 +324,118 @@ namespace moves {
             }
 
 
+    };
+
+    template<index_t n>
+    struct Castle : public Move<n> {
+
+        Castle(
+            index_t axis = 0,
+            index_t min_steps = 2,
+            index_t max_steps = 2,
+            std::string&& partner_key = "Rook"
+        ) : Move<n>(std::vector<Vector<n>>{Vector<n>::one_hot(axis)}, false, true, true), axis(axis), min_steps(min_steps), max_steps(max_steps), partner_key(partner_key) {}
+
+        virtual std::string type_str() const {
+            return "Castle";
+        }
+
+        virtual bool sees(const game::Board<n>& board, const Index<n>& position, const Index<n>& target, index_t player_index) const {
+            Vector<n> vec(target - position);
+
+            arith_t scaling = vec | this -> directions[0];
+
+            if (scaling == 0){
+                return false;
+            }
+
+            arith_t num_steps = (scaling < 0) ? -scaling : scaling;
+
+            if (num_steps < this -> min_steps || num_steps > this -> max_steps){
+                return false;
+            }
+            
+            Vector<n> di = (scaling < 0) ? -(this -> directions[0]) : (this -> directions[0]);
+
+            for (Index<n> i(position + di); i.is_valid(); i += di) {
+                if (board[i] != nullptr) {
+                    if (i.is_at_bounds(this -> axis) &&
+                        board[i] -> player_index == player_index &&
+                        board[i] -> figure -> key == this -> partner_key && 
+                        !(board[i] -> has_moved)){
+                            return true;
+                        }
+                    
+                        return false;
+                }
+            }
+
+            return false;
+        }
+
+
+        virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index) const {
+            this -> populate_helper(
+                map, board, position, player_index, this -> directions[0]
+            );
+            this -> populate_helper(
+                map, board, position, player_index, -(this -> directions[0])
+            );
+        }
+
+        
+        // SERIALIZATION
+
+        Castle(const json& j) : 
+            Castle(
+                j.value("axis", json(0)).get<index_t>(),
+                j.value("min_steps", json(2)).get<index_t>(),
+                j.value("max_steps", json(2)).get<index_t>(),
+                j.value("partner_key", json("Rook")).get<std::string>()
+            ) {}
+
+        virtual json serialize() const {
+            return {
+                {"axis", this -> axis},
+                {"min_steps", this -> min_steps},
+                {"max_steps", this -> max_steps},
+                {"partner_key", this -> partner_key},
+                {"__move__", this -> type_str()}
+            };
+        }
+        
+        private:
+            index_t axis;
+            index_t min_steps;
+            index_t max_steps;
+            std::string partner_key;
+
+
+            void populate_helper(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& position, index_t player_index, const Vector<n>& forward) const {
+                bool _seen = false;
+                
+                for (Index<n> i(position + forward); i.is_valid(); i+= forward){
+                    if (board[i] != nullptr){
+                        if (i.is_at_bounds(axis) &&
+                            board[i] -> player_index == player_index &&
+                            board[i] -> figure -> key == this -> partner_key && 
+                            !(board[i] -> has_moved)){
+                            _seen = true;
+                            }
+
+                        break;
+                    }
+                }
+
+                if (_seen){
+                    Index<n> s = position + (this -> min_steps) * forward;
+                    
+                    for (index_t i = 0; i <= this -> max_steps - this -> min_steps; i++){
+                        map[s] = this;
+                        s += forward;
+                    }
+                }
+            }
     };
 
     template<index_t n>
@@ -353,8 +501,14 @@ namespace moves {
         // SERIALIZATION
 
         static sptr<Move<n>> deserialize(const json& m) {
-            if (m.contains("min_steps")){
+            std::string __move__ = m.at("__move__");
+
+            if (__move__ == "Span"){
                 return std::make_shared<Span<n>>(m);
+            } else if (__move__ == "Castle"){
+                return std::make_shared<Castle<n>>(m);
+            } else if (__move__ == "EnPassant"){
+                return std::make_shared<EnPassant<n>>(m);
             } else {
                 return std::make_shared<Move<n>>(m);
             }

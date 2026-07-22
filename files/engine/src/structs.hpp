@@ -84,7 +84,7 @@ namespace structs {
             return result;
         }
 
-        std::vector<T> into_vector() {
+        std::vector<T> into_vector() && {
             std::vector<T> result;
             result.reserve(n);
             for (index_t i = 0; i < n; i++){
@@ -398,6 +398,24 @@ namespace structs {
         Vector& operator=(const Vector&) = default;
         Vector& operator=(Vector&&) noexcept = default;
 
+        static Vector one_hot(index_t i) {
+            Vector result(0);
+            result[i] = 1;
+            return result;
+        }
+
+        index_t first_nonzero() const {
+            index_t axis;
+
+            for(axis=0; axis < n; axis++){
+                if (this -> at(axis) != 0){
+                    return axis;
+                }
+            }
+
+            return axis;
+        }
+
         Vector operator+(const Vector& v) const {
             Vector result;
 
@@ -642,6 +660,36 @@ namespace structs {
 
         index_t operator[](index_t i) const{
             return this -> at(i);
+        }
+
+        
+        Index& zero_out(index_t axis) {
+            index_t relevant_size = this -> sizes -> operator[](axis);
+
+            this -> collapsed -= (relevant_size * this -> at(axis));
+            this -> at(axis) = 0;
+            return *this;
+        }
+
+        Index& max_out(index_t axis) {
+            index_t relevant_size = this -> sizes -> operator[](axis);
+            index_t last_index = this -> limits -> operator[](axis) -1;
+
+            this -> collapsed += ((last_index - this -> at(axis)) * (relevant_size));
+            this -> at(axis) = last_index;
+            return *this;
+        }
+
+        bool is_at_start(index_t axis) const {
+            return this -> at(axis) == 0;
+        }
+
+        bool is_at_end(index_t axis) const {
+            return this -> at(axis) == this -> limits -> operator[](axis)-1;
+        }
+
+        bool is_at_bounds(index_t axis) const {
+            return this -> is_at_start(axis) || this -> is_at_end(axis);
         }
 
 

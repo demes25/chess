@@ -162,6 +162,8 @@ class Event(Serializable):
     times : Sequence[float]
     duration : float 
     end : str | None = None
+    checks : list | None = None
+    coaction : Action | None = None
     die : Index | None = None 
     promote : int | None = None 
 
@@ -174,6 +176,12 @@ class Event(Serializable):
 
         if self.end is not None:
             dct["end"] = self.end
+
+        if self.checks is not None:
+            dct["checks"] = self.checks
+
+        if self.coaction is not None:
+            dct["coaction"] = self.coaction
         
         if self.die is not None:
             dct["die"] = self.die 

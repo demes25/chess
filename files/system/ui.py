@@ -58,6 +58,9 @@ class UserInterface:
             def resolve_promote(self, index : int):
                 self.surface = self.promotion_list[index]
                 self.promotion_list = []
+
+            def __setattr__(self, name, value):
+                objects.Object.__setattr__(self, name, tuple(value) if name == "board_pos" else value)
             
             # serialization
 
@@ -137,6 +140,9 @@ class UserInterface:
                 
                 if self.promotion_plaque is not None:
                     yield self.promotion_plaque
+
+                if self.end_plaque is not None:
+                    yield self.end_plaque
 
                 if self.selected_piece is not None:
                     yield self.selected_piece
@@ -223,11 +229,11 @@ class UserInterface:
                 if label_color is None:
                     label_color = assets.scheme.__getattribute__(label.lower()) 
 
-                dx_r = self.width // 5
-                dx_q = self.width // 4
-                dy = self.height // 7
+                dx_r = result.width // 5
+                dx_q = result.width // 4
+                dy = result.height // 7
 
-                x, y = self.midpoint
+                x, y = result.midpoint
 
                 label_object = objects.Object(assets.title_font.render(label.upper(), label_color))
                 label_object.center = (x, y - dy)
@@ -240,6 +246,8 @@ class UserInterface:
                 quit_button = objects.Object(assets.half_title_font.render('QUIT', assets.scheme.text))
                 quit_button.rect.center = (x-dx_q, y + dy)
                 result['quit'] = quit_button
+
+                result.center = self.midpoint
 
                 self._wrap(result)
                 self.end_plaque = result
@@ -315,10 +323,14 @@ class UserInterface:
                 self._wrap(obj)
                 self.selected_squares.append(obj) 
 
+            def unhold_piece(self):
+                if self.selected_piece is not None:
+                    self.hold_selected = False 
+                    self.selected_piece.topleft = self.coords(self.selected_piece.board_pos, to_global=False)
+
             def deselect_piece(self):
-                self.selected_piece.topleft = self.coords(self.selected_piece.board_pos, to_global=False)
+                self.unhold_piece()
                 self.selected_piece = None
-                self.hold_selected = False 
 
             def deselect_squares(self):
                 self.selected_squares = []
@@ -373,16 +385,20 @@ class UserInterface:
                 self.revert_cache()
                 self.deselect_piece()
 
-                sounds : list[Sound] = []
+                sounds : list[str] = []
 
                 action = event.action
+                coaction = event.coaction
 
                 piece : Piece = self.grid[action.start]
 
                 piece.board_pos = action.end
                 piece.topleft = self.coords(action.end, to_global=False)
 
-                if event.die is not None:
+                __captures = event.die is not None
+                __castles = coaction is not None
+
+                if __captures:
                     die = self.grid[event.die]
                     result = (piece.player_index, die)
 
@@ -390,13 +406,29 @@ class UserInterface:
                     self.grid[event.die] = None
 
                     sounds.append("take")
-                else:
-                    sounds.append("move")
 
+                if event.checks:
+                    sounds.append("check")
                 
                 
                 self.grid[action.start] = None
                 self.grid[action.end] = piece
+
+                if __castles:
+                    partner : Piece = self.grid[coaction.start]
+
+                    partner.board_pos = coaction.end
+                    partner.topleft = self.coords(coaction.end, to_global=False)
+
+                    self.grid[coaction.start] = None 
+                    self.grid[coaction.end] = partner
+
+                    sounds.append("castle")
+
+
+                if not (__captures or event.checks or __castles):
+                    sounds.append("move")
+                
                 
                 if event.promote is not None:
                     piece.resolve_promote(event.promote)
@@ -427,7 +459,7 @@ class UserInterface:
                         self.play('illegal')
                         self.deselect_piece()
                     else:
-                        self.hold_selected = False
+                        self.unhold_piece()
 
                     print(response.content)
                     self.deselect_squares()
@@ -470,7 +502,7 @@ class UserInterface:
                             self.play_sound_if_next_error = True
 
                         else:
-                            self.hold_selected = False 
+                            self.unhold_piece()
                 
                 if self.selected_piece is not None and self.hold_selected:
                     self.selected_piece.global_center = pg.mouse.get_pos()
@@ -736,7 +768,7 @@ class UserInterface:
                 self.arrs[player_index].add(piece)
 
         
-        class ChatBar(objects.Environment, Controllable):
+        class ChatBar(objects.Environment, Controllable[OutMessage]):
             def __init__(
                 self,
                 
@@ -872,7 +904,7 @@ class UserInterface:
                     queue.append(result)
 
 
-        class GameInterface(objects.Environment, Controllable):
+        class GameInterface(objects.Environment, Controllable[OutMessage]):
             def __init__(
                 self,
                 
@@ -880,6 +912,7 @@ class UserInterface:
 
                 # TODO: GENERALIZE FOR SIDEBAR SIZES
                 player_index : int = 0,
+                enforce_player : bool = True 
             ):
                 chatbar = ChatBar(env_height = board.shape[1], player_index=player_index)
                 statbar = SideBar(env_height = board.shape[1], player_index=player_index)
@@ -894,8 +927,12 @@ class UserInterface:
 
                 super().__init__(shape)
 
+                ###
                 board.set_player(player_index)
                 self.board = self['board'] = board
+                board.enforce_player = enforce_player
+                board.play("start")
+                ###
                 
                 self.chatbar = self['chatbar'] = chatbar
                 self.statbar = self['statbar'] = statbar
@@ -933,12 +970,18 @@ class UserInterface:
 
                 self.focus = focus
 
+            def set_board(self, board : Board):
+                board.set_player(self.player_index)
+                board.enforce_player = self.board.enforce_player
+                board.topleft = self.board.topleft 
+
+                self.board = self['board'] = board
+                board.play("start")
+
 
             def register(self, msg : InMessage | Board):
                 if isinstance(msg, Board):
-                    msg.set_player(self.player_index)
-                    self.board = msg
-                    self['board'] = msg
+                    self.set_board(msg)
             
                 elif isinstance(msg, Response):
                     self.board.register_response(msg)
