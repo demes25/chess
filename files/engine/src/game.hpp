@@ -74,29 +74,29 @@ namespace game{
 
         ~Piece() = default;
 
-        bool sees(const Board<n>& board, const Index<n>& target) const {
+        bool sees(const Board<n>& board, const Index<n>& square) const {
             if (this -> dead || this -> promoted) {
                 return false;
             }
 
             if (!this -> has_moved){
-                if (this -> figure -> which_opener(board, this -> position, target, this -> player_index) != nullptr){
+                if (this -> figure -> which_opener(board, this -> position, square, this -> player_index) != nullptr){
                     return true;
                 } else if (this -> figure -> open_exclusive){
                     return false;
                 }
             }
 
-            return (this -> figure -> which_move(board, this -> position, target, this -> player_index) != nullptr);
+            return (this -> figure -> which_move(board, this -> position, square, this -> player_index) != nullptr);
         }
 
-        sptr<Move<n>> which_sees(const Board<n>& board, const Index<n>& target) const {
+        sptr<Move<n>> which_sees(const Board<n>& board, const Index<n>& square) const {
             if (this -> dead || this -> promoted) {
                 return nullptr;
             }
 
             if (!this -> has_moved){
-                sptr<Move<n>> opener = this -> figure -> which_opener(board, this -> position, target, this -> player_index);
+                sptr<Move<n>> opener = this -> figure -> which_opener(board, this -> position, square, this -> player_index);
                 if (opener != nullptr) {
                     return opener;
                 } else if (this -> figure -> open_exclusive){
@@ -104,7 +104,7 @@ namespace game{
                 }
             }
 
-            return this -> figure -> which_move(board, this -> position, target, this -> player_index);
+            return this -> figure -> which_move(board, this -> position, square, this -> player_index);
         }
 
         virtual void populate(MoveMap<n>& map, const Board<n>& board) const {
@@ -185,9 +185,9 @@ namespace game{
             }
         }
 
-        bool pieces_see(const Board<n>& board, const Index<n>& target) const {
+        bool pieces_see(const Board<n>& board, const Index<n>& square) const {
             for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, target)){
+                if (piece -> sees(board, square)){
                     return true;
                 }
             }
@@ -195,9 +195,9 @@ namespace game{
             return false;
         }
 
-        bool monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        bool monarchs_see(const Board<n>& board, const Index<n>& square) const {
             for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, target)){
+                if (monarch -> sees(board, square)){
                     return true;
                 }
             }
@@ -205,18 +205,18 @@ namespace game{
             return false;
         }
 
-        bool sees(const Board<n>& board, const Index<n>& target) const {
-            return this -> monarchs_see(board, target) || this -> pieces_see(board, target);
+        bool sees(const Board<n>& board, const Index<n>& square) const {
+            return this -> monarchs_see(board, square) || this -> pieces_see(board, square);
         }
 
 
 
 
-        std::vector<sptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& square) const {
             std::vector<sptr<Piece<n>>> result;
 
             for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, target)){
+                if (piece -> sees(board, square)){
                     result.push_back(&piece);
                 }
             }
@@ -224,11 +224,11 @@ namespace game{
             return result;
         }
 
-        std::vector<sptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& square) const {
             std::vector<sptr<Piece<n>>> result;
 
             for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, target)){
+                if (monarch -> sees(board, square)){
                     result.push_back(&monarch);
                 }
             }
@@ -236,17 +236,17 @@ namespace game{
             return result;
         }
 
-        std::vector<sptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& target) const {
+        std::vector<sptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& square) const {
             std::vector<sptr<Piece<n>>> result;
 
             for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, target)){
+                if (piece -> sees(board, square)){
                     result.push_back(&piece);
                 }
             }
 
             for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, target)){
+                if (monarch -> sees(board, square)){
                     result.push_back(&monarch);
                 }
             }
@@ -256,11 +256,11 @@ namespace game{
 
 
 
-        index_t how_many_pieces_see(const Board<n>& board, const Index<n>& target) const {
+        index_t how_many_pieces_see(const Board<n>& board, const Index<n>& square) const {
             index_t N = 0;
 
             for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, target)){
+                if (piece -> sees(board, square)){
                     N++;
                 }
             }
@@ -268,11 +268,11 @@ namespace game{
             return N;
         }
 
-        index_t how_many_monarchs_see(const Board<n>& board, const Index<n>& target) const {
+        index_t how_many_monarchs_see(const Board<n>& board, const Index<n>& square) const {
             index_t N = 0;
 
             for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, target)){
+                if (monarch -> sees(board, square)){
                     N++;
                 }
             }
@@ -280,8 +280,8 @@ namespace game{
             return N;
         }
 
-        index_t how_many_see(const Board<n>& board, const Index<n>& target) const {
-            return this -> how_many_pieces_see(board, target) + this -> how_many_monarchs_see(board, target);
+        index_t how_many_see(const Board<n>& board, const Index<n>& square) const {
+            return this -> how_many_pieces_see(board, square) + this -> how_many_monarchs_see(board, square);
         }
     };
 
@@ -341,7 +341,164 @@ namespace game{
             return Index<n>(std::move(t), this -> board);
         }
 
+        // returns true if any OTHER players see the given square
+        bool is_unsafe_for(const Index<n>& square, index_t player_index) const {
+            for (index_t i = 0; i < p; i++){
+                if (i != player_index){
+                    const Player<n>& opponent = this -> players[i];
+                    if (opponent.pieces_see(this -> board, square)){
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
 
+        // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
+        bool in_check(index_t player_index) const {
+            const Player<n>& player = this -> players[player_index];
+
+            if (player.monarchs.size() == 1){
+                const sptr<Piece<n>>& king = player.monarchs[0];
+
+                if (this -> is_unsafe_for(king -> position, player_index)){
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // returns a std::vector containing the indices of all the players that are currently in check.
+        std::vector<index_t> get_checks() const {
+            std::vector<index_t> checks;
+
+            for (index_t i = 0; i < p; i++){
+                if (this -> in_check(i)){
+                    checks.push_back(i);
+                }
+            }
+
+            return checks;
+        }
+
+        // returns a std::vector containing the indices of all the players that are currently in check.
+        std::vector<index_t> get_checks_except(index_t j) const {
+            std::vector<index_t> checks;
+
+            for (index_t i = 0; i < p; i++){
+                if (i != j && this -> in_check(i)){
+                    checks.push_back(i);
+                }
+            }
+
+            return checks;
+        }
+
+
+        // returns a BitMap containing all the **legal** moves that the piece at the given index can make.
+        // i.e., enforces checks
+        MoveMap<n> legal_moves(const sptr<Piece<n>>& piece) {
+            if (piece == nullptr){
+                throw std::runtime_error("empty");
+            }
+
+            MoveMap<n> result(this -> board.get_shape());
+
+            piece -> populate(result, this -> board);
+
+            for (Index<n> j(result); j.is_valid(); ++j){
+                const Move<n>* sp = result[j];        
+                if (sp != nullptr){
+                    if (sp -> type_str() == "Castle"){
+                        Vector<n> displacement = j - (piece -> position);
+                        Vector<n> unit = sp -> operator[](0);
+
+                        arith_t scaling = displacement | unit;
+
+                        Vector<n> direction = (scaling < 0) ? -unit : unit;
+                        index_t lim = (scaling < 0) ? -scaling : scaling;
+                        
+                        Index<n> tracker = piece -> position;
+
+                        for (index_t t = 0; t <= lim; t++){
+                            if (this -> is_unsafe_for(tracker, piece -> player_index)){
+                                result[j] = nullptr;
+                                break;
+                            }
+
+                            tracker += direction;
+                        }
+
+                    } else if (this -> walks_into_check(piece, j, sp)){
+                        result[j] = nullptr;
+                    }
+                }
+            }
+
+            return result;
+        }
+        
+
+        void move(const Index<n>& start, const Index<n>& end) {
+            this -> make_move(start, end);
+
+            if (this -> status != PROMOTING) {
+                this -> post_move();
+            }
+        }
+        
+        virtual void resolve_promotion(index_t i) {
+            if (this -> status != PROMOTING) {
+                this -> status_error();
+            }
+
+            this -> raw_promote(i);
+            this -> post_move();
+        }
+
+
+        // NEEDS WORK!!
+        // needs to adjust for castles !!
+        template<typename F, typename... Args>
+        decltype(auto) if_move(sptr<Piece<n>> piece, const Index<n>& end, const Move<n>* move_ptr, F&& func, Args&&... args) {
+            Index<n> start_pos = piece -> position;
+            Index<n> end_pos = end;
+            Index<n> take_pos = end + move_ptr -> relative_capture;
+
+            sptr<Piece<n>> target = this -> board[take_pos];
+            
+            bool move_status = piece -> has_moved;
+            bool open_status = piece -> just_opened;
+
+            this -> raw_move(piece, end_pos, target);
+            this -> abide(piece, move_ptr);
+
+            using Result = std::invoke_result_t<F&&, Args&&...>;
+
+            if constexpr (std::is_void_v<Result>) {
+                std::invoke(std::forward<F>(func),
+                            std::forward<Args>(args)...);
+                
+                this -> raw_unmove(piece, start_pos, target);
+                piece -> has_moved = move_status;
+                piece -> just_opened = open_status;
+
+            } else {
+                Result result =
+                    std::invoke(std::forward<F>(func),
+                                std::forward<Args>(args)...);
+                
+                this -> raw_unmove(piece, start_pos, target);
+                piece -> has_moved = move_status;
+                piece -> just_opened = open_status;
+
+                return result;
+            }
+        }
+
+
+        
         friend std::ostream& operator<<(std::ostream& os, const Instance<n, p>& inst) {
             index_t index = 0;
             return inst.print_help(os, 0, index);
@@ -491,6 +648,20 @@ namespace game{
                 }
             }
 
+            void raw_move(sptr<Piece<n>> piece, const Index<n>& end, sptr<Piece<n>> target = nullptr) {
+                this -> board[piece -> position] = nullptr;
+                this -> kill(target);
+                piece -> position = end;
+                this -> board[end] = piece;
+            }
+
+            void raw_unmove(sptr<Piece<n>> piece, const Index<n>& start, sptr<Piece<n>> target = nullptr) {
+                this -> board[piece -> position] = nullptr;
+                this -> unkill(target);
+                piece -> position = start;
+                this -> board[start] = piece;
+            }
+
             // if promoting is nullptr, raises error.
             // otherwise, sets promoting -> promoted = true, and calls .add on the promoted piece
             void raw_promote(index_t promotion_index) {
@@ -503,122 +674,27 @@ namespace game{
             }
 
 
-            // returns a std::vector containing the indices of all the players that are currently in check.
-            std::vector<index_t> get_checks() {
-                std::vector<index_t> checks;
-
-                for (index_t i = 0; i < p; i++){
-                    if (i != this -> turn && this -> in_check(i)){
-                        checks.push_back(i);
-                    }
-                }
-
-                return std::move(checks);
+            // returns true if the given move walks into check.
+            // TODO: this needs to be done better. what if at_i does not take at_j???
+            bool walks_into_check(sptr<Piece<n>> piece, const Index<n>& end, const Move<n>* move_ptr) {
+                return this -> if_move(
+                    piece, 
+                    end, 
+                    move_ptr, 
+                    [this](index_t i) {
+                        return in_check(i);
+                    },
+                    piece -> player_index
+                );
             }
             
-            // returns true if any OTHER players see the given square
-            bool is_unsafe(const Index<n>& square, index_t player_index) const {
-                for (index_t i = 0; i < p; i++){
-                    if (i != player_index){
-                        const Player<n>& opponent = this -> players[i];
-                        if (opponent.pieces_see(this -> board, square)){
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-
-            // returns true if the given player has only one monarch, and it is "seen" by any of the other players' pieces.
-            bool in_check(index_t player_index) const {
-                const Player<n>& player = this -> players[player_index];
-
-                if (player.monarchs.size() == 1){
-                    const sptr<Piece<n>>& king = player.monarchs[0];
-
-                    if (this -> is_unsafe(king -> position, player_index)){
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            // returns a BitMap containing all the **legal** moves that the piece at the given index can make.
-            // i.e., enforces checks
-            MoveMap<n> legal_moves(const sptr<Piece<n>>& piece) {
-                if (piece == nullptr){
-                    throw std::runtime_error("empty");
-                }
-
-                MoveMap<n> result(this -> board.get_shape());
-
-                piece -> populate(result, this -> board);
-
-                for (Index<n> j(result); j.is_valid(); ++j){
-                    const Move<n>* sp = result[j];        
-                    if (sp != nullptr){
-                        if (sp -> type_str() == "Castle"){
-                            Vector<n> displacement = j - (piece -> position);
-                            Vector<n> unit = sp -> operator[](0);
-
-                            arith_t scaling = displacement | unit;
-
-                            Vector<n> direction = (scaling < 0) ? -unit : unit;
-                            index_t lim = (scaling < 0) ? -scaling : scaling;
-                            
-                            Index<n> tracker = piece -> position;
-
-                            for (index_t t = 0; t <= lim; t++){
-                                if (this -> is_unsafe(tracker, piece -> player_index)){
-                                    result[j] = nullptr;
-                                    break;
-                                }
-
-                                tracker += direction;
-                            }
-
-                        } else if (this -> walks_into_check(piece, j)){
-                            result[j] = nullptr;
-                        }
-                    }
-                }
-
-                return result;
-            }
-
-            // returns true if the given move walks into check.
-            bool walks_into_check(const sptr<Piece<n>>& at_i, const Index<n>& j) {
-                sptr<Piece<n>> at_j = this -> board[j];
-
-                Index<n> i = at_i -> position;
-
-                this -> board[i] = nullptr;
-                this -> kill(at_j);
-
-                this -> board[j] = at_i;
-                at_i -> position = j;
-
-                bool result = this -> in_check(at_i -> player_index);
-
-                at_i -> position = i;
-                this -> board[i] = at_i;
-
-                if (at_j == nullptr){
-                    this -> board[j] = nullptr;
-                } else {
-                    this -> unkill(at_j);
-                }
-
-                return result;
-            }
 
             // updates the internal flags of the given piece depending on the move
-            void abide(const sptr<Piece<n>>& piece, const sptr<Move<n>>& move) {
+            void abide(const sptr<Piece<n>>& piece, const Move<n>* move_ptr) {
                 if (!piece -> has_moved){
                     piece -> has_moved = true;
-                    if (move -> only_opens) {
-                        piece -> just_opened = move -> only_opens;
+                    if (move_ptr -> only_opens) {
+                        piece -> just_opened = move_ptr -> only_opens;
                         this -> players[piece -> player_index].just_opened.push_back(piece);
                     }
                 } 
@@ -634,31 +710,14 @@ namespace game{
                 throw std::runtime_error(error_str);
             }
     
-            void move(const Index<n>& start, const Index<n>& end) {
-                this -> make_move(start, end);
-
-                if (this -> status != PROMOTING) {
-                    this -> post_move();
-                }
-            }
-            
-            virtual void resolve_promotion(index_t i) {
-                if (this -> status != PROMOTING) {
-                    this -> status_error();
-                }
-
-                this -> raw_promote(i);
-                this -> post_move();
-            }
-
             virtual void make_move(const Index<n>& start, const Index<n>& end) {
                 if (this -> status > ONGOING) {
                     this -> status_error();
                 }
 
                 sptr<Piece<n>> piece = this -> board[start];
-                sptr<Move<n>> move = this -> validate_and_get_move(piece, end);
-                const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move, start, end);
+                sptr<Move<n>> move_ptr = this -> validate_and_get_move(piece, end);
+                const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move_ptr.get(), start, end);
 
                 this -> set_current_action(start, end);
 
@@ -666,7 +725,7 @@ namespace game{
             }
 
             virtual void post_move() {
-                std::vector<index_t> checks = this -> get_checks();
+                std::vector<index_t> checks = this -> get_checks_except(this -> turn);
                 
                 this -> advance_turn();
 
@@ -697,13 +756,13 @@ namespace game{
                     throw std::runtime_error("panic");
                 }
 
-                sptr<Move<n>> move = piece -> which_sees(this -> board, end);
+                sptr<Move<n>> move_ptr = piece -> which_sees(this -> board, end);
 
-                if (move == nullptr){
+                if (move_ptr == nullptr){
                     throw std::runtime_error("illegal");
                 }
                 
-                return move;
+                return move_ptr;
             }
 
             // updates the board according to the given piece and move.
@@ -712,10 +771,10 @@ namespace game{
             // otherwise, returns a pointer to the piece, if any, that was captured.
             //
             // IF the given move is a castle, then checks for castle validity (i.e. not to castle through check) and returns the partner piece (i.e. the rook)
-            sptr<Piece<n>> adjust_board_and_get_target(sptr<Piece<n>> piece, sptr<Move<n>> move, const Index<n>& start, const Index<n>& end) {
-                if (move -> type_str() == "Castle"){
+            sptr<Piece<n>> adjust_board_and_get_target(sptr<Piece<n>> piece, const Move<n>* move_ptr, const Index<n>& start, const Index<n>& end) {
+                if (move_ptr -> type_str() == "Castle"){
                     Vector<n> displacement = end - start;
-                    Vector<n> unit = move -> operator[](0);
+                    Vector<n> unit = move_ptr -> operator[](0);
 
                     index_t axis = unit.first_nonzero();
 
@@ -727,7 +786,7 @@ namespace game{
                     Index<n> tracker = start;
 
                     for (index_t t = 0; t <= lim; t++){
-                        if (this -> is_unsafe(tracker, piece -> player_index)){
+                        if (this -> is_unsafe_for(tracker, piece -> player_index)){
                             throw std::runtime_error("check");
                         }
 
@@ -742,43 +801,28 @@ namespace game{
                         partner_index.max_out(axis);
                     }
 
-                    piece -> position = end;
-                    this -> abide(piece, move);
-                    
 
-                    this -> board[start] = nullptr;
-                    this -> board[end] = piece;
-
+                    this -> raw_move(piece, end);
+                    this -> abide(piece, move_ptr);
+                
                     Index<n> partner_end = end-direction;
                     sptr<Piece<n>> partner = this -> board[partner_index];
                     
-                    partner -> position = partner_end;
-                    this -> abide(piece, move);
-                    this -> board[partner_index] = nullptr;
-                    this -> board[partner_end] = partner;
+                    this -> raw_move(partner, partner_end);
+                    this -> abide(partner, move_ptr);
 
                     return partner;
                 } else {
-                    sptr<Piece<n>> target_piece = this -> board[end + move -> relative_capture];
-                    sptr<Piece<n>> end_piece = this -> board[end];
+                    sptr<Piece<n>> target_piece = this -> board[end + move_ptr -> relative_capture];
 
-                    this -> kill(target_piece);
-
-                    piece -> position = end;
-                    this -> board[start] = nullptr;
-                    this -> board[end] = piece;
+                    this -> raw_move(piece, end, target_piece);
 
                     if (this -> in_check(this -> turn)) {
-                        piece -> position = start;
-                        this -> board[start] = piece;
-                        this -> board[end] = end_piece;
-
-                        this -> unkill(target_piece);
-
+                        this -> raw_unmove(piece, start, target_piece);
                         throw std::runtime_error("check");
                     }
 
-                    this -> abide(piece, move);
+                    this -> abide(piece, move_ptr);
 
                     return target_piece;
                 }

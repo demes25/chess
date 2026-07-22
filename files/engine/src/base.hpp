@@ -14,6 +14,9 @@
 #include<chrono>
 #include<unordered_map>
 #include<vector>
+#include<functional>
+#include<utility>
+#include<type_traits>
 #include"json.hpp"
 
 using index_t = unsigned short;
