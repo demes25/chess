@@ -1,4 +1,4 @@
-from files.engine import Engine, load_figures
+from files.engine import Engine, load_figures, load_sets
 from files.engine.pyutils import Request
 from files.system.ui import to_UI
 
@@ -11,12 +11,10 @@ import pygame as pg
 ui = to_UI(4)
 
 load_figures("files/engine/figures.json")
-
-with open("files/engine/game.json") as f:
-    game = f.read()
+load_sets("files/engine/sets.json")
 
 
-engine = Engine(game)
+engine = Engine("Shatranj", 600)
 board = deserialize(engine.begin())
 
 frontend = ui.GameInterface(board, 0, False)

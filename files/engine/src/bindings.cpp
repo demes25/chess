@@ -15,7 +15,7 @@ void bind(py::module_& m, const char* name)
     using T = Engine<n, p>;
     
     py::class_<T>(m, name)
-        .def(py::init<std::string>(), py::arg("j_str"))
+        .def(py::init<const std::string&, double>(), py::arg("set_name"), py::arg("timer"))
         
         .def("begin", &T::begin)
         .def("layout", &T::layout)
@@ -35,8 +35,17 @@ void load_figures(std::string figure_path){
     moves::Figure<n>::load(j);
 }
 
+template<index_t n, index_t p>
+void load_sets(std::string set_path){
+    std::fstream file(set_path);
+    json j;
+    file >> j;
+    Engine<n, p>::sets = j;
+}
+
 PYBIND11_MODULE(engine, m)
 {  
     m.def("load_figures", load_figures<2>);
+    m.def("load_sets", load_sets<2, 2>);
     bind<2, 2>(m, "Engine");
 }

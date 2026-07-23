@@ -11,9 +11,11 @@
 template <index_t n, index_t p>
 struct Engine {
 
+    static json sets;
+
     Engine(const std::string& j_str) : setup(json::parse(j_str)) {}
 
-    Engine(const std::string& name, double timer) : setup(json::parse(Engine::sets[name])) {
+    Engine(const std::string& name, double timer) : setup(Engine::sets[name]) {
         json times = json::array();
         for (index_t i = 0; i < p; i++){
             times.push_back(timer);
@@ -87,8 +89,9 @@ struct Engine {
     private:
         json setup;
         uptr<SerializableInstance<n, p>> instance;
-
-        static std::unordered_map<std::string, std::string> sets;
 };
+
+template<index_t n, index_t p>
+json Engine<n, p>::sets = nullptr;
 
 #endif
