@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from applib import objects
 from applib.text import TextEntry, TextRecord
 from applib.utils import Color, Coords, Surface, Sound, new_surface, Vector, ZERO_VEC, phase
-from applib.controls import Controllable, EventUI
+from applib.controls import Controllable, EventUI, Interface
 
 from netlib.serialization import Serializable
 
@@ -904,7 +904,7 @@ class UserInterface:
                     queue.append(result)
 
 
-        class GameInterface(objects.Environment, Controllable[OutMessage]):
+        class GameInterface(Interface[OutMessage]):
             def __init__(
                 self,
                 
@@ -947,28 +947,7 @@ class UserInterface:
                 self.promotion_plaque = None 
 
                 self.focus : Controllable | None = None
-            
-
-            def adjust_focus(self, coords : Coords):
-                focus_key = self.which_hits(coords)
-
-                if focus_key is None:
-                    self.focus = None 
-                    return
-                
-                focus = self[focus_key]
-
-                if focus is not self.focus:
-                    if focus is self.statbar:
-                        self.focus = None
-                        return
-                    
-                    if focus is self.chatbar:
-                        self.chatbar.focus()
-                    else:
-                        self.chatbar.defocus()
-
-                self.focus = focus
+        
 
             def set_board(self, board : Board):
                 board.set_player(self.player_index)
@@ -998,30 +977,6 @@ class UserInterface:
                 
                 elif isinstance(msg, Chat):
                     self.chatbar.register_chat(msg)
-
-
-            # checks if the pygame event is global and executes
-            # this is defined because it will be used across all event loops
-            def global_handle(self, event : EventUI, queue : list[OutMessage]):
-                result = None 
-                if event.type == pg.QUIT:
-                    result = self._quit()
-                
-                if event.type == pg.MOUSEBUTTONDOWN:
-                    self.adjust_focus(event.pos)
-                
-                if event.type == pg.MOUSEBUTTONUP and self.focus is not None and not self.focus.hits(event.pos):
-                    self.focus = None
-                
-                if result is not None:
-                    queue.append(result)
-
-
-            # handles the event.
-            # subhandlers are defined above for text, ingame, game_over, and promotion environments    
-            def handle(self, event : EventUI, queue : list[OutMessage]):
-                if self.focus is not None:
-                    self.focus.handle(event, queue)
 
 
             def reset(self, board : Board):

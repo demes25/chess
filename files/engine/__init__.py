@@ -1,3 +1,3 @@
-from . import Engine, load_figures, pyutils 
+from .engine import Engine, load_figures 
 
-__all__ = ["Engine", "load_figures", "pyutils"]
+__all__ = ["Engine", "load_figures"]
