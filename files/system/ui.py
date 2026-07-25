@@ -856,7 +856,7 @@ class UserInterface:
                 for text in chat.content:
                     self.chat_box.register(text.content, color=self.text_colors[text.index])
             
-            def drain(self) -> Text | None:
+            def drain(self, _register : bool =False) -> Text | None:
                 content = self.entry_box.clear()
 
                 if content == '':
@@ -867,7 +867,8 @@ class UserInterface:
                     index=self.player_index 
                 )
 
-                self.register_text(text)
+                if _register:
+                    self.register_text(text)
 
                 return text
             

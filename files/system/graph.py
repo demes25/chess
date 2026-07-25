@@ -5,10 +5,9 @@
 
 from netlib.serialization import Serializable
 from dataclasses import dataclass, field
-from typing import Sequence
 import time
 
-from files.engine import Response, Request, Event, Engine, NUM_PLAYERS
+from files.engine import Response, Request, Event, Engine
 
 @dataclass
 class Text(Serializable):
@@ -101,14 +100,19 @@ class Processor(Serializable):
                 self.chat.append(msg)
                 return msg
 
-            elif isinstance(msg, Request) and msg.label == "reset":
-                if self.instance.engine.is_on():
-                    raise PermissionError("Cannot reset while game is ongoing")
+            elif isinstance(msg, Request):
+                if msg.label == "reset":
+                    if self.instance.engine.is_on():
+                        raise PermissionError("Cannot reset while game is ongoing")
+                    else:
+                        return self.begin()
+                elif msg.label == "times":
+                    return self.instance.engine.times()
                 else:
-                    return self.begin()
+                    return self.instance.engine.process(msg)
 
             else:
-                return self.instance.engine.process(msg)
+                raise TypeError(f"Invalid message type {msg.__class__.__name__}")
 
 
         except Exception as e:
