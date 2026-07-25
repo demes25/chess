@@ -2,50 +2,33 @@
 // Chess
 // Test
 
-#include"engine.hpp"
+#include"engines.hpp"
 #include<fstream>
 
-json follow(Engine<2, 2>& e, const std::string& s) {
+template<index_t n, index_t p>
+using Engine = engines::SerializableEngine<n, p>;
+
+Reaction<2, 2> follow(Engine<2, 2>& e, const std::string& s) {
     if (s == "reset"){
-        json request = {
-            {"__type__", "Request"},
-            {"label", "reset"}
-        };
-
-        json response = json::parse(
-            e.process(request.dump())
+        return e.process(
+            Request<2>{"reset"}
         );
-
-        return response;
     }
-    
-    json action = {
-        {"start", {s[0] - 'a', s[1] - '1'}},
-        {"end", {s[2] - 'a', s[3] - '1'}},
-        {"__type__", "Action"}
-    };
 
-    std::string a = action.dump();
-
-    json result = json::parse(
-        e.process(a)
+    Reaction<2, 2> response = e.process(
+        Request<2>{"action", std::optional{Action<2>(Tup<2>(s[0]-'a', s[1]-'1'), Tup<2>(s[2]-'a', s[3]-'1'))}}
     );
 
-    if (result["__type__"] == "Response" && result["label"] == "promote"){
+    if (std::holds_alternative<Response<2>>(response) && std::get<Response<2>>(response).label == "promote"){
         index_t i;
         std::cin >> i;
 
-        json response = {
-            {"__type__", "Promotion"},
-            {"index", i}
-        };
-
-        result = json::parse(e.process(
-            response.dump()
-        ));
+        response = e.process(
+            Request<2>{"promote", i}
+        );
     }
 
-    return result;
+    return response;
 }
 
 int main() {
@@ -57,11 +40,13 @@ int main() {
     moves::Figure<2>::load(j);
 
     j = json::object();
-    f = std::fstream("../game.json");
+    f = std::fstream("../sets.json");
 
     f >> j;
 
-    Engine<2, 2> e(j.dump());
+    engines::Engine<2, 2>::game_sets = j;
+
+    Engine<2, 2> e = Engine<2, 2>::instantiate("Chess", 600.0);
 
     std::vector<std::string> premoves = {
         //"d2d4", "a7a5", "d4d5", "a5a4", "d5d6", "a4a3", "d6e7", "a3b2"
@@ -74,13 +59,13 @@ int main() {
     };
 
 
-    std::cout << e.begin() << std::endl;
+    std::cout << e.layout() << std::endl;
 
     for (const std::string& s : premoves){
         follow(e, s);
         std::cout << e.to_str() << std::endl;
-        MoveMap<2> map(e.unwrap() -> look().get_shape());
-        e.unwrap() -> look()[Tup<2>(4, 0)] -> populate(map, e.unwrap() -> look());
+        MoveMap<2> map(e.look().get_shape());
+        e.look()[Tup<2>(4, 0)] -> populate(map, e.look());
         std::cout << map.to_bitmap() << std::endl;
     }
 
@@ -89,13 +74,13 @@ int main() {
         std::cin >> s;
 
         
-        json result = follow(e, s);  
-        std::cout << result << std::endl;
+        Reaction<2, 2> result = follow(e, s);  
+        //std::cout << std::visit(result) << std::endl;
         
 
         std::cout << e.to_str() << std::endl;
-        MoveMap<2> map(e.unwrap() -> look().get_shape());
-        e.unwrap() -> look()[Tup<2>(4, 0)] -> populate(map, e.unwrap() -> look());
+        MoveMap<2> map(e.look().get_shape());
+        e.look()[Tup<2>(4, 0)] -> populate(map, e.look());
         std::cout << map.to_bitmap() << std::endl;
     }
 }

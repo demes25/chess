@@ -5,11 +5,11 @@
 #ifndef MOVES
 #define MOVES
 
-#include"structs.hpp"
+#include"utils.hpp"
 
-using namespace structs;
+using namespace utils;
 
-namespace game {
+namespace objects {
     template<index_t n>
     struct Piece;
 
@@ -49,13 +49,13 @@ namespace moves {
             return "Move";
         }
 
-        virtual bool sees(const game::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
+        virtual bool sees(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
             return (
                 this -> valid_occupancy(board, end, player_index) && this -> valid_square(board, start, end)
             );
         }
 
-        virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        virtual void populate(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
             for (const Vector<n>& v : this -> directions){
                 Index<n> end = start + v;
                 
@@ -95,9 +95,9 @@ namespace moves {
 
         protected:
 
-            virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& end, index_t player_index) const {
-                const sptr<game::Piece<n>>& piece_at = board[end];
-                const sptr<game::Piece<n>>& takes_at = board[end + this -> relative_capture];
+            virtual bool valid_occupancy(const objects::Board<n>& board, const Index<n>& end, index_t player_index) const {
+                const sptr<objects::Piece<n>>& piece_at = board[end];
+                const sptr<objects::Piece<n>>& takes_at = board[end + this -> relative_capture];
 
                 if (piece_at == nullptr && takes_at == nullptr) return this -> moves;
 
@@ -110,7 +110,7 @@ namespace moves {
                 return false;
             }
 
-            virtual bool valid_square(const game::Board<n>& board, const Index<n>& start, const Index<n>& end) const {
+            virtual bool valid_square(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end) const {
                 if (start == end){
                     return false;
                 }
@@ -158,9 +158,9 @@ namespace moves {
 
 
         protected:
-            virtual bool valid_occupancy(const game::Board<n>& board, const Index<n>& end, index_t player_index) const {
-                const sptr<game::Piece<n>>& piece_at = board[end];
-                const sptr<game::Piece<n>>& takes_at = board[end + this -> relative_capture];
+            virtual bool valid_occupancy(const objects::Board<n>& board, const Index<n>& end, index_t player_index) const {
+                const sptr<objects::Piece<n>>& piece_at = board[end];
+                const sptr<objects::Piece<n>>& takes_at = board[end + this -> relative_capture];
 
                 if (piece_at != nullptr || takes_at == nullptr || takes_at -> player_index == player_index){
                     return false;
@@ -214,7 +214,7 @@ namespace moves {
             return "Span";
         }
 
-        virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        virtual void populate(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
             for (const Vector<n>& di : this -> directions){
                 this -> positive_span(map, board, start, player_index, di);
                 this -> positive_span(map, board, start, player_index, -di);
@@ -246,7 +246,7 @@ namespace moves {
 
 
         protected:
-            bool valid_square(const game::Board<n>& board, const Index<n>& start, const Index<n>& end) const override {
+            bool valid_square(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end) const override {
                 if (start == end){
                     return false;
                 }
@@ -290,7 +290,7 @@ namespace moves {
                 return false;
             }
 
-            virtual void positive_span(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index, const Vector<n>& v) const {
+            virtual void positive_span(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index, const Vector<n>& v) const {
                 arith_t steps(1);
                 arith_t obstacles(0);
 
@@ -340,7 +340,7 @@ namespace moves {
             return "Castle";
         }
 
-        virtual bool sees(const game::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
+        virtual bool sees(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
             Vector<n> vec(end - start);
 
             arith_t scaling = vec | this -> directions[0];
@@ -374,7 +374,7 @@ namespace moves {
         }
 
 
-        virtual void populate(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        virtual void populate(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
             this -> populate_helper(
                 map, board, start, player_index, this -> directions[0]
             );
@@ -411,7 +411,7 @@ namespace moves {
             std::string partner_key;
 
 
-            void populate_helper(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index, const Vector<n>& forward) const {
+            void populate_helper(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index, const Vector<n>& forward) const {
                 bool _seen = false;
                 
                 for (Index<n> i(start + forward); i.is_valid(); i+= forward){
@@ -465,7 +465,7 @@ namespace moves {
         }
 
         
-        sptr<Move<n>> which_opener(const game::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
+        sptr<Move<n>> which_opener(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
             for (const sptr<Move<n>>& m : this -> opener_list){
                 if (m -> sees(board, start, end, player_index)){
                     return m;
@@ -475,13 +475,13 @@ namespace moves {
             return nullptr;
         }
 
-        virtual void populate_openers(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        virtual void populate_openers(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
             for (const sptr<Move<n>>& m : this -> opener_list){
                 m -> populate(map, board, start, player_index);
             }
         }
 
-        sptr<Move<n>> which_move(const game::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
+        sptr<Move<n>> which_move(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
             for (const sptr<Move<n>>& m : this -> move_list){
                 if (m -> sees(board, start, end, player_index)){
                     return m;
@@ -491,7 +491,7 @@ namespace moves {
             return nullptr;
         }
 
-        virtual void populate_moves(MoveMap<n>& map, const game::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        virtual void populate_moves(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
             for (const sptr<Move<n>>& m : this -> move_list){
                 m -> populate(map, board, start, player_index);
             }

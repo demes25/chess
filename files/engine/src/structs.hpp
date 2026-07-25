@@ -579,6 +579,14 @@ namespace structs {
                 this -> valid = false;
             }
         }
+
+        Index(const Tup<n>& value, const sptr<Tup<n>>& limits, const sptr<Tup<n>>& sizes) : Tup<n>(value), limits(limits), sizes(sizes), collapsed(0), valid(true) {
+            try {
+                this -> collapsed = this -> collapse();
+            } catch(...) {
+                this -> valid = false;
+            }
+        }
         
         template<typename T>
         Index(const Grid<T, n>& grid) : Tup<n>(0), limits(grid.shape_ptr()), sizes(grid.sizes_ptr()), collapsed(0), valid(true) {}
@@ -586,6 +594,8 @@ namespace structs {
         template<typename T>
         Index(Tup<n>&& value, const Grid<T, n>& grid) : Index(std::move(value), grid.shape_ptr(), grid.sizes_ptr()) {}
 
+        template<typename T>
+        Index(const Tup<n>& value, const Grid<T, n>& grid) : Index(value, grid.shape_ptr(), grid.sizes_ptr()) {}
 
         
         template<typename T>

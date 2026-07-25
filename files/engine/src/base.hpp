@@ -17,6 +17,8 @@
 #include<functional>
 #include<utility>
 #include<type_traits>
+#include<optional>
+#include<variant>
 #include"json.hpp"
 
 using index_t = unsigned short;

@@ -2,8 +2,6 @@
 # Chess
 # Protocol
 
-from dataclasses import dataclass
-from netlib.serialization import Serializable
 
 from typing import Sequence, Generic, TypeVar
 
@@ -87,109 +85,30 @@ class Grid(Generic[T], Iterable[T]):
             index = self.collapse(index)
         
         self._arr[index] = value 
+
+class Wrapper(Generic[T]):
+    _type : type
+
+    __item__ : T
+    __attrs__ : tuple[str]
+
+    def __init__(self, item : T, *attrs : str):
+        object.__setattr__(self, '__item__', item)
+        object.__setattr__(self, '__attrs__', tuple(attrs))
+
+        super().__init__()
+
+    def __getattr__(self, name : str):
+        return getattr(self.__item__, name)
+
+    def __setattr__(self, name : str, value):
+        if name in self.__attrs__:
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self.__item__, name, value)
+
     
+    @classmethod
+    def construct(cls, *args, **kwargs):
+        return cls(cls._type(*args, **kwargs))
 
-
-@dataclass 
-class Text(Serializable):
-    content : str
-    index : int
-
-    def to_dict(self):
-        return {
-            "content" : self.content,
-            "index" : self.index
-        }
-
-@dataclass
-class Chat(Serializable):
-    content : list[Text]
-
-    def to_dict(self):
-        return {
-            "content" : self.content
-        }
-    
-@dataclass
-class Response(Serializable):
-    label : str
-    content : str | None = None
-
-    def to_dict(self):
-        dct = {
-            "label" : self.label
-        }
-
-        if self.content is not None:
-            dct["content"] = self.content
-        
-        return dct
-    
-@dataclass
-class Request(Serializable):
-    index : int 
-    content : str 
-
-    def to_dict(self):
-        return {
-            "index" : self.index,
-            "content" : self.content
-        }
-
-@dataclass
-class Action(Serializable):
-    start : Index
-    end : Index
-
-    def to_dict(self):
-        return {
-            "start" : self.start,
-            "end" : self.end
-        }
-
-@dataclass
-class Promotion(Serializable):
-    index : int
-
-    def to_dict(self):
-        return {
-            "index" : self.index 
-        }
-    
-@dataclass
-class Event(Serializable):
-    action : Action
-    times : Sequence[float]
-    duration : float 
-    end : str | None = None
-    checks : list | None = None
-    coaction : Action | None = None
-    die : Index | None = None 
-    promote : int | None = None 
-
-    def to_dict(self):
-        dct = {
-            "action" : self.action,
-            "times" : self.times,
-            "duration" : self.duration,
-        }
-
-        if self.end is not None:
-            dct["end"] = self.end
-
-        if self.checks is not None:
-            dct["checks"] = self.checks
-
-        if self.coaction is not None:
-            dct["coaction"] = self.coaction
-        
-        if self.die is not None:
-            dct["die"] = self.die 
-        
-        if self.promote is not None:
-            dct["promote"] = self.promote
-
-
-
-InMessage = Text | Chat | Event | Response
-OutMessage = Text | Chat | Action | Promotion | Request

@@ -1,303 +1,25 @@
 // Demetre Seturidze
 // Chess
-// Game
+// Engines
 
-#ifndef GAME
-#define GAME
+#ifndef ENGINES
+#define ENGINES
 
-#include"moves.hpp"
+#include"objects.hpp"
 
-using namespace structs;
+using namespace objects;
 using namespace moves;
 
-namespace game{
-    template <index_t n>
-    struct Piece{
-        mutable Index<n> position;
+// RIGHT NOW: winning and losing is very much defined for a 2-player chess game. as such, determining who wins and who loses 
+// is not in the current form generalizable to higher numbers of players. KEEP THAT IN MIND.
 
-        const sptr<Figure<n>> figure;
-
-        const index_t player_index;
-
-        const std::vector<std::string> promotion_list;
-        const index_t promotion_axis;
-        const index_t promotion_index;
-        mutable bool promoted;
-
-        mutable bool dead;
-
-        mutable bool has_moved;
-        mutable bool just_opened; // JUST_OPENED marks a piece that played its first move in the current round, and the first move was marked "ONLY_OPENS".
-
-        Piece(
-            Index<n>&& position, 
-            sptr<Figure<n>> figure, 
-            index_t player_index, 
-            std::vector<std::string>&& promotion_list, 
-            index_t promotion_axis, 
-            index_t promotion_index, 
-            bool promoted, 
-            bool dead, 
-            bool has_moved, 
-            bool just_opened
-        ) : position(std::forward<Index<n>>(position)), 
-            figure(figure), 
-            player_index(player_index), 
-            promotion_list(std::forward<std::vector<std::string>>(promotion_list)), 
-            promotion_axis(promotion_axis), 
-            promotion_index(promotion_index), 
-            promoted(promoted), 
-            dead(dead), 
-            has_moved(has_moved), 
-            just_opened(just_opened){}
-        
-        Piece(
-            Index<n>&& position, 
-            sptr<Figure<n>> figure, 
-            index_t player_index, 
-            bool dead, 
-            bool has_moved, 
-            bool just_opened
-        ) : position(std::forward<Index<n>>(position)), 
-            figure(figure), 
-            player_index(player_index), 
-            promotion_list(), 
-            promotion_axis(0), 
-            promotion_index(0), 
-            promoted(false), 
-            dead(dead), 
-            has_moved(has_moved), 
-            just_opened(just_opened){}
-        
-        Piece(Piece&&) = default;
-        Piece(const Piece&) = default;
-
-        ~Piece() = default;
-
-        bool sees(const Board<n>& board, const Index<n>& square) const {
-            if (this -> dead || this -> promoted) {
-                return false;
-            }
-
-            if (!this -> has_moved){
-                if (this -> figure -> which_opener(board, this -> position, square, this -> player_index) != nullptr){
-                    return true;
-                } else if (this -> figure -> open_exclusive){
-                    return false;
-                }
-            }
-
-            return (this -> figure -> which_move(board, this -> position, square, this -> player_index) != nullptr);
-        }
-
-        sptr<Move<n>> which_sees(const Board<n>& board, const Index<n>& square) const {
-            if (this -> dead || this -> promoted) {
-                return nullptr;
-            }
-
-            if (!this -> has_moved){
-                sptr<Move<n>> opener = this -> figure -> which_opener(board, this -> position, square, this -> player_index);
-                if (opener != nullptr) {
-                    return opener;
-                } else if (this -> figure -> open_exclusive){
-                    return nullptr;
-                }
-            }
-
-            return this -> figure -> which_move(board, this -> position, square, this -> player_index);
-        }
-
-        virtual void populate(MoveMap<n>& map, const Board<n>& board) const {
-            if (this -> dead || this -> promoted) {
-                return;
-            }
-
-            if (!this -> has_moved){
-                this -> figure -> populate_openers(map, board, this -> position, this -> player_index);
-
-                if (this -> figure -> open_exclusive){
-                    return;
-                }
-            }
-
-            this -> figure -> populate_moves(map, board, this -> position, this -> player_index);
-        }
-
-
-        // TODO: instead of true/false, make promoted hold a pointer to the piece it promoted to.
-        sptr<Piece<n>> promoted_piece(index_t i) {
-            this -> promoted = true;
-
-            const std::string& promotion_fig = this -> promotion_list[i];
-
-            return std::make_shared<Piece<n>>(
-                Index<n>(this -> position),
-                Figure<n>::resolve(promotion_fig),
-                this -> player_index, 
-                false,
-                false, 
-                false
-            );
-        }
-    };
-
-    template<index_t n>
-    struct Player{
-        index_t index;
-
-        value_t material;
-
-        std::vector<sptr<Piece<n>>> pieces;
-        std::vector<sptr<Piece<n>>> monarchs;
-
-        std::vector<sptr<Piece<n>>> just_opened; // a list of pieces that were JUST_OPENED
-
-        Player(
-            index_t index, 
-            value_t material, 
-            std::vector<sptr<Piece<n>>>&& pieces, 
-            std::vector<sptr<Piece<n>>>&& monarchs,
-            std::vector<sptr<Piece<n>>>&& just_opened = std::move(std::vector<sptr<Piece<n>>>())
-        ) : index(index), 
-            material(material), 
-            pieces(std::forward<std::vector<sptr<Piece<n>>>>(pieces)), 
-            monarchs(std::forward<std::vector<sptr<Piece<n>>>>(monarchs)),
-            just_opened(std::forward<std::vector<sptr<Piece<n>>>>(just_opened)) {}
-
-        Player() : index(0), material(0), pieces(), monarchs() {}
-
-        Player(Player&&) = default;
-        Player(const Player&) = default;
-        
-
-        Player& operator=(Player&&) = default;
-        Player& operator=(const Player&) = default;
-
-        // PREPS FOR THE NEXT TURN
-        // i.e. all pieces that JUST_OPENED in the last turn will have JUST_OPENED set to false
-        void drain_last_opened() {
-            if (!this -> just_opened.empty()){
-                for (sptr<Piece<n>>& piece : this -> just_opened){
-                    piece -> just_opened = false;
-                }
-
-                this -> just_opened = std::vector<sptr<Piece<n>>>();
-            }
-        }
-
-        bool pieces_see(const Board<n>& board, const Index<n>& square) const {
-            for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, square)){
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool monarchs_see(const Board<n>& board, const Index<n>& square) const {
-            for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, square)){
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool sees(const Board<n>& board, const Index<n>& square) const {
-            return this -> monarchs_see(board, square) || this -> pieces_see(board, square);
-        }
-
-
-
-
-        std::vector<sptr<Piece<n>>> which_pieces_see(const Board<n>& board, const Index<n>& square) const {
-            std::vector<sptr<Piece<n>>> result;
-
-            for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, square)){
-                    result.push_back(&piece);
-                }
-            }
-
-            return result;
-        }
-
-        std::vector<sptr<Piece<n>>> which_monarchs_see(const Board<n>& board, const Index<n>& square) const {
-            std::vector<sptr<Piece<n>>> result;
-
-            for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, square)){
-                    result.push_back(&monarch);
-                }
-            }
-
-            return result;
-        }
-
-        std::vector<sptr<Piece<n>>> which_see(const Board<n>& board, const Index<n>& square) const {
-            std::vector<sptr<Piece<n>>> result;
-
-            for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, square)){
-                    result.push_back(&piece);
-                }
-            }
-
-            for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, square)){
-                    result.push_back(&monarch);
-                }
-            }
-
-            return result;
-        }
-
-
-
-        index_t how_many_pieces_see(const Board<n>& board, const Index<n>& square) const {
-            index_t N = 0;
-
-            for (const sptr<Piece<n>>& piece : this -> pieces){
-                if (piece -> sees(board, square)){
-                    N++;
-                }
-            }
-
-            return N;
-        }
-
-        index_t how_many_monarchs_see(const Board<n>& board, const Index<n>& square) const {
-            index_t N = 0;
-
-            for (const sptr<Piece<n>>& monarch : this -> monarchs){
-                if (monarch -> sees(board, square)){
-                    N++;
-                }
-            }
-
-            return N;
-        }
-
-        index_t how_many_see(const Board<n>& board, const Index<n>& square) const {
-            return this -> how_many_pieces_see(board, square) + this -> how_many_monarchs_see(board, square);
-        }
-    };
-
-    template<index_t n>
-    using Action = Tuple<Index<n>, 2>;
-
-    enum Status : char {
-        UNBEGUN = '0', ONGOING, PROMOTING, CHECKMATE, STALEMATE, TIMEOUT, DRAW
-    };
-
-    template<index_t n>
-    using Board = Grid<sptr<Piece<n>>, n>;
+namespace engines {
 
     template <index_t n, index_t p>
-    struct Instance{
-        Instance(
+    struct Engine{
+        static json game_sets;
+
+        Engine(
             const Tup<n>& shape,
             Tuple<Player<n>, p>&& players,
             double time
@@ -308,7 +30,8 @@ namespace game{
             turn_start_time(0),
             history(), 
             status(UNBEGUN), 
-            promoting(nullptr) 
+            promoting(nullptr),
+            victor()
         {
             this -> set();
 
@@ -316,9 +39,9 @@ namespace game{
             this -> round = &(this -> history.back());
         }
 
-        Instance(Instance&&) = default;
-        Instance& operator=(Instance&&) = default;
-        ~Instance() = default;
+        Engine(Engine&&) = default;
+        Engine& operator=(Engine&&) = default;
+        ~Engine() = default;
 
         sptr<Piece<n>>& operator[](const Index<n>& i) {
             return this -> board[i];
@@ -328,8 +51,8 @@ namespace game{
             return this -> board[i];
         }
 
-        bool is_over() const {
-            return (this -> status > PROMOTING);
+        bool is_on() const {
+            return (this -> status <= PROMOTING);
         }
 
         
@@ -440,6 +163,16 @@ namespace game{
         }
         
 
+        void declare_timeout() {
+            this -> status = TIMEOUT;
+            this -> victor = (this -> turn + 1) % p;
+        }
+
+        void declare_draw() {
+            this -> status = DRAW;
+        }
+
+
         void move(const Index<n>& start, const Index<n>& end) {
             this -> make_move(start, end);
 
@@ -499,7 +232,7 @@ namespace game{
 
 
         
-        friend std::ostream& operator<<(std::ostream& os, const Instance<n, p>& inst) {
+        friend std::ostream& operator<<(std::ostream& os, const Engine<n, p>& inst) {
             index_t index = 0;
             return inst.print_help(os, 0, index);
         }
@@ -522,7 +255,9 @@ namespace game{
             Status status;
             sptr<Piece<n>> promoting;
 
-            Instance(
+            std::optional<index_t> victor;
+
+            Engine(
                 Board<n>&& board,
                 Tuple<Player<n>, p>&& players,
                 Tuple<duration, p>&& times,
@@ -532,7 +267,8 @@ namespace game{
                 timestamp turn_start_time,
 
                 Status status,
-                sptr<Piece<n>> promoting
+                sptr<Piece<n>> promoting,
+                std::optional<index_t> victor
             ) : board(std::forward<Board<n>>(board)), 
                 players(std::forward<Tuple<Player<n>, n>>(players)), 
                 times(std::forward<Tuple<duration, p>>(times)), 
@@ -540,7 +276,8 @@ namespace game{
                 turn_start_time(turn_start_time),
                 history(std::forward<std::vector<Tuple<Action<n>, p>>>(history)), 
                 status(status), 
-                promoting(promoting) 
+                promoting(promoting),
+                victor(victor)
             {
                 this -> set();
 
@@ -709,7 +446,7 @@ namespace game{
 
                 throw std::runtime_error(error_str);
             }
-    
+
             virtual void make_move(const Index<n>& start, const Index<n>& end) {
                 if (this -> status > ONGOING) {
                     this -> status_error();
@@ -908,6 +645,7 @@ namespace game{
                 if (!has_legal_moves){
                     if (next_in_check){
                         this -> status = CHECKMATE;
+                        this -> victor = (this -> turn + p - 1) % p;
                     } else {
                         this -> status = STALEMATE;
                     }
@@ -969,5 +707,473 @@ namespace game{
 
     };
 
+    template <index_t n, index_t p>
+    json Engine<n, p>::game_sets = json::object();
+
+    template <index_t n, index_t p>
+    struct EvaluableEngine : public Engine<n, p> {
+        using Engine<n, p>::Engine;
+
+        EvaluableEngine(EvaluableEngine&&) = default;
+        EvaluableEngine& operator=(EvaluableEngine&&) = default;
+        ~EvaluableEngine() = default;
+
+        //TODO: write
+
+        private:
+            double check_value;
+            double threat_weight;
+
+            double move_eval();
+        
+    };
+
+
+    template <index_t n, index_t p>
+    struct SerializableEngine : public Engine<n, p>{
+        using Engine<n, p>::Engine;
+
+        SerializableEngine(SerializableEngine&&) = default;
+        SerializableEngine& operator=(SerializableEngine&&) = default;
+        ~SerializableEngine() = default;
+
+        static SerializableEngine instantiate(const std::string& set_name, double timer) {
+            json setup = Engine<n, p>::game_sets.at(set_name);
+
+            json times_arr = json::array();
+
+            for (index_t i = 0; i < p; i++){
+                times_arr.push_back(timer);
+            }
+
+            setup["times"] = times_arr;
+
+            return SerializableEngine::deserialize(setup);
+        }
+
+        virtual void resolve_promotion(index_t i) {
+            if (this -> status != PROMOTING) {
+                this -> status_error();
+            }
+
+            this -> raw_promote(i);
+            this -> move_event -> promote = i;
+
+            this -> post_move();
+        }
+
+
+        // EXTERNAL SERIALIZATION
+
+        // the following map to python Serializable objects (see netlib)
+        // defined in AV.
+        Reaction<n, p> execute(const Index<n>& start, const Index<n>& end) {
+            try {
+                this -> move(start, end);
+                
+                if (this -> status != PROMOTING) {
+                    return *(this -> drain_event());
+                } else {
+                    return Response<p>{"promote"};
+                }
+
+            } catch(const std::exception& e){
+                this -> move_event = std::nullopt;
+                return Response<p>{"error", e.what()};
+            }
+        }
+
+        Reaction<n, p> promote(index_t i) {
+            try {
+                this -> resolve_promotion(i);
+                return *(this -> drain_event());
+            } catch (const std::exception& e) {
+                return Response<p>{"error", e.what()};
+            }
+        }
+        
+
+        // EXPOSED SERIALIZATION
+
+        // the following are exposed to python
+        Reaction<n, p> process(const Request<n>& a) {
+            if (a.label == "action"){
+                const Action<n>& c = std::get<Action<n>>(*(a.content));
+                Index<n> start = this -> as_index(c[0]);
+                Index<n> end = this -> as_index(c[1]);
+                return this -> execute(start, end);
+            } else if (a.label == "promotion") {
+                index_t i = std::get<index_t>(*(a.content));
+                return this -> promote(i);
+            } else {
+                return Response<n>{"error", "Invalid json."};
+            }
+        }
+
+        Response<p> get_times() const {
+            Tuple<double, p> times;
+
+            for (index_t i = 0; i < p; i++){
+                if (i == this -> turn && this -> status > UNBEGUN){
+                    duration elapsed_time = std::chrono::duration_cast<duration>(timer::now() - this -> turn_start_time);
+                    times[i] = (this -> times[i] - elapsed_time).count();
+                } else {
+                    times[i] = this -> times[i].count();
+                }
+            }
+
+            return {"times", times};
+        }
+
+
+        json layout() const {
+            json k = json::array();
+
+            for (index_t i = 0; i < p; i++){
+                const Player<n>& player = this -> players[i];
+
+                json arr = json::array();
+
+                for (const sptr<Piece<n>>& piece : player.pieces) {
+                    if (!(piece -> dead || piece -> promoted)){
+                        arr.push_back({
+                            {"name", piece -> figure -> name},
+                            {"position", piece -> position},
+                            {"promotion_list", piece -> promotion_list},
+                            {"player_index", i},
+                            {"__type__", "Piece"}
+                        });
+                    }
+                }
+
+                for (const sptr<Piece<n>>& piece : player.monarchs) {
+                    if (!(piece -> dead || piece -> promoted)){
+                        arr.push_back({
+                            {"name", piece -> figure -> name},
+                            {"position", piece -> position},
+                            {"promotion_list", piece -> promotion_list},
+                            {"player_index", i},
+                            {"__type__", "Piece"}
+                        });
+                    }
+                }
+
+                k.push_back(arr);
+            }
+
+            return {
+                {"dims", this -> board.get_shape()},
+                {"armies", k},
+                {"__type__", "Board"}
+            };
+        }
+
+        
+
+        std::string layout_str() const {
+            return this -> layout().dump();
+        }
+
+        std::string to_str() const {
+            std::ostringstream oss;
+            oss << (*this);
+            return oss.str();
+        }
+
+
+        // INTERNAL SERIALIZATION 
+
+        json serialize() const {
+            json promoting;
+
+            if (this -> promoting == nullptr){
+                promoting = nullptr;
+            } else {
+                promoting = this -> promoting -> position;
+            }  
+
+            duration t = this -> turn_start_time.time_since_epoch();
+
+            return {
+                {"board", this -> board.get_shape()},
+                {"players", SerializableEngine::players_to_json(this -> players)},
+                {"times", this -> serialize_static_times()},
+                {"turn_start_time", t.count()},
+
+                {"turn", this -> turn},
+                {"history", this -> history},
+
+                {"status", (char)this -> status},
+                {"promoting", promoting},
+
+                {"victor", this -> victor},
+
+                {"move_event", this -> move_event}
+            };
+        }
+
+        static SerializableEngine deserialize(const json& j) {
+            Board<n> board(j.at("board").get<Tup<n>>());
+            Tuple<Player<n>, p> players = SerializableEngine::players_from_json(j.at("players"), board);
+
+            Tuple<duration, p> times;
+
+            json json_times = j.at("times");
+
+            for (index_t i = 0; i < p; i++){
+                times[i] = duration(json_times.at(i).get<double>());
+            }
+
+            json j_start_time = j.value("turn_start_time", json(nullptr));
+            timestamp turn_start_time;
+
+            if (j_start_time.is_null()){
+                turn_start_time = timestamp(timer::duration(0));
+            } else {
+                turn_start_time = timestamp(std::chrono::duration_cast<timer::duration>(duration{j.at("turn_start_time").get<double>()}));
+            }
+            SerializableEngine result(
+                std::move(board), 
+                std::move(players), 
+                std::move(times),
+                
+                j.value("history", json::array()).get<std::vector<Tuple<Action<n>, p>>>(),
+                j.value("turn", json(0)).get<index_t>(),
+                turn_start_time,
+
+                j.value("status", json(UNBEGUN)).get<Status>(),
+                nullptr,
+                j.value("victor", json(nullptr)).get<std::optional<index_t>>()
+            );
+
+            const json& promoting = j.value("promoting", json(nullptr));
+
+            if (!promoting.is_null()){
+                result.promoting = result.board[Index<n>(promoting.get<Tup<n>>(), board)];
+            }
+            
+            return result;
+        }
+
+
+        std::string embed() const {
+            return this -> serialize().dump();
+        }
+
+        static SerializableEngine disembed(const std::string& jstr) {
+            return SerializableEngine::deserialize(json::parse(jstr));
+        }
+
+        
+        protected:
+            std::optional<Event<n, p>> move_event;
+
+            virtual void make_move(const Index<n>& start, const Index<n>& end) {
+                if (this -> status > ONGOING) {
+                    this -> status_error();
+                }
+
+                sptr<Piece<n>> piece = this -> board[start];
+                sptr<Move<n>> move_ptr = this -> validate_and_get_move(piece, end);
+                const sptr<Piece<n>> target_piece = this -> adjust_board_and_get_target(piece, move_ptr.get(), start, end);
+                
+                this -> set_current_action(start, end);
+
+                bool auto_promote = this -> update_promoting(piece);
+
+                this -> move_event = Event<n, p>{std::vector<Action<n>>()};
+                this -> move_event -> actions.push_back(Action<n>(start, end));
+
+
+                if (move_ptr -> type_str() == "Castle"){
+                    //TODO: LOTS of recalculating scaling with castles. not too big a deal but try to optimize at some point.
+                    Vector<n> direction = move_ptr -> operator[](0);
+
+                    arith_t scaling = (end - start) | direction;
+                    Index<n> partner_start = target_piece -> position;
+
+                    index_t axis = direction.first_nonzero();
+
+                    if(scaling < 0){
+                        partner_start.zero_out(axis);
+                    } else {
+                        partner_start.max_out(axis);
+                    }
+
+                    this -> move_event -> actions.push_back(Action<n>(partner_start, target_piece -> position));
+
+                } else if (target_piece != nullptr){
+                    this -> move_event -> die = target_piece -> position;
+                }
+
+                if (auto_promote){
+                    this -> move_event -> promote = 0;
+                }
+
+            }
+
+            virtual void post_move() {
+                this -> move_event -> checks = this -> get_checks_except(this -> turn);
+                    
+                duration time_dif = this -> advance_turn();
+
+                bool next_in_check = false;
+
+                for (const index_t & check : *(this -> move_event -> checks)){
+                    if (check == this -> turn){
+                        next_in_check = true;
+                        break;
+                    }
+                }
+
+                this -> update_game_status(next_in_check);
+
+                this -> move_event -> times = Tuple<double, p>();
+
+                for (index_t i = 0; i < p; i++){
+                    this -> move_event -> times -> operator[](i) = this -> times[i].count();
+                }
+                
+                this -> move_event -> duration = time_dif.count();
+
+                if (this -> status == CHECKMATE){
+                    this -> move_event -> end = "checkmate";
+                } else if (this -> status == STALEMATE){
+                    this -> move_event -> end = "stalemate";
+                }
+            }
+
+
+            std::optional<Event<n, p>> drain_event() {
+                return std::exchange(this -> move_event, std::nullopt);
+            }
+
+            json serialize_static_times() const {
+            json times = json::array();
+
+            for (index_t i = 0; i < p; i++){
+                if (i == this -> turn && this -> status > UNBEGUN){
+                    duration elapsed_time = std::chrono::duration_cast<duration>(timer::now() - this -> turn_start_time);
+                    times.push_back(
+                        (this -> times[i] - elapsed_time).count()
+                    );
+                } else {
+                    times.push_back(this -> times[i].count());
+                }
+            }
+
+            return times;
+        }
+
+
+            static json piece_to_json(const sptr<Piece<n>>& pi) {
+                return {
+                    {"position", pi -> position},
+                    {"figure", pi -> figure -> key},
+                    {"player_index", pi -> player_index},
+                    {"promotion_list", pi -> promotion_list},
+                    {"promotion_axis", pi -> promotion_axis},
+                    {"promotion_index", pi -> promotion_index},
+                    {"promoted", pi -> promoted},
+                    {"dead", pi -> dead},
+                    {"has_moved", pi -> has_moved},
+                    {"just_opened", pi -> just_opened}
+                };
+            }
+
+            static sptr<Piece<n>> piece_from_json(const json& j, const Board<n>& board, index_t player_index) {
+                return std::make_shared<Piece<n>>(
+                    Index<n>(std::move(j.at("position").get<Tup<n>>()), board),
+                    Figure<n>::resolve(j.at("figure").get<std::string>()),
+                    j.value("player_index", json(player_index)).get<index_t>(),
+
+                    j.value("promotion_list", json::array()).get<std::vector<std::string>>(),
+                    j.value("promotion_axis", json(0)).get<index_t>(),
+                    j.value("promotion_index", json(0)).get<index_t>(),
+                    
+                    j.value("promoted", json(false)).get<bool>(),
+                    j.value("dead", json(false)).get<bool>(),
+                    j.value("has_moved", json(false)).get<bool>(),
+                    j.value("just_opened", json(false)).get<bool>()
+                );
+            }
+
+
+            static json player_to_json(const Player<n>& pl) {
+                json pieces = json::array();
+                json monarchs = json::array();
+                json just_opened = json::array();
+
+                for (const sptr<Piece<n>>& piece : pl.pieces){
+                    pieces.push_back(SerializableEngine::piece_to_json(piece));
+                }
+
+                for (const sptr<Piece<n>>& monarch : pl.monarchs){
+                    monarchs.push_back(SerializableEngine::piece_to_json(monarch));
+                }
+
+                return {
+                    {"index", pl.index},
+                    {"material", pl.material},
+                    {"pieces", pieces},
+                    {"monarchs", monarchs}
+                };
+            }
+
+            static Player<n> player_from_json(const json& j, const Board<n>& board, index_t index) {
+                std::vector<sptr<Piece<n>>> pieces;
+                std::vector<sptr<Piece<n>>> monarchs;
+                std::vector<sptr<Piece<n>>> just_opened;
+
+                const json& jpieces = j.at("pieces");
+                const json& jmonarchs = j.at("monarchs");
+
+                for (const json& piece : jpieces){
+                    pieces.push_back(SerializableEngine::piece_from_json(piece, board, index));
+                    if (pieces.back() -> just_opened){
+                        just_opened.push_back(pieces.back());
+                    }
+                }
+
+                for (const json& monarch : jmonarchs){
+                    monarchs.push_back(SerializableEngine::piece_from_json(monarch, board, index));
+                    if (monarchs.back() -> just_opened){
+                        just_opened.push_back(monarchs.back());
+                    }
+                }
+
+                return Player<n>(
+                    j.value("index", json(index)).get<index_t>(),
+                    j.at("material").get<value_t>(),
+                    std::move(pieces),
+                    std::move(monarchs),
+                    std::move(just_opened)
+                );
+            }
+
+
+            static json players_to_json(const Tuple<Player<n>, p>& ps){
+                json j = json::array();
+
+                for (index_t k = 0; k < p; k++){
+                    j.push_back(SerializableEngine::player_to_json(ps[k]));
+                }
+
+                return j;
+            }
+
+            static Tuple<Player<n>, p> players_from_json(const json& j, const Board<n>& board) {
+                
+                Tuple<Player<n>, p> ps;
+
+                for (index_t k = 0; k < p; k++){
+                    ps[k] = SerializableEngine::player_from_json(j[k], board, k);
+                }
+
+                return ps;
+            }
+        
+    };
 }
-#endif
+
+#endif 

@@ -1,6 +1,6 @@
 # Demetre Seturidze
 # Chess
-# AudioVisuals
+# User Interface
 
 from typing import List, Sequence
 from collections.abc import Iterator
@@ -9,13 +9,15 @@ from dataclasses import dataclass
 
 from applib import objects
 from applib.text import TextEntry, TextRecord
-from applib.utils import Color, Coords, Surface, Sound, new_surface, Vector, ZERO_VEC, phase
+from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
 from applib.controls import Controllable, EventUI, Interface
 
 from netlib.serialization import Serializable
 
 from files.media.assets import Assets
-from files.engine.pyutils import Index, Grid, Text, Chat, Response, Request, Action, Promotion, Event, InMessage, OutMessage
+
+from files.engine import Index, Grid, Response, Request, Event 
+from files.system.graph import Text, Chat, SystemMessage, UserMessage
 
 import pygame as pg
 
@@ -35,7 +37,7 @@ class UserInterface:
     ):  
         this.assets = assets
         tile_width, tile_height = assets.tile_shape
-        
+
 
         class Piece(objects.Object, Serializable):
             def __init__(
@@ -75,13 +77,13 @@ class UserInterface:
 
         @dataclass
         class Cache:
-            action : Action
+            action : tuple[Index, Index]
 
             start_piece : Piece
             end_piece : Piece | None = None
          
 
-        class Board(objects.Structure, Serializable, Controllable[OutMessage]):    
+        class Board(objects.Structure, Serializable, Controllable[UserMessage]):    
             def __init__(
                 self, 
                 dims : Index, # dimensions of the game board, in tiles
@@ -342,11 +344,8 @@ class UserInterface:
 
             # COMMUNICATION
             
-            def _request_move(self, start : Index, end : Index) -> Action:
-                action = Action(
-                    start=start,
-                    end=end
-                )
+            def _request_move(self, start : Index, end : Index) -> Request:
+                action = (start, end)
 
                 start_piece=self.grid[start]
                 end_piece=self.grid[end]
@@ -360,21 +359,21 @@ class UserInterface:
                 self.grid[start] = None
                 self.grid[end] = start_piece 
 
-                return action
+                return Request.construct("action", action)
 
-            def _request_promote(self, start_coords : Coords, end_coords : Coords, from_global : bool = True) -> Promotion | None:
+            def _request_promote(self, start_coords : Coords, end_coords : Coords, from_global : bool = True) -> Request | None:
                 index = self.promotion_plaque.which_hits(start_coords, end_coords, from_global=from_global)
                 if index == -1:
                     return None
-                return Promotion(index)
+                return Request.construct("promote", index)
 
 
             def revert_cache(self):
                 if self.cache is not None:
                     action = self.cache.action 
 
-                    self.grid[action.start] = self.cache.start_piece
-                    self.grid[action.end] = self.cache.end_piece
+                    self.grid[action[0]] = self.cache.start_piece
+                    self.grid[action[1]] = self.cache.end_piece
 
                     self.cache = None
             
@@ -387,16 +386,12 @@ class UserInterface:
 
                 sounds : list[str] = []
 
-                action = event.action
-                coaction = event.coaction
-
-                piece : Piece = self.grid[action.start]
-
-                piece.board_pos = action.end
-                piece.topleft = self.coords(action.end, to_global=False)
+                actions = event.actions
 
                 __captures = event.die is not None
-                __castles = coaction is not None
+                __castles = len(actions) > 1
+
+                piece : Piece = self.grid[actions[0][0]]
 
                 if __captures:
                     die = self.grid[event.die]
@@ -407,22 +402,19 @@ class UserInterface:
 
                     sounds.append("take")
 
+                for action in actions:
+                    piece : Piece = self.grid[action[0]]
+
+                    piece.board_pos = action[1]
+                    piece.topleft = self.coords(action[1], to_global=False)
+
+                    self.grid[action[0]] = None
+                    self.grid[action[1]] = piece
+
                 if event.checks:
                     sounds.append("check")
-                
-                
-                self.grid[action.start] = None
-                self.grid[action.end] = piece
 
                 if __castles:
-                    partner : Piece = self.grid[coaction.start]
-
-                    partner.board_pos = coaction.end
-                    partner.topleft = self.coords(coaction.end, to_global=False)
-
-                    self.grid[coaction.start] = None 
-                    self.grid[coaction.end] = partner
-
                     sounds.append("castle")
 
 
@@ -450,7 +442,7 @@ class UserInterface:
                     
                 if self.cache is not None and response.label == "promote":
                     self.make_promotion_plaque(
-                        self.cache.start_piece, self.cache.action.end
+                        self.cache.start_piece, self.cache.action[1]
                     )
                 elif response.label == "error":
                     self.revert_cache()
@@ -469,7 +461,7 @@ class UserInterface:
 
             # CONTROLS
 
-            def _handle_ingame(self, event : EventUI) -> OutMessage | None:
+            def _handle_ingame(self, event : EventUI) -> UserMessage | None:
                 result = None 
 
                 if event.type == pg.MOUSEBUTTONDOWN:
@@ -509,7 +501,7 @@ class UserInterface:
 
                 return result
                     
-            def _handle_gameover(self, event : EventUI) -> OutMessage | None:
+            def _handle_gameover(self, event : EventUI) -> UserMessage | None:
                 result = None
                     
                 if event.type == pg.MOUSEBUTTONDOWN:
@@ -519,17 +511,17 @@ class UserInterface:
                     button = self.end_plaque.which_hits(event.pos, self.last_click)
 
                     if button == 'reset': 
-                        result = Request(index=self.player_index, content='reset')
+                        result = Request.construct(label='reset', content=self.player_index)
                         self.end_plaque = None 
 
                     elif button == 'quit':
-                        result = Request(index=self.player_index, content="quit")
+                        result = Request.construct(label='quit', content=self.player_index)
                     
                     self.last_click = None 
                 
                 return result
             
-            def _handle_promotion(self, event : EventUI) -> OutMessage | None:
+            def _handle_promotion(self, event : EventUI) -> UserMessage | None:
                 result = None
 
                 if event.type == pg.MOUSEBUTTONDOWN:
@@ -541,7 +533,7 @@ class UserInterface:
                 return result
             
 
-            def handle(self, event : EventUI, queue : list[OutMessage]): 
+            def handle(self, event : EventUI, queue : list[UserMessage]): 
                 if self.end_plaque is not None:
                     handle = self._handle_gameover
                 elif self.promotion_plaque is not None:
@@ -768,7 +760,7 @@ class UserInterface:
                 self.arrs[player_index].add(piece)
 
         
-        class ChatBar(objects.Environment, Controllable[OutMessage]):
+        class ChatBar(objects.Environment, Controllable[UserMessage]):
             def __init__(
                 self,
                 
@@ -880,7 +872,7 @@ class UserInterface:
                 return text
             
 
-            def handle(self, event : EventUI, queue : list[OutMessage]):
+            def handle(self, event : EventUI, queue : list[UserMessage]):
                 result = None 
 
                 if event.type == pg.TEXTINPUT:
@@ -904,7 +896,7 @@ class UserInterface:
                     queue.append(result)
 
 
-        class GameInterface(Interface[OutMessage]):
+        class GameInterface(Interface[UserMessage]):
             def __init__(
                 self,
                 
@@ -929,13 +921,17 @@ class UserInterface:
 
                 ###
                 board.set_player(player_index)
-                self.board = self['board'] = board
+                self.board = board
+                self.append(board)
                 board.enforce_player = enforce_player
                 board.play("start")
                 ###
                 
-                self.chatbar = self['chatbar'] = chatbar
-                self.statbar = self['statbar'] = statbar
+                self.chatbar = chatbar
+                self.append(chatbar)
+
+                self.statbar = statbar
+                self.append(statbar)
 
                 self.player_index = player_index
                 
@@ -954,11 +950,11 @@ class UserInterface:
                 board.enforce_player = self.board.enforce_player
                 board.topleft = self.board.topleft 
 
-                self.board = self['board'] = board
+                self.board = self[0] = board
                 board.play("start")
 
 
-            def register(self, msg : InMessage | Board):
+            def register(self, msg : SystemMessage | Board):
                 if isinstance(msg, Board):
                     self.set_board(msg)
             
@@ -988,9 +984,13 @@ class UserInterface:
 
             def _quit(self) -> Event:
                 self.running = False 
-                return Request(index=self.player_index, content='quit')
+                return Request.construct(label='quit', content=self.player_index)
 
-        
+
+        # work on making sign-up/login page, etc...
+        class EntryInterface(Interface[UserMessage]):
+            ...
+
         this.Piece = Piece
         this.Board = Board
 
@@ -1001,6 +1001,8 @@ class UserInterface:
         this.ChatBar = ChatBar
 
         this.GameInterface = GameInterface
+
+        this.EntryInterface = EntryInterface
 
 
 def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):
