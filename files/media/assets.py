@@ -245,7 +245,7 @@ class Assets:
                 int(tiles * tile_side) for tile_side in self.tile_shape
             )
 
-    def pixels_to_coords(self, pixels : Sequence[int] | int) -> Coords:
+    def pixels_to_coords(self, pixels : Sequence[int | float] | int | float) -> Coords:
         if isinstance(pixels, (tuple, list)):
             return tuple(
                 int(pixels[i] * self.pixel_shape[i]) for i in range(len(pixels))
@@ -256,10 +256,20 @@ class Assets:
             )
 
 
-    
-    
+    def play_sound(self, sound_name : str):
+        self.sounds[sound_name].play()
 
-        
+
+    def resolve_color(self, color : Color | str):
+        if isinstance(color, Color):
+            return color
+        return getattr(self.scheme, color)
+
+
+
+
+
+
 
 
 

@@ -35,7 +35,10 @@ class Scheme:
     timeout : Color = Color.from_hex('#DCC0B4')
     
     plaque : Color = Color.from_hex('#8C7864')
+    button : Color = Color.from_hex("#5A4735")
     text : Color = Color.from_hex('#DCC0B4')
+
+    error : Color = Color.from_hex("#DE170C")
 
     select : Color = Color.from_hex('#CD643288')
 

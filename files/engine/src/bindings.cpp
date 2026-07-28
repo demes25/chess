@@ -66,11 +66,12 @@ void load_sets(std::string set_path){
 
 
 template<index_t n, index_t p>
-void bind(py::module_& m, const char* req_name = "Request", const char* resp_name = "Response", const char* event_name = "Event", const char* eng_name = "Engine")
+void bind(py::module_& m, const char* req_name = "Request", const char* resp_name = "Response", const char* event_name = "Event", const char* err_name = "Error", const char* eng_name = "Engine")
 {   
     using Rq = Request<n>;
     using Rp = Response<p>;
     using Ev = Event<n, p>;
+    using Er = Error;
 
     py::class_<Rq>(m, req_name)
         .def(py::init([](
@@ -129,6 +130,20 @@ void bind(py::module_& m, const char* req_name = "Request", const char* resp_nam
         .def_readwrite("promote", &Ev::promote)
         .def_readwrite("end", &Ev::end);
 
+    py::class_<Er>(m, err_name)
+        .def(py::init([](
+                            std::string label,
+                            std::optional<std::string> content
+                        ) -> Er {
+                            return Error{
+                                std::move(label), std::move(content)
+                            };
+                        }
+
+                    ), py::arg("label"), py::arg("content") = py::none())
+        .def_readwrite("label", &Er::label)
+        .def_readwrite("content", &Er::content);
+
     using Eng = engines::SerializableEngine<n, p>;
     
     py::class_<Eng>(m, eng_name)
@@ -148,7 +163,7 @@ void bind(py::module_& m, const char* req_name = "Request", const char* resp_nam
     m.def("load_sets", load_sets<n, p>, py::arg("filepath"));
 }
 
-PYBIND11_MODULE(engine, m)
+PYBIND11_MODULE(internals, m)
 {  
     bind<2, 2>(m);
 }

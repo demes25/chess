@@ -4,7 +4,7 @@
 
 
 from typing import Sequence, Generic, TypeVar
-
+from netlib.serialization import Serializable
 from collections.abc import Iterable, Iterator
 
 T = TypeVar("T")
@@ -111,4 +111,10 @@ class Wrapper(Generic[T]):
     @classmethod
     def construct(cls, *args, **kwargs):
         return cls(cls._type(*args, **kwargs))
+
+class SerialWrapper(Wrapper[T], Serializable):
+    @classmethod
+    def from_dict(cls, dct):
+        return cls.construct(**dct)
+
 

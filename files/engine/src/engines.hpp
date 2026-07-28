@@ -779,7 +779,7 @@ namespace engines {
 
             } catch(const std::exception& e){
                 this -> move_event = std::nullopt;
-                return Response<p>{"error", e.what()};
+                return Error{"InGame",  e.what()};
             }
         }
 
@@ -788,7 +788,7 @@ namespace engines {
                 this -> resolve_promotion(i);
                 return *(this -> drain_event());
             } catch (const std::exception& e) {
-                return Response<p>{"error", e.what()};
+                return Error{"InGame",  e.what()};
             }
         }
         
@@ -805,8 +805,10 @@ namespace engines {
             } else if (a.label == "promotion") {
                 index_t i = std::get<index_t>(*(a.content));
                 return this -> promote(i);
+            } else if (a.label == "times") {
+                return this -> get_times();
             } else {
-                return Response<n>{"error", "Invalid json."};
+                return Error{"InGame", "invalid request"};
             }
         }
 
@@ -814,7 +816,7 @@ namespace engines {
             Tuple<double, p> times;
 
             for (index_t i = 0; i < p; i++){
-                if (i == this -> turn && this -> status > UNBEGUN){
+                if (i == this -> turn && this -> status > UNBEGUN && this -> status < CHECKMATE){
                     duration elapsed_time = std::chrono::duration_cast<duration>(timer::now() - this -> turn_start_time);
                     times[i] = (this -> times[i] - elapsed_time).count();
                 } else {

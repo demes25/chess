@@ -1,6 +1,6 @@
-from files.engine import Engine, load_figures, load_sets, Request 
+from files.engine import load_figures, load_sets, EngineRequest 
 
-from files.system.graph import Processor
+from files.system.items import Session, Request, UserLayout, Error, Challenge, Response
 from files.system.ui import to_UI
 
 from applib.controls import fetch
@@ -15,16 +15,17 @@ load_figures("files/engine/figures.json")
 load_sets("files/engine/sets.json")
 
 
-processor = Processor("Chess", 600)
+processor = Session("Chess", 600)
 layout = processor.begin()
 
-print(layout.content)
-board = deserialize(layout.content)
-
-frontend = ui.GameInterface(board, 0, False)
+print(layout.board_str)
+board = deserialize(layout.board_str)
 
 pg.init()
 pg.display.init()
+
+'''
+frontend = ui.GameInterface(board, 0, False)
 screen = pg.display.set_mode(frontend.shape)
 
 in_queue = []
@@ -53,7 +54,32 @@ while True:
 
     frontend.blit_onto(screen)
     pg.display.flip()
-    
+'''
 
 
+#frontend = ui.AuthInterface(25)
 
+frontend = ui.MiddleInterface('deme', 36, 6.5)
+frontend.add(
+    UserLayout('joaco')
+)
+frontend.add(
+    UserLayout('cristiancito')
+)
+
+screen = pg.display.set_mode(frontend.shape)
+
+frontend.show_message(Error(label="error", content="test error"), 5)
+#frontend.show_challenge(Challenge('joaco', 'deme', 'Chess', 600))
+
+#frontend.show_challenge(Challenge('cristiancito', 'deme', 'Chess', 600))
+
+while True:
+    events = fetch()
+    out_queue = frontend.process(events)
+
+    for outward in out_queue:
+        print(outward)
+
+    frontend.blit_onto(screen)
+    pg.display.flip()

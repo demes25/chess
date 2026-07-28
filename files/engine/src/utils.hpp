@@ -31,6 +31,11 @@ namespace utils {
         std::optional<ResponseContent<p>> content = std::nullopt;  
     };
 
+    struct Error {
+        std::string label;
+        std::optional<std::string> content = std::nullopt;
+    };
+
     template <index_t n, index_t p>
     struct Event {
         std::vector<Action<n>> actions;
@@ -72,7 +77,7 @@ namespace utils {
     }
 
     template <index_t n, index_t p>
-    using Reaction = std::variant<Event<n, p>, Response<p>>;
+    using Reaction = std::variant<Event<n, p>, Response<p>, Error>;
 }
 
 #endif 

@@ -15,7 +15,7 @@ sources = [
 
 ext_modules = [
     Pybind11Extension(
-        "engine",
+        "internals",
         sources=sources,
         cxx_std=20
     )

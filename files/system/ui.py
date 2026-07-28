@@ -2,27 +2,31 @@
 # Chess
 # User Interface
 
-from typing import List, Sequence
+from typing import List, Sequence, Literal
 from collections.abc import Iterator
 from dataclasses import dataclass
 
 
 from applib import objects
-from applib.text import TextEntry, TextRecord
-from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase
-from applib.controls import Controllable, EventUI, Interface
+from applib.text import TextEntry, TextRecord, Font
+from applib.utils import Color, Coords, Surface, new_surface, Vector, ZERO_VEC, phase, scale, alpha_blend
+from applib.controls import Controllable, EventUI, FocusContainer, Scrollable
 
-from netlib.serialization import Serializable
+from files.media.schemes import GRAYSCALE
+from files.media.schemes import CristiancitoScheme
+
+from netlib.serialization import Serializable, deserialize
 
 from files.media.assets import Assets
 
-from files.engine import Index, Grid, Response, Request, Event 
-from files.system.graph import Text, Chat, SystemMessage, UserMessage
+from files.engine import Index, Grid, EngineResponse, EngineRequest, EngineEvent, EngineError
+from files.system.items import Text, SystemResponse, SystemRequest, Layout, Response, Request, Auth, Error, UserLayout, Challenge
 
 import pygame as pg
 
-
 Dimensions = tuple[int | float, int | float]
+
+AnchorPoint = Literal['center', 'left', 'right']
 
 # TODO: make CHAT HISTORY communicable.
         
@@ -38,7 +42,239 @@ class UserInterface:
         this.assets = assets
         tile_width, tile_height = assets.tile_shape
 
+        king_scale : int = 2
+        king_color : Color = CristiancitoScheme.players[0]
 
+        text_color : Color = CristiancitoScheme.tiles[0]
+        subtext_color : Color = CristiancitoScheme.players[0]
+
+        ### LOGO ###
+        king = objects.Object(phase(scale(assets.figures['King'], king_scale), king_color, False))
+
+        title_font = assets.title_font
+
+        _title = phase(title_font.render("OBCHESSED", text_color), GRAYSCALE[1], copy=False)
+        _shade = title_font.render("OBCHESSED", subtext_color)
+
+        title_shape = _title.get_size()
+        title_shape = (title_shape[0] + assets.pixel_shape[0], title_shape[1] + assets.pixel_shape[1])
+
+        title = objects.Object(title_shape)
+        title.surface.blit(_shade, (0, 0))
+        title.surface.blit(_title, assets.pixel_shape)
+
+        logo_shape = (max(title_shape[0], king.width), title_shape[1] + 2*assets.pixel_shape[1] + king.height)
+        logo = objects.Object(logo_shape)
+
+        king.center = logo.center
+        king.top = logo.top
+
+        title.center = logo.center
+        title.bottom = logo.bottom
+
+        king.blit_onto(logo.surface)
+        title.blit_onto(logo.surface)
+        ###
+
+        this.icon = king.surface
+        this.logo = logo
+
+
+        class InputField(Scrollable[SystemRequest]):
+            def __init__(
+                self,
+                font : Font,
+                shape : Coords | int,
+                color : Color = assets.scheme.text,
+                margin : float = 1,
+                velocity : float = 2.0,
+                small_corners : bool = False,
+                background_color : Color | str = 'translucent_plaque',
+                default_text : str | None = None
+            ):
+
+                
+                margins = assets.pixels_to_coords(margin)
+                if isinstance(shape, tuple):
+                    entry = TextEntry(font, shape[0] - 2*margins[0], color)
+                else:
+                    entry = TextEntry(font, shape - 2*margins[0], color)
+
+                if default_text is not None:
+                    self.default_text = objects.Object(font.render(default_text, color=color.new_opacity(127)))
+                    self.default_text.topleft = margins
+                else:
+                    self.default_text = None
+                
+                self.is_in_focus = False
+                
+                if isinstance(shape, int):
+                    shape = (shape, font.glyph_height + 2*margins[1])
+
+                plaque = assets.make_plaque(shape=shape, small_corners=small_corners, color=background_color)
+                super().__init__(plaque, item=entry, margins=margins, velocity=velocity)
+
+            def __iter__(self):
+                yield self.item
+
+                if not self.is_in_focus and self.default_text is not None and self.item.string == '':
+                    yield self.default_text
+
+
+            def enfocus(self):
+                self.item.show_pointer()
+                self.is_in_focus = True
+
+            def defocus(self):
+                self.item.hide_pointer()
+                self.is_in_focus = False
+
+        class Button(objects.Object):
+            def __init__(self, text : str, min_width : int = 0, font : Font = assets.half_title_font, color : Color = assets.scheme.text, anchor : AnchorPoint = 'center', margin : float = 3, background_color : Color | str = 'button'):
+                text_obj = objects.Object(font.render(text, color))
+                margins = assets.pixels_to_coords(margin)
+                
+                shape = (max(text_obj.width + 2*margins[0], min_width), font.glyph_height + 2*margins[1])
+                surface = assets.make_plaque(shape, small_corners=True, color=background_color)
+
+                self.string = text 
+
+                super().__init__(surface)
+
+                if anchor == 'center':
+                    text_obj.center = self.midpoint
+                elif anchor == 'left':
+                    text_obj.topleft = margins
+                elif anchor == 'right':
+                    text_obj.topright = (self.width - margins[0], margins[1])
+
+                text_obj.blit_onto(self.surface)
+
+                shade = alpha_blend(surface, Color.from_hex("#00000032"))
+
+                self.shaded_surface = self.surface.copy()
+                self.shaded_surface.blit(shade, (0, 0))
+
+                self.default_surface = self.surface
+
+            def click(self):
+                self.surface = self.shaded_surface
+                assets.play_sound('click')
+                self.is_clicked = True
+
+            def unclick(self):
+                self.surface = self.default_surface
+                self.is_clicked = False 
+
+        class Selection(objects.Array, Controllable[SystemRequest]):
+            def __init__(self, width : int,  choices : list[str], font : Font, text_color : Color = assets.scheme.text, anchor : AnchorPoint = 'center', margin : float = 3.0, button_color : Color = assets.scheme.button, keep_after_defocus : bool = False):
+                choice_buttons : list[Button] = []
+                total_height = 0
+
+                self.font = font
+                self.text_color = text_color
+                self.margin = margin
+                self.anchor = anchor
+                self.button_color = button_color
+
+                self.selected : Button | None = None
+                self._keep_after_defocus = keep_after_defocus
+
+                for choice in choices:
+                    new_button = Button(choice, min_width=width, font=font, color=text_color, anchor=anchor, margin=margin, background_color=button_color)
+                    if choice_buttons:
+                        new_button.topleft = choice_buttons[-1].bottomleft
+                    choice_buttons.append(new_button)
+                    total_height += new_button.height
+
+                super().__init__((width, max(total_height, 1)))
+                self.extend(choice_buttons)
+
+                self.CURRENT_Y = total_height
+
+
+            def toggle_keep(self):
+                self._keep_after_defocus = not self._keep_after_defocus
+
+            def enfocus(self):
+                return
+
+            def defocus(self):
+                if not self._keep_after_defocus:
+                    self.deselect()
+            
+            def deselect(self):
+                if self.selected is not None:
+                    self.selected.unclick()
+                    self.selected = None
+
+            def select(self, key : int):
+                if key == -1:
+                    self.deselect()
+                else:
+                    choice = self[key]
+
+                    if self.selected is not choice:
+                        if self.selected is not None:
+                            self.selected.unclick()
+                        self.selected = choice
+                        choice.click()
+            
+            def handle(self, event : EventUI, _ : list[SystemRequest]):
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
+                    choice = self.which_hits(event.pos)
+                    self.select(choice)
+                
+            def add(self, choice : str):
+                new_button = Button(choice, min_width=self.width, font=self.font, color=self.text_color, anchor=self.anchor, margin=self.margin, background_color=self.button_color)
+
+                
+                if (self.height - self.CURRENT_Y) < (new_button.height):
+                    self._set(new_surface((self.width, self.height + new_button.height)), fixed='topleft')
+
+                new_button.topleft = (0, self.CURRENT_Y)
+                self.CURRENT_Y += new_button.height
+                self.append(new_button)
+
+            def delete(self, choice : str):
+                target_index = None 
+                
+                for i in range(len(self)):
+                    if self[i].string == choice:
+                        target_index = i
+                        break
+
+                if target_index is None:
+                    return
+
+                o = self[target_index]
+                shift_amount = o.height
+                self.remove(o)
+
+                for j in range(target_index, len(self)):
+                    self[j].top -= shift_amount
+
+        class ScrollableSelection(Scrollable[SystemRequest]):
+            def __init__(self, shape : Coords,  choices : list[str], font : Font, text_color : Color = assets.scheme.text, anchor : AnchorPoint = 'center', view_margin : float = 3.0, text_margin : float = 3.0, button_color : Color = assets.scheme.button, background_color : Color = assets.scheme.plaque, keep_after_defocus : bool = False):
+
+                margins = assets.pixels_to_coords(view_margin)
+                width = shape[0] - 2*margins[0]
+
+                selection = Selection(width, choices=choices, font=font, text_color=text_color, anchor=anchor, margin=text_margin, button_color=button_color, keep_after_defocus=keep_after_defocus)
+                plaque = assets.make_plaque(shape, small_corners=True, color=background_color)
+
+                super().__init__(plaque, item=selection, margins=margins)
+
+            def add(self, choice : str):
+                self.item.add(choice)
+
+            def delete(self, choice : str):
+                self.item.delete(choice)
+
+
+
+               
+               
         class Piece(objects.Object, Serializable):
             def __init__(
                 self,
@@ -58,7 +294,7 @@ class UserInterface:
 
 
             def resolve_promote(self, index : int):
-                self.surface = self.promotion_list[index]
+                self.surface = assets.colored_figures[self.player_index][self.promotion_list[index]]
                 self.promotion_list = []
 
             def __setattr__(self, name, value):
@@ -83,7 +319,7 @@ class UserInterface:
             end_piece : Piece | None = None
          
 
-        class Board(objects.Structure, Serializable, Controllable[UserMessage]):    
+        class Board(objects.Structure, Serializable, Controllable[SystemRequest]):    
             def __init__(
                 self, 
                 dims : Index, # dimensions of the game board, in tiles
@@ -126,7 +362,7 @@ class UserInterface:
                 self.promotion_plaque : objects.Array | None = None
 
                 self.last_click : Coords | None = None 
-                self.end_plaque : objects.Environment | None = None
+                self.end_plaque : objects.Mapping | None = None
                 
 
 
@@ -168,6 +404,10 @@ class UserInterface:
 
                         self.surface.blit(tile, assets.tiles_to_coords((j, i)))
 
+                for army in self.armies:
+                    for piece in army:
+                        piece.topleft = self.coords(piece.board_pos, to_global=False)
+
 
             def make_promotion_plaque(self, piece : Piece, board_pos : Index):
                 figures = piece.promotion_list
@@ -179,11 +419,11 @@ class UserInterface:
                 # TODO: extend this to be able to be a square or some other dimension to accommodate n promotion figures
                 if (self.dims[0]-board_pos[0]) < len(figures):
                     disp = -tile_width
-                    left = self.topleft[0] + tile_width * (board_pos[0] - len(figures) + 1)
+                    left = tile_width * (board_pos[0] - len(figures) + 1)
                     x_init = tile_width * (len(figures)-1)
                 else:
                     disp = tile_width
-                    left = self.topleft[0] + tile_width * board_pos[0]
+                    left = tile_width * board_pos[0]
                     x_init = 0
 
                 plaque = assets.make_plaque(
@@ -198,7 +438,7 @@ class UserInterface:
                 x = x_init
                 
                 for piece in figures:
-                    sprite = sprites[piece.name]
+                    sprite = sprites[piece]
                     
                     object = objects.Object(sprite)
                     object.topleft = (x, 0)
@@ -226,28 +466,29 @@ class UserInterface:
                 
                 plaque = assets.make_plaque(shape=assets.tiles_to_coords(dims))
 
-                result = objects.Environment(plaque)
+                result = objects.Mapping(plaque)
 
                 if label_color is None:
                     label_color = assets.scheme.__getattribute__(label.lower()) 
 
-                dx_r = result.width // 5
-                dx_q = result.width // 4
-                dy = result.height // 7
-
+                
                 x, y = result.midpoint
+
+                close_center = x // 2 
+                reset_center = (x * 3 ) // 2
+                dy = result.height // 7
 
                 label_object = objects.Object(assets.title_font.render(label.upper(), label_color))
                 label_object.center = (x, y - dy)
                 result['label'] = label_object
 
-                reset_button = objects.Object(assets.half_title_font.render('RESET', assets.scheme.text))
-                reset_button.rect.center = (x + dx_r, y + dy)
+                reset_button = Button('RESET', background_color=assets.scheme.plaque)
+                reset_button.rect.center = (reset_center, y + dy)
                 result['reset'] = reset_button
 
-                quit_button = objects.Object(assets.half_title_font.render('QUIT', assets.scheme.text))
-                quit_button.rect.center = (x-dx_q, y + dy)
-                result['quit'] = quit_button
+                close_button = Button('CLOSE', background_color=assets.scheme.plaque)
+                close_button.rect.center = (close_center, y + dy)
+                result['close'] = close_button
 
                 result.center = self.midpoint
 
@@ -330,21 +571,19 @@ class UserInterface:
                     self.hold_selected = False 
                     self.selected_piece.topleft = self.coords(self.selected_piece.board_pos, to_global=False)
 
-            def deselect_piece(self):
-                self.unhold_piece()
+            def deselect_piece(self, unhold = True):
+                if unhold:
+                    self.unhold_piece()
                 self.selected_piece = None
 
             def deselect_squares(self):
                 self.selected_squares = []
 
-            def play(self, sound_name : str):
-                assets.sounds[sound_name].play()
-
                 
 
             # COMMUNICATION
             
-            def _request_move(self, start : Index, end : Index) -> Request:
+            def _request_move(self, start : Index, end : Index) -> EngineRequest:
                 action = (start, end)
 
                 start_piece=self.grid[start]
@@ -359,13 +598,13 @@ class UserInterface:
                 self.grid[start] = None
                 self.grid[end] = start_piece 
 
-                return Request.construct("action", action)
+                return EngineRequest.construct("action", action)
 
-            def _request_promote(self, start_coords : Coords, end_coords : Coords, from_global : bool = True) -> Request | None:
+            def _request_promote(self, start_coords : Coords, end_coords : Coords, from_global : bool = True) -> EngineRequest | None:
                 index = self.promotion_plaque.which_hits(start_coords, end_coords, from_global=from_global)
                 if index == -1:
                     return None
-                return Request.construct("promote", index)
+                return EngineRequest.construct("promotion", index)
 
 
             def revert_cache(self):
@@ -378,7 +617,7 @@ class UserInterface:
                     self.cache = None
             
 
-            def register_event(self, event : Event) -> tuple[int, Piece] | None:
+            def register_event(self, event : EngineEvent) -> tuple[int, Piece] | None:
                 result = None 
 
                 self.revert_cache()
@@ -431,40 +670,45 @@ class UserInterface:
                 if event.end is not None:
                     self.make_end_plaque(label=event.end)
 
+                    self.deselect_piece()
+                    self.deselect_squares()
+
                     sounds.append("end")
                 
                 for sound in sounds:
-                    self.play(sound)
+                    assets.play_sound(sound)
                 
                 return result
             
-            def register_response(self, response : Response):
-                    
+            def register_response(self, response : EngineResponse):
                 if self.cache is not None and response.label == "promote":
                     self.make_promotion_plaque(
                         self.cache.start_piece, self.cache.action[1]
                     )
-                elif response.label == "error":
+
+                    self.deselect_piece(unhold=False)
+
+            def register_error(self, err : EngineError):
+                if self.cache is not None and err.label == "InGame":
                     self.revert_cache()
                     
                     if self.play_sound_if_next_error:
-                        self.play('illegal')
-                        self.deselect_piece()
-                    else:
-                        self.unhold_piece()
+                        assets.play_sound('illegal')
 
-                    print(response.content)
+                    self.deselect_piece()
                     self.deselect_squares()
-                
-                self.play_sound_if_next_error = True
+
+                    print(err.content)
+                    self.play_sound_if_next_error = True
+
 
 
             # CONTROLS
 
-            def _handle_ingame(self, event : EventUI) -> UserMessage | None:
+            def _handle_ingame(self, event : EventUI) -> SystemRequest | None:
                 result = None 
 
-                if event.type == pg.MOUSEBUTTONDOWN:
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
                     # selects the piece
                     pos = self.board_pos(event.pos)
                     target = self.grid[pos]
@@ -482,7 +726,7 @@ class UserInterface:
                             self.deselect_piece()
                             self.play_sound_if_next_error = False 
                 
-                if event.type == pg.MOUSEBUTTONUP:
+                if event.type == pg.MOUSEBUTTONUP and event.button <= 2:
                     selected = self.selected_piece
 
                     if selected is not None:
@@ -501,39 +745,42 @@ class UserInterface:
 
                 return result
                     
-            def _handle_gameover(self, event : EventUI) -> UserMessage | None:
+            def _handle_gameover(self, event : EventUI) -> SystemRequest | None:
                 result = None
                     
-                if event.type == pg.MOUSEBUTTONDOWN:
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
                     self.last_click = event.pos
+                    button = self.end_plaque.which_hits(event.pos)
+
+                    if button in ('reset', 'close'):
+                        self.end_plaque[button].click()
+
                 
-                if event.type == pg.MOUSEBUTTONUP and self.last_click is not None:
+                if event.type == pg.MOUSEBUTTONUP and event.button <= 2 and self.last_click is not None:
                     button = self.end_plaque.which_hits(event.pos, self.last_click)
 
-                    if button == 'reset': 
-                        result = Request.construct(label='reset', content=self.player_index)
+                    if button in ('reset', 'close'):
+                        result = Request(label=button, content=self.player_index)
+                        self.end_plaque[button].unclick()
                         self.end_plaque = None 
-
-                    elif button == 'quit':
-                        result = Request.construct(label='quit', content=self.player_index)
                     
                     self.last_click = None 
                 
                 return result
             
-            def _handle_promotion(self, event : EventUI) -> UserMessage | None:
+            def _handle_promotion(self, event : EventUI) -> SystemRequest | None:
                 result = None
 
-                if event.type == pg.MOUSEBUTTONDOWN:
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
                     self.last_click = event.pos
                 
-                if event.type == pg.MOUSEBUTTONUP and self.last_click is not None:
+                if event.type == pg.MOUSEBUTTONUP and event.button <= 2 and self.last_click is not None:
                     result = self._request_promote(event.pos, self.last_click)
                 
                 return result
             
 
-            def handle(self, event : EventUI, queue : list[UserMessage]): 
+            def handle(self, event : EventUI, queue : list[SystemRequest]): 
                 if self.end_plaque is not None:
                     handle = self._handle_gameover
                 elif self.promotion_plaque is not None:
@@ -551,7 +798,7 @@ class UserInterface:
         class Timer(objects.Object):
             def __init__(
                 self,
-                margin : int = 3,
+                margin : float = 3,
                 player_index : int = 0,
             ):
                 clock_color = assets.scheme.tiles[player_index]
@@ -612,29 +859,35 @@ class UserInterface:
         # to represent captured figures.
         #TODO: CONTINUE FROM HERE -- making these intrinsic instead of needing to "draw" each frame.
         # that way everything works under blit_onto. 
-        class FigureArray(objects.Array):
+        class FigureArray(Scrollable[SystemRequest]):
             def __init__(
                 self, 
                 
                 figures_per_row : int,
                 figures_per_col : int,
 
-                margin : int = 4,
+                margin : float = 4,
 
                 player_index : int = 0,
 
                 plaque_opacity : int = 64,
                 player_opacity : int = 196,
             ):
-                self.margins = assets.pixels_to_coords(margin)
+                margins = assets.pixels_to_coords(margin)
 
                 self.FIGURES_PER_ROW = figures_per_row
                 self.FIGURES_PER_COL = figures_per_col
 
+                inter_width = figures_per_row*assets.captured_fig_shape[0]
+                inter_height = figures_per_col*assets.captured_fig_shape[1]
+
                 shape = (
-                    int(self.margins[0] * 2 + figures_per_row*assets.captured_fig_shape[0]), 
-                    int(self.margins[1] * 2 + figures_per_col*assets.captured_fig_shape[1])
+                    int(margins[0] * 2 + inter_width), 
+                    int(margins[1] * 2 + inter_height)
                 )
+
+                self._orig_shape = shape
+                self._orig_inter = (inter_width, inter_height)
 
                 background = assets.make_raw_plaque(shape=shape)
 
@@ -644,13 +897,20 @@ class UserInterface:
                 background.blit(plaque_tint, (0,0))
                 background.blit(player_tint, (0,0))
 
-                self.INIT_X = self.margins[0]
-                self.MAX_X = self.INIT_X + (figures_per_row-1)*assets.captured_fig_shape[0]
+                self.INIT_X = 0
+                self.MAX_X = (figures_per_row-1)*assets.captured_fig_shape[0]
 
                 self.CURRENT_X = self.INIT_X
-                self.CURRENT_Y = self.margins[1]
+                self.CURRENT_Y = 0
 
-                super().__init__(background)
+                super().__init__(background, item=objects.Array((inter_width, inter_height)), margins=margins)
+
+            def clear(self):
+                self.item = objects.Array(self._orig_inter)
+
+                self.CURRENT_X = 0
+                self.CURRENT_Y = 0
+
 
             def add(self, piece : Piece | tuple[str, int]):
                 if isinstance(piece, Piece):
@@ -662,6 +922,10 @@ class UserInterface:
                     raise TypeError(piece.__class__.__name__)
                 
                 obj = objects.Object(sprite)
+
+                if self.CURRENT_Y >= self.item.height:
+                    self.item._set(new_surface((self.item.width, self.item.height + assets.captured_fig_shape[1])), fixed='topleft')
+                    
                 obj.topleft = (self.CURRENT_X, self.CURRENT_Y)
                 
                 self.CURRENT_X += (assets.captured_fig_shape[0])
@@ -670,22 +934,22 @@ class UserInterface:
                     self.CURRENT_X = self.INIT_X
                     self.CURRENT_Y += (assets.captured_fig_shape[1])
 
-                self.append(obj)
+                self.item.append(obj)
 
 
-        class SideBar(objects.Environment):
+        class SideBar(FocusContainer[SystemRequest]):
             def __init__(
                 self,
                 
                 env_height : int,
 
-                figures_per_row : int = 8,
+                figures_per_row : int = 6,
                 figures_per_col : int = 2,
 
-                arr_margin : int = 4,
-                clock_margin : int = 3,
+                arr_margin : float = 4,
+                clock_margin : float = 3,
 
-                margin : int = 4,
+                margin : float = 4,
 
                 color : Color = assets.scheme.plaque,
 
@@ -713,11 +977,10 @@ class UserInterface:
                 arr_shape = self.arrs[0].shape 
                 clock_shape = self.clocks[0].shape 
 
-                env_w = arr_shape[0] + 2 * self.margins[0]
+                env_w = max(arr_shape[0] + 2 * self.margins[0], (clock_shape[0] + 2*self.margins[0]))
                 env_h = env_height
 
                 assert (env_h >= 2 * (3*self.margins[1] + arr_shape[1] + clock_shape[1]))
-                assert (env_w >= (clock_shape[0] + 2*self.margins[0]))
 
                 surface = new_surface((env_w, env_h))
                 surface.fill(color.rgb)
@@ -745,12 +1008,18 @@ class UserInterface:
                 self.arrs[0].center = (X, Y + signed_arr_disp)
                 self.arrs[1].center = (X, Y - signed_arr_disp)
 
-                self['white_clock'] = self.clocks[0]
-                self['black_clock'] = self.clocks[1]
-                self['white_array'] = self.arrs[0]
-                self['black_array'] = self.arrs[1]
+                self.player_index = player_index
 
-            
+                self.append(self.clocks[0])
+                self.append(self.clocks[1])
+                self.append(self.arrs[0])
+                self.append(self.arrs[1])
+
+
+            def clear(self):
+                for arr in self.arrs:
+                    arr.clear()
+
             def set_times(self, times_s : Sequence[float]):
                 for time_s, clock in zip(times_s, self.clocks):
                     clock.set_time(time_s)
@@ -759,18 +1028,19 @@ class UserInterface:
             def add(self, player_index : int, piece : Piece | tuple[str, int]):
                 self.arrs[player_index].add(piece)
 
-        
-        class ChatBar(objects.Environment, Controllable[UserMessage]):
+            
+            
+        class ChatBar(FocusContainer[SystemRequest]):
             def __init__(
                 self,
                 
                 env_height : int,
 
-                chat_dims : Dimensions = (5, 4),
-                entry_dims : Dimensions = (5, 2),
+                chat_dims : Dimensions = (4, 3),
+                entry_dims : Dimensions = (4, 1.5),
 
-                margin : int = 5,
-                text_margin : int = 4,
+                margin : float = 8,
+                text_margin : float = 5,
 
                 #chat_history : list[tuple[str, int]] | None = None,
 
@@ -803,10 +1073,9 @@ class UserInterface:
 
                 chat_topleft = (left_margin, top_margin)
                 entry_topleft = (left_margin, top_margin + chat_h + self.margins[1])
-
+            
                 # generalize this
                 chat_plaque = assets.make_plaque(shape = chat_shape)
-                entry_plaque = assets.make_plaque(shape = entry_shape)
 
                 font = assets.quarter_text_font
                 
@@ -815,89 +1084,69 @@ class UserInterface:
                 self.text_colors = assets.scheme.chat_texts
                 self.outgoing_color = self.text_colors[player_index]
 
-                self.text_margins = assets.pixels_to_coords(text_margin)
+                text_margins = assets.pixels_to_coords(text_margin)
 
-                chat_view_shape = (chat_shape[0] - 2 * self.text_margins[0], chat_shape[1] - 2*self.text_margins[1])
-                entry_view_shape = (entry_shape[0] - 2 * self.text_margins[0], entry_shape[1] - 2*self.text_margins[1])
-                
-                chat_box = TextRecord(font=font, width=chat_view_shape[0])
+    
+                chat_box = TextRecord(font=font, width = chat_shape[0] - 2 * text_margins[0])
 
                 #if chat_history is not None:
                 #    for chat, i in chat_history:
                 #        chat_box.register(chat, i, color=assets.scheme.chat_texts[i])
 
-                entry_box = TextEntry(font=font, width=entry_view_shape[0], color=self.outgoing_color)
-                
-                chat_view = objects.View(chat_plaque, chat_box)
-                chat_box.topleft = self.text_margins
+                chat_view = Scrollable(chat_plaque, chat_box, margins=text_margins)
                 chat_view.topleft = chat_topleft
 
-                entry_view = objects.View(entry_plaque, entry_box)
-                entry_box.topleft = self.text_margins
+                entry_view = InputField(font=font, shape=entry_shape, color=self.outgoing_color, margin=text_margin)
                 entry_view.topleft = entry_topleft
 
-                self.chat_box = chat_box
-                self.entry_box = entry_box
+                self.chat_view = chat_view
+                self.entry_view = entry_view
 
-                self['chat'] = chat_view
-                self['entry'] = entry_view
-
-
-            def focus(self):
-                self.entry_box.show_pointer()
-
-            def defocus(self):
-                self.entry_box.hide_pointer()
+                self.append(chat_view)
+                self.append(entry_view)
 
             def register_text(self, text : Text):
-                self.chat_box.register(text.content, color=self.text_colors[text.index])
+                self.chat_view.item.register(text.content, color=self.text_colors[text.index])
                 
-            def register_chat(self, chat : Chat):
-                for text in chat.content:
-                    self.chat_box.register(text.content, color=self.text_colors[text.index])
-            
-            def drain(self, _register : bool =False) -> Text | None:
-                content = self.entry_box.clear()
+            def register_chat(self, chat : list[Text]):
+                for text in chat:
+                    self.chat_view.item.register(text.content, color=self.text_colors[text.index])
 
-                if content == '':
-                    return None
-                
-                text = Text(
-                    content=content,
-                    index=self.player_index 
+            def show_message(self, message : Error | Response | EngineError | EngineResponse, lifespan : float = 5):
+                message_popup = MessagePopup(message.__class__.__name__, message, text_color=assets.scheme.error if isinstance(message, (Error, EngineError)) else assets.scheme.text)
+
+                message_popup.topleft = self.margins 
+                self.append_temp(message_popup, lifespan=lifespan)
+
+
+            def handle(self, event : EventUI, queue : list[SystemRequest]):
+                super().handle(event, queue)
+
+                if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and self.focus is self.entry_view:
+                    result = Text(
+                        index=self.player_index,
+                        content=self.entry_view.item.clear()
+                    )
+
+                    queue.append(result)
+        
+
+        class EnvContainer(FocusContainer[SystemRequest]):
+
+            def _quit(self, queue : list[SystemRequest]):
+                queue.append(
+                    Request("quit")
                 )
 
-                if _register:
-                    self.register_text(text)
+            def show_message(self, message : Error | Response | EngineError | EngineResponse, lifespan : float = 5):
+                message_popup = MessagePopup(message.__class__.__name__, message, text_color=assets.scheme.error if isinstance(message, (Error, EngineError)) else assets.scheme.text)
 
-                return text
-            
-
-            def handle(self, event : EventUI, queue : list[UserMessage]):
-                result = None 
-
-                if event.type == pg.TEXTINPUT:
-                    text = event.text
-                    self.entry_box.register(text)
-                
-                if event.type == pg.KEYDOWN:
-                    if event.key == pg.K_BACKSPACE:
-                        self.entry_box.backspace()
-                    
-                    if event.key == pg.K_RETURN:
-                        result = self.drain()
-
-                    if event.key == pg.K_LEFT:
-                        self.entry_box.move_ptr_left()
-                    
-                    if event.key == pg.K_RIGHT:
-                        self.entry_box.move_ptr_right()
-                
-                if result is not None:
-                    queue.append(result)
+                if hasattr(self, 'margins'):
+                    message_popup.topleft = self.margins 
+                self.append_temp(message_popup, lifespan=lifespan)
 
 
-        class GameInterface(Interface[UserMessage]):
+        class GameInterface(EnvContainer):
             def __init__(
                 self,
                 
@@ -925,7 +1174,7 @@ class UserInterface:
                 self.board = board
                 self.append(board)
                 board.enforce_player = enforce_player
-                board.play("start")
+                assets.play_sound("start")
                 ###
                 
                 self.chatbar = chatbar
@@ -939,58 +1188,423 @@ class UserInterface:
                 self.text_colors = assets.scheme.chat_texts
 
                 self.running = True
-
-                self.end_plaque = None
-                self.promotion_plaque = None 
-
-                self.focus : Controllable | None = None
         
 
-            def set_board(self, board : Board):
+            def _set_board(self, board : Board):
                 board.set_player(self.player_index)
                 board.enforce_player = self.board.enforce_player
                 board.topleft = self.board.topleft 
 
                 self.board = self[0] = board
-                board.play("start")
+                assets.play_sound("start")
 
 
-            def register(self, msg : SystemMessage | Board):
-                if isinstance(msg, Board):
-                    self.set_board(msg)
+            def register(self, msg : SystemResponse):
+                if isinstance(msg, Layout):
+                    self._set_board(deserialize(msg.board_str))
+                    self.statbar.clear()
+                    #TODO: fix this ^^^ how do we know which player is which
             
-                elif isinstance(msg, Response):
+                elif isinstance(msg, EngineResponse):
                     self.board.register_response(msg)
                     if msg.label == "times":
                         self.statbar.set_times(msg.content)
                 
-                elif isinstance(msg, Event):
+                elif isinstance(msg, EngineEvent):
                     result = self.board.register_event(msg)
                     if result is not None:
                         self.statbar.add(*result)
 
+                elif isinstance(msg, EngineError):
+                    self.board.register_error(msg)
+
                 elif isinstance(msg, Text):
                     self.chatbar.register_text(msg)
+
+            def show_message(self, message : Error | Response | EngineError | EngineResponse, lifespan : float = 5):
+                self.chatbar.show_message(message, lifespan=lifespan)
                 
-                elif isinstance(msg, Chat):
-                    self.chatbar.register_chat(msg)
 
 
-            def reset(self, board : Board):
-                self.board = board 
-                self.promotion_plaque = None 
-                self.end_plaque = None 
-                self.timeout = False
-                self.running = True
-
-            def _quit(self) -> Event:
-                self.running = False 
-                return Request.construct(label='quit', content=self.player_index)
-
+        # NEW THINGS....
 
         # work on making sign-up/login page, etc...
-        class EntryInterface(Interface[UserMessage]):
-            ...
+        class AuthInterface(EnvContainer):
+            def __init__(
+                self, 
+                glyph_length : int, 
+                text_margin : float = 3, 
+                margin : float = 5,
+                fill_color : Color = assets.scheme.plaque
+            ):
+                
+                font = assets.half_text_font
+
+                self.login_button = login_button = Button('LOG IN')
+                self.signup_button = signup_button = Button('SIGN UP')
+
+                self.margins = assets.pixels_to_coords(margin)
+
+                entry_width = (font.glyph_width + font.gap_size) * glyph_length
+                self.username_entry = username_entry = InputField(font, entry_width, color=assets.scheme.text, margin=text_margin, small_corners=True, background_color=assets.scheme.button, default_text='Enter your username')
+                self.password_entry = password_entry = InputField(font, entry_width, color=assets.scheme.text, margin=text_margin, small_corners=True, background_color=assets.scheme.button, default_text='Enter your password')
+
+                buttons_width = login_button.width + signup_button.width + self.margins[0]
+                
+                env_shape = (max(buttons_width, username_entry.width, logo.width) + self.margins[0] * 2, signup_button.height + username_entry.height * 2 + self.margins[1] * 6 + logo.height)
+
+                super().__init__(env_shape)
+                self.surface.fill(fill_color.rgb)
+
+                logo.center = self.center 
+                logo.top = self.margins[1]
+
+                logo.blit_onto(self.surface)
+
+                login_button.bottomleft = (self.margins[0], env_shape[1] - self.margins[1])
+                signup_button.bottomright = (env_shape[0] - self.margins[0], env_shape[1] - self.margins[1])
+
+                password_entry.bottomleft = (self.margins[0], login_button.top - self.margins[1])
+                username_entry.bottomleft = (self.margins[0], password_entry.top - self.margins[1])
+
+                self.append(username_entry)
+                self.append(password_entry)
+                self.append(login_button)
+                self.append(signup_button)
+
+
+
+            def read_to(self, queue : list[SystemRequest], is_new : bool = False) -> bool:
+                if self.username_entry.item.string != '' and self.password_entry.item.string != '':
+                    queue.append(
+                        Auth(
+                            username=self.username_entry.item.read(),
+                            password=self.password_entry.item.read(),
+                            is_new=is_new
+                        )
+                    )
+
+                    return True
+                return False 
+
+            def drain_to(self, queue : list[SystemRequest], is_new : bool = False) -> bool:
+                if self.username_entry.item.string != '' and self.password_entry.item.string != '':
+                    queue.append(
+                        Auth(
+                            username=self.username_entry.item.clear(),
+                            password=self.password_entry.item.clear(),
+                            is_new=is_new
+                        )
+                    )
+
+                    return True
+                return False 
+                
+
+            def handle(self, event : EventUI, queue : list[SystemRequest]):
+                is_tab = False
+
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_TAB:
+                        is_tab = True
+                        if self.focus is self.username_entry:
+                            self.mediate_focus(self.password_entry)
+                        elif self.focus is self.password_entry:
+                            self.mediate_focus(None)
+
+                    if event.key == pg.K_RETURN:
+                        self.read_to(queue)
+                        self.mediate_focus(None)
+                
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
+                    if self.login_button.hits(event.pos):
+                        if self.read_to(queue):
+                            self.login_button.click()
+                        
+                    if self.signup_button.hits(event.pos):
+                        if self.read_to(queue, is_new=True):
+                            self.signup_button.click()
+                    
+                if event.type == pg.MOUSEBUTTONUP and event.button <= 2:
+                    self.login_button.unclick()
+                    self.signup_button.unclick()
+
+                if not is_tab:
+                    super().handle(event, queue)
+
+
+        class PlaySelection(FocusContainer[SystemRequest]):
+            def __init__(self, shape : Coords, sets : list[str] = ['Chess', 'Shatranj'], times : list[str] = ['5:00', '10:00', '20:00'], margin : float = 3, background_color : Color | str = assets.scheme.plaque):
+                
+                self.receiver_name = None 
+
+                width, height = shape
+
+                self.margins = margins = assets.pixels_to_coords(margin)
+                bar_width = (width - 3*margins[0]) // 2
+
+                font = assets.half_text_font
+
+                play_button = Button('PLAY', font=font)
+                close_button = Button('CLOSE', font=font)
+
+                set_selection_height = height - (2*margins[1])
+                time_selection_height = height - (3 * margins[1] + play_button.height)
+
+                set_selection = ScrollableSelection(
+                    (bar_width, set_selection_height),
+                    choices=sets, font=font
+                )
+
+                time_selection = ScrollableSelection(
+                    (bar_width, time_selection_height),
+                    choices=times, font=font
+                )
+
+                self.set_select = set_selection
+                self.time_select = time_selection
+
+                self.play_button = play_button
+                self.close_button = close_button
+
+                plaque = assets.make_plaque((width, height), small_corners=True, color=background_color)
+                super().__init__(plaque)
+                
+                set_selection.topleft = margins 
+                time_selection.topleft = (2*margins[0] + set_selection.width, margins[1])
+                close_button.topright = (self.width - margins[0], time_selection.bottom + margins[1])
+                play_button.topright = (close_button.left - margins[0], close_button.top)
+
+                self.append(set_selection)
+                self.append(time_selection)
+                self.append(play_button)
+                self.append(close_button)
+            
+            
+            def toggle_keep(self):
+                self.set_select.item.toggle_keep()
+                self.time_select.item.toggle_keep()
+
+            def defocus(self):
+                self.set_select.defocus()
+                self.time_select.defocus()
+
+                super().defocus()
+            
+
+        class ChallengePopup(objects.Array, Controllable[SystemRequest]):
+            def __init__(self, challenge : Challenge, font : Font = assets.half_title_font, text_color : Color = assets.scheme.text, margin : float = 3, figure : str = "Pawn", background_color : Color = assets.scheme.plaque, button_color : Color = assets.scheme.button):
+                symbol = objects.Object(assets.figures[figure])
+
+                self.margins = assets.pixels_to_coords(margin)
+
+                minutes = challenge.timer//60
+                seconds = int(challenge.timer - int(challenge.timer/60)*60)
+
+                minutes = str(minutes)
+                seconds = str(seconds) if seconds >= 10 else f'0{seconds}'
+                
+                text_surface = objects.Object(font.render(f'{challenge.sender} - {challenge.game_set} - {minutes}:{seconds}', color=text_color))
+
+                self.accept = accept_button = Button('accept', color=text_color, background_color=button_color)
+                self.decline = decline_button = Button('decline', color=text_color, background_color=background_color)
+
+                width = 3*self.margins[0] + symbol.width + max(text_surface.width, accept_button.width + decline_button.width + self.margins[0])
+                height = 2 * self.margins[1] + max(symbol.height, text_surface.height + int(0.5*self.margins[1]) + accept_button.height)
+
+                plaque = assets.make_plaque((width, height), small_corners=True, color=background_color)
+
+                super().__init__(plaque)
+
+                symbol.center = self.midpoint
+                symbol.left = self.margins[0]
+
+                symbol.blit_onto(self.surface)
+
+                text_surface.top = self.margins[1]
+                text_surface.left = symbol.right + self.margins[0]
+
+                text_surface.blit_onto(self.surface)
+
+                accept_button.left = text_surface.left 
+                decline_button.left = accept_button.right + self.margins[0]
+
+                accept_button.bottom = decline_button.bottom = height - self.margins[1]
+
+                self.append(accept_button)
+                self.append(decline_button)
+                self.challenge = challenge
+
+            
+            def handle(self, event : EventUI, queue : list[SystemRequest]):
+                # TODO: fix all mousebuttondown things to generalize nicely with mousebuttonup
+                if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
+                    i = self.which_hits(event.pos)
+
+                    if i == 0:
+                        self.accept.click()
+                        queue.append(
+                            Request('accept', self.challenge.game_id)
+                        )
+                        self.__container__.resolve_challenge(self)
+                        self.__container__.mediate_focus(None)
+                    elif i == 1:
+                        self.decline.click()
+                        queue.append(
+                            Request('decline', self.challenge.game_id)
+                        )
+                        self.__container__.resolve_challenge(self)
+                        self.__container__.mediate_focus(None)
+
+
+        class MessagePopup(objects.Object):
+            def __init__(self, title : str, msg : Error | Response | EngineResponse | EngineError, margin : float = 3, font : Font = assets.quarter_text_font, text_color : Color = assets.scheme.error, background_color : Color = assets.scheme.button):
+
+                self.margins = assets.pixels_to_coords(margin)
+
+                label_surface = objects.Object(font.render(f"{title}: {msg.label}", color=text_color))
+                content_surface = objects.Object(font.render(msg.content, color=text_color))
+
+                width = max(label_surface.width, content_surface.width) + 2*self.margins[0]
+                height = label_surface.height + content_surface.height + int(2.5*self.margins[1])
+                
+                label_surface.topleft = self.margins
+                content_surface.topleft = (self.margins[0], label_surface.bottom + int(0.5*self.margins[1]))
+                plaque = assets.make_plaque((width, height), small_corners=True, color=background_color)
+
+                label_surface.blit_onto(plaque)
+                content_surface.blit_onto(plaque)
+
+                super().__init__(plaque)
+
+
+        class MiddleInterface(EnvContainer):
+            def __init__(self, username : str, glyphs_per_line : int, tabs_per_view : float = 6.5, font : Font = assets.half_text_font, view_margin : float = 3, margin : float = 5, fill_color : Color = assets.scheme.plaque):
+                
+                self.margins = assets.pixels_to_coords(margin)
+                view_margins = assets.pixels_to_coords(view_margin)
+
+                self.username = username
+                username_text = objects.Object(font.render(username))
+                
+
+                button_width = int(glyphs_per_line * (font.glyph_width + font.gap_size))
+                test_button = Button('test', min_width=button_width, font=font, color=text_color, margin=margin)
+
+                view_shape = ( 
+                    button_width + 2*view_margins[0],
+                    int(tabs_per_view * test_button.height) + 2*view_margins[1]
+                )
+
+                shape = (max(view_shape[0], logo.width) + 2*self.margins[0], view_shape[1] + 3*self.margins[1] + logo.height)
+
+                super().__init__(shape)
+                self.surface.fill(fill_color.rgb)
+
+                logo.center = self.center 
+                logo.top = self.margins[1]
+
+                logo.blit_onto(self.surface)
+
+                # CHANGE THIS:
+                # instead of scrollable dropdowns, just have a separate window. it is easier.
+
+                self.selection = ScrollableSelection(view_shape, choices=[], font=font, anchor='left', view_margin=view_margin, button_color=assets.scheme.plaque, background_color=assets.scheme.button)
+                self.selection.bottomleft = (self.margins[0], self.height - self.margins[1])
+
+                self.proposal = PlaySelection(view_shape)
+                self.proposal.bottomleft = self.selection.bottomleft
+
+                self.proposing = False
+
+                self.challenge_popups = []
+
+                username_text.topright = (shape[0] - self.margins[0], self.margins[1])
+
+                self.CURRENT_Y = 0 
+                self.append(self.selection)
+                self.append(username_text)
+
+            def add(self, user : UserLayout):
+                self.selection.add(user.username)
+            
+            def delete(self, user : UserLayout):
+                self.selection.delete(user.username)                
+            
+            def show_challenge(self, challenge : Challenge):
+                challenge_popup = ChallengePopup(challenge)
+
+                if not self.challenge_popups:
+                    challenge_popup.topright = (self.width - self.margins[0], self.margins[1])
+                else:
+                    challenge_popup.topright = (self.width - self.margins[0], self.challenge_popups[-1].bottom + int(0.5*self.margins[1]))
+
+                self.challenge_popups.append(challenge_popup)
+                self.append(challenge_popup)
+            
+            def resolve_challenge(self, cp : ChallengePopup):
+                target_index = None
+                for i in range(len(self.challenge_popups)):
+                    if self.challenge_popups[i] is cp:
+                        target_index = i 
+                        break
+
+                if target_index is None:
+                    return 
+                
+                self.challenge_popups.remove(cp)
+                self.remove(cp)
+                shift_ = cp.height + int(0.5*self.margins[1])
+
+                for i in range(target_index, len(self.challenge_popups)):
+                    self.challenge_popups[i].top -= shift_
+
+                
+
+            def handle(self, event : EventUI, queue : list[SystemRequest]):
+                super().handle(event, queue)
+
+                if self.selection.item.selected is not None and not self.proposing:
+                    self.proposing = True
+                    self.remove(self.selection)
+                    self.append(self.proposal)
+                    self.proposal.receiver_name = self.selection.item.selected.string
+                    self.proposal.toggle_keep()
+                    self.proposal.enfocus()
+
+                if self.proposing and event.type == pg.MOUSEBUTTONDOWN and event.button <= 2: 
+                    if self.proposal.close_button.hits(event.pos):
+                        self.proposing = False 
+                        self.proposal.close_button.click()
+                        self.remove(self.proposal)
+                        self.append(self.selection)
+                        self.selection.defocus()
+                        self.proposal.toggle_keep()
+                        self.proposal.defocus()
+                        self.proposal.play_button.unclick()
+                        self.proposal.close_button.unclick()
+                    elif self.proposal.play_button.hits(event.pos):
+                        if self.proposal.set_select.item.selected is not None and self.proposal.time_select.item.selected is not None:
+                            self.proposal.play_button.click()
+                            minutes, seconds = self.proposal.time_select.item.selected.string.split(':')
+                            queue.append(
+                                Challenge(
+                                    sender=self.username,
+                                    receiver=self.proposal.receiver_name,
+                                    game_set=self.proposal.set_select.item.selected.string,
+                                    timer=int(minutes)*60+int(seconds)
+                                )
+                            )
+                        
+                    
+
+                
+                
+                            
+
+
+                
+
 
         this.Piece = Piece
         this.Board = Board
@@ -1002,8 +1616,10 @@ class UserInterface:
         this.ChatBar = ChatBar
 
         this.GameInterface = GameInterface
+        this.AuthInterface = AuthInterface
 
-        this.EntryInterface = EntryInterface
+        this.MiddleInterface = MiddleInterface
+
 
 
 def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):
