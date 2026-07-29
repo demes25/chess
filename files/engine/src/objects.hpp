@@ -286,7 +286,7 @@ namespace objects{
 
 
     enum Status : char {
-        UNBEGUN = '0', ONGOING, PROMOTING, CHECKMATE, STALEMATE, TIMEOUT, DRAW
+        UNBEGUN = '0', ONGOING, PROMOTING, CHECKMATE, STALEMATE, TIMEOUT, DRAW, ABANDONMENT
     };
 
     template<index_t n>

@@ -23,7 +23,7 @@ namespace utils {
     };
 
     template<index_t p>
-    using ResponseContent = std::variant<std::string, Tuple<double, p>>;
+    using ResponseContent = std::variant<std::string, Tuple<double, p>, index_t>;
 
     template<index_t p>
     struct Response {

@@ -328,7 +328,7 @@ class UserInterface:
             ):
                 self.rank = len(dims)
                 self.num_players = len(armies)
-                self.player_index = 0
+                self.player_index = None 
 
                 self.enforce_player = enforce_player
 
@@ -351,7 +351,6 @@ class UserInterface:
                     for piece in army:
                         self._wrap(piece)
                         self.grid[piece.board_pos] = piece
-                        piece.topleft = self.coords(piece.board_pos, to_global=False)
                 
                 self.cache : Cache | None = None
 
@@ -391,7 +390,7 @@ class UserInterface:
                 return {
                     "dims" : self.dims,
                     "armies" : self.armies,
-                    "player_index" : self.player_index
+                    "enforce_player" : self.enforce_player
                 }
             
             def set_player(self, player_index : int):
@@ -469,7 +468,10 @@ class UserInterface:
                 result = objects.Mapping(plaque)
 
                 if label_color is None:
-                    label_color = assets.scheme.__getattribute__(label.lower()) 
+                    if not hasattr(assets.scheme, label.lower()):
+                        label_color = assets.scheme.draw
+                    else:
+                        label_color = getattr(assets.scheme, label.lower()) 
 
                 
                 x, y = result.midpoint
@@ -622,6 +624,7 @@ class UserInterface:
 
                 self.revert_cache()
                 self.deselect_piece()
+                self.deselect_squares()
 
                 sounds : list[str] = []
 
@@ -631,6 +634,9 @@ class UserInterface:
                 __castles = len(actions) > 1
 
                 piece : Piece = self.grid[actions[0][0]]
+
+                self.select_square(actions[0][0])
+                self.select_square(actions[0][1])
 
                 if __captures:
                     die = self.grid[event.die]
@@ -687,6 +693,12 @@ class UserInterface:
                     )
 
                     self.deselect_piece(unhold=False)
+
+                elif response.label in ("timeout", "abandonment", "draw"):
+                    self.make_end_plaque(label=response.label)
+                    self.deselect_piece()
+                    self.deselect_squares()
+                    assets.play_sound("end")
 
             def register_error(self, err : EngineError):
                 if self.cache is not None and err.label == "InGame":
@@ -747,7 +759,8 @@ class UserInterface:
                     
             def _handle_gameover(self, event : EventUI) -> SystemRequest | None:
                 result = None
-                    
+
+                # this is good mouse design. this should happen for other things also.     
                 if event.type == pg.MOUSEBUTTONDOWN and event.button <= 2:
                     self.last_click = event.pos
                     button = self.end_plaque.which_hits(event.pos)
@@ -762,6 +775,8 @@ class UserInterface:
                     if button in ('reset', 'close'):
                         result = Request(label=button, content=self.player_index)
                         self.end_plaque[button].unclick()
+
+                    if button == 'reset':
                         self.end_plaque = None 
                     
                     self.last_click = None 
@@ -827,7 +842,7 @@ class UserInterface:
                 self.previous_time = self.current_time
                 self.current_time = time_s
 
-                if time_s != self.previous_time:
+                if time_s != self.previous_time and time_s >= 0:
                     rounded_time = round(time_s)
                     minutes =  rounded_time//60
                     assert minutes <= 99 
@@ -857,8 +872,6 @@ class UserInterface:
 
         # An array of figures:
         # to represent captured figures.
-        #TODO: CONTINUE FROM HERE -- making these intrinsic instead of needing to "draw" each frame.
-        # that way everything works under blit_onto. 
         class FigureArray(Scrollable[SystemRequest]):
             def __init__(
                 self, 
@@ -1195,7 +1208,12 @@ class UserInterface:
                 board.enforce_player = self.board.enforce_player
                 board.topleft = self.board.topleft 
 
-                self.board = self[0] = board
+                self.clear()
+                self.append(board)
+                self.board = board 
+                self.append(self.chatbar)
+                self.append(self.statbar)
+
                 assets.play_sound("start")
 
 
@@ -1207,7 +1225,7 @@ class UserInterface:
             
                 elif isinstance(msg, EngineResponse):
                     self.board.register_response(msg)
-                    if msg.label == "times":
+                    if msg.label == "times" and self.board.end_plaque is None:
                         self.statbar.set_times(msg.content)
                 
                 elif isinstance(msg, EngineEvent):

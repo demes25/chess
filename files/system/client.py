@@ -210,7 +210,7 @@ class NetworkClient(SenderClient):
                         self._switch_interface(self.middle_interface, self.middle_lock)
             elif message.label == 'quit':
                 await ws.close()
-                await ws.recv()
+                await ws.send('')
 
 
 
@@ -233,7 +233,7 @@ class NetworkClient(SenderClient):
                         self.current_interface.blit_onto(self.screen)
                         self.window.flip()
 
-                    if self.current_interface is self.game_interface:
+                    if self.current_interface is self.game_interface and self.game_interface.board.end_plaque is None:
                         now_time = time.time()
                         if now_time-last_time > time_refresh:
                             results.append(

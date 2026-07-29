@@ -15,7 +15,7 @@ load_figures("files/engine/figures.json")
 load_sets("files/engine/sets.json")
 
 
-processor = Session("Wildebeest", 600, ("", ""))
+processor = Session("Wildebeest", 3, ("", ""))
 layout = processor.begin()
 
 print(layout.board_str)

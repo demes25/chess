@@ -205,6 +205,9 @@ class Session(Serializable):
             self.layout, self.layout_history, self.chat
         )
 
+    def is_on(self):
+        return self.instance is not None and self.instance.engine.is_on()
+
 
     def begin(self, randomize : bool = True, save_current : bool = True) -> Layout:
         if save_current and self.instance is not None:
@@ -299,7 +302,8 @@ class Relation(Edge):
 
     async def send_to_both(self, msg : str):
         for c in self.connections.values():
-            await c.send(msg)
+            if c is not None:
+                await c.send(msg)
 
 
     def enter(self, session_index : int, save_current : bool = True) -> SessionLayout:

@@ -152,7 +152,8 @@ void bind(py::module_& m, const char* req_name = "Request", const char* resp_nam
         }), py::arg("set_name"), py::arg("timer"))
         
         .def("layout", &Eng::layout_str)
-        .def("times", &Eng::get_times)
+        .def("times", &Eng::enforce_times)
+        .def("abandon", &Eng::abandon, py::arg("player_index"))
         .def("process", &Eng::process, py::arg("request"))
         .def("is_on", &Eng::is_on)
         .def("embed", &Eng::embed)

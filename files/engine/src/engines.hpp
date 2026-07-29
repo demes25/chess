@@ -792,6 +792,10 @@ namespace engines {
             }
         }
         
+        Response<p> abandon(index_t i) {
+            this -> status = ABANDONMENT;
+            return {"abandonment", i};
+        }
 
         // EXPOSED SERIALIZATION
 
@@ -824,6 +828,25 @@ namespace engines {
                 }
             }
 
+            return {"times", times};
+        }
+
+        Response<p> enforce_times() {
+            Tuple<double, p> times;
+
+            for (index_t i = 0; i < p; i++){
+                if (i == this -> turn && this -> status > UNBEGUN && this -> status < CHECKMATE){
+                    duration elapsed_time = std::chrono::duration_cast<duration>(timer::now() - this -> turn_start_time);
+                    times[i] = (this -> times[i] - elapsed_time).count();
+
+                    if (times[i] <= 0){
+                        this -> status = TIMEOUT;
+                        return {"timeout", i};
+                    }
+                } else {
+                    times[i] = this -> times[i].count();
+                }
+            }
             return {"times", times};
         }
 

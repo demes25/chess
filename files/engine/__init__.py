@@ -114,6 +114,11 @@ class Engine(Wrapper[internals.Engine]): #, Serializable):
         else:
             return EngineEvent(resp)
 
+    def abandon(self, player_index : int) -> EngineResponse:
+        resp = self.__item__.abandon(player_index)
+
+        return EngineResponse(resp)
+
     def times(self) -> EngineResponse:
         return EngineResponse(self.__item__.times())
 
