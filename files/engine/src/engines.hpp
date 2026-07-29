@@ -27,7 +27,7 @@ namespace engines {
             players(std::forward<Tuple<Player<n>, n>>(players)), 
             times(duration(time)), 
             turn(0), 
-            turn_start_time(0),
+            turn_start_time{},
             history(), 
             status(UNBEGUN), 
             promoting(nullptr),

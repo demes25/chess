@@ -95,14 +95,7 @@
                 "monarchs" : [
                     {
                         "position" : [4, 0],
-                        "figure" : "King",
-                        "promotion_list" : [],
-                        "promotion_axis" : 0,
-                        "promotion_index" : 0,
-                        "promoted" : false,
-                        "dead" : false,
-                        "has_moved" : false,
-                        "just_opened" : false
+                        "figure" : "King"
                     }
                 ]
             },
@@ -302,14 +295,7 @@
                 "monarchs" : [
                     {
                         "position" : [4, 0],
-                        "figure" : "King",
-                        "promotion_list" : [],
-                        "promotion_axis" : 0,
-                        "promotion_index" : 0,
-                        "promoted" : false,
-                        "dead" : false,
-                        "has_moved" : false,
-                        "just_opened" : false
+                        "figure" : "King"
                     }
                 ]
             },
@@ -411,6 +397,273 @@
                 ]
             }
         ]
+    },
+
+    "Wildebeest" : {    
+        "board" : [11, 10],
+
+        "players" : [
+            {
+                "material" : 39.0,
+                "pieces" : [
+                    {
+                        "position" : [0, 0],
+                        "figure" : "Rook"
+                    },
+                    {
+                        "position" : [1, 0],
+                        "figure" : "Knight"
+                    },
+                    {
+                        "position" : [2, 0],
+                        "figure" : "Bishop"
+                    },
+                    {
+                        "position" : [3, 0],
+                        "figure" : "Bishop"
+                    },
+                    {
+                        "position" : [4, 0],
+                        "figure" : "Queen"
+                    },
+                    {
+                        "position" : [6, 0],
+                        "figure" : "Wildebeest"
+                    },
+                    {
+                        "position" : [7, 0],
+                        "figure" : "Camel"
+                    },
+                    {
+                        "position" : [8, 0],
+                        "figure" : "Camel"
+                    },
+                    {
+                        "position" : [9, 0],
+                        "figure" : "Knight"
+                    },
+                    {
+                        "position" : [10, 0],
+                        "figure" : "Rook"
+                    },
+
+                    {
+                        "position" : [0, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [1, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [2, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [3, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [4, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [5, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [6, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [7, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [8, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [9, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    },
+                    {
+                        "position" : [10, 1],
+                        "figure" : "WhitePawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 9
+                    }
+                ],
+                "monarchs" : [
+                    {
+                        "position" : [5, 0],
+                        "figure" : "King"
+                    }
+                ]
+            },
+
+            {
+                "material" : 39.0,
+                "pieces" : [
+                    {
+                        "position" : [0, 9],
+                        "figure" : "Rook"
+                    },
+                    {
+                        "position" : [1, 9],
+                        "figure" : "Knight"
+                    },
+                    {
+                        "position" : [2, 9],
+                        "figure" : "Bishop"
+                    },
+                    {
+                        "position" : [3, 9],
+                        "figure" : "Bishop"
+                    },
+                    {
+                        "position" : [4, 9],
+                        "figure" : "Queen"
+                    },
+                    {
+                        "position" : [6, 9],
+                        "figure" : "Wildebeest"
+                    },
+                    {
+                        "position" : [7, 9],
+                        "figure" : "Camel"
+                    },
+                    {
+                        "position" : [8, 9],
+                        "figure" : "Camel"
+                    },
+                    {
+                        "position" : [9, 9],
+                        "figure" : "Knight"
+                    },
+                    {
+                        "position" : [10, 9],
+                        "figure" : "Rook"
+                    },
+
+                    {
+                        "position" : [0, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [1, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [2, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [3, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [4, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [5, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [6, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [7, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [8, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [9, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    },
+                    {
+                        "position" : [10, 8],
+                        "figure" : "BlackPawn",
+                        "promotion_list" : ["Queen", "Wildebeest"],
+                        "promotion_axis" : 1,
+                        "promotion_index" : 0
+                    }
+                ],
+                "monarchs" : [
+                    {
+                        "position" : [5, 9],
+                        "figure" : "King"
+                    }
+                ]
+            }
+        ]
     }
+
 
 }

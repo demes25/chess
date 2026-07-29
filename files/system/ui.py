@@ -1077,7 +1077,7 @@ class UserInterface:
                 # generalize this
                 chat_plaque = assets.make_plaque(shape = chat_shape)
 
-                font = assets.quarter_text_font
+                font = assets.half_text_font
                 
                 self.player_index = player_index
 
@@ -1334,7 +1334,7 @@ class UserInterface:
 
 
         class PlaySelection(FocusContainer[SystemRequest]):
-            def __init__(self, shape : Coords, sets : list[str] = ['Chess', 'Shatranj'], times : list[str] = ['5:00', '10:00', '20:00'], margin : float = 3, background_color : Color | str = assets.scheme.plaque):
+            def __init__(self, shape : Coords, sets : list[str] = ['Chess', 'Shatranj', 'Wildebeest'], times : list[str] = ['5:00', '10:00', '20:00'], margin : float = 3, background_color : Color | str = assets.scheme.plaque):
                 
                 self.receiver_name = None 
 

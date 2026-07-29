@@ -15,7 +15,7 @@ load_figures("files/engine/figures.json")
 load_sets("files/engine/sets.json")
 
 
-processor = Session("Chess", 600)
+processor = Session("Wildebeest", 600, ("", ""))
 layout = processor.begin()
 
 print(layout.board_str)
@@ -24,7 +24,7 @@ board = deserialize(layout.board_str)
 pg.init()
 pg.display.init()
 
-'''
+
 frontend = ui.GameInterface(board, 0, False)
 screen = pg.display.set_mode(frontend.shape)
 
@@ -83,3 +83,4 @@ while True:
 
     frontend.blit_onto(screen)
     pg.display.flip()
+'''

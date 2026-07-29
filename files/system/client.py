@@ -225,25 +225,26 @@ class NetworkClient(SenderClient):
 
         while True:
             events = fetch()
-            if events:
-                async with self.lock:
-                    async with self.current_lock:
-                        results = self.current_interface.process(events)
-                        if self.screen is not None:
-                            self.current_interface.blit_onto(self.screen)
-                            self.window.flip()
+            
+            async with self.lock:
+                async with self.current_lock:
+                    results = self.current_interface.process(events)
+                    if self.screen is not None:
+                        self.current_interface.blit_onto(self.screen)
+                        self.window.flip()
 
-                        if self.current_interface is self.game_interface:
-                            now_time = time.time()
-                            if now_time-last_time > time_refresh:
-                                results.append(
-                                    EngineRequest.construct("times")
-                                )
-                                last_time = now_time
+                    if self.current_interface is self.game_interface:
+                        now_time = time.time()
+                        if now_time-last_time > time_refresh:
+                            results.append(
+                                EngineRequest.construct("times")
+                            )
+                            last_time = now_time
 
-                if results:
-                    print(results)
-                    await self.queue_iter(results)
+            if results:
+                print(results)
+                await self.queue_iter(results)
+                
             await asyncio.sleep(0)
     
 

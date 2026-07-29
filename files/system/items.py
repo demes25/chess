@@ -211,7 +211,7 @@ class Session(Serializable):
             self.history.append(self.instance.to_dict())
             self.layout_history.append(self.instance.to_layout())
 
-        pl = self.players.copy()
+        pl = list(self.players)
 
         if randomize:
             shuffle(pl)
