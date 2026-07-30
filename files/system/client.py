@@ -87,7 +87,7 @@ class NetworkClient(SenderClient):
         self.current_lock = self.auth_lock
 
         self.window = pg.Window(title="OBCHESSED", size=self.auth_interface.shape)
-        self.window.set_icon(self.ui.icon)
+        self.window.set_icon(self.ui.icon.surface)
         self.window.focus()
         self.screen = self.window.get_surface()
 
@@ -211,6 +211,10 @@ class NetworkClient(SenderClient):
             elif message.label == 'quit':
                 await ws.close()
                 await ws.send('')
+
+        elif isinstance(message, Challenge):
+            async with self.lock:
+                self.sent_challenges[message.game_id] = message 
 
 
 

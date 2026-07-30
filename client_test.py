@@ -5,6 +5,8 @@ import asyncio, pygame as pg
 import ctypes 
 
 if hasattr(ctypes, 'windll'):
+    myappid = 'demes25:obchessed:0.1.0' # arbitrary string
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     ctypes.windll.user32.SetProcessDPIAware()
 
 logs.init()

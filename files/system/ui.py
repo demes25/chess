@@ -48,13 +48,22 @@ class UserInterface:
         text_color : Color = CristiancitoScheme.tiles[0]
         subtext_color : Color = CristiancitoScheme.players[0]
 
-        ### LOGO ###
+        ### LOGOS AND ICON ###
         king = objects.Object(phase(scale(assets.figures['King'], king_scale), king_color, False))
 
+        scaled_pixel = assets.pixels_to_coords(king_scale)
+        icon_shape = (king.width - 2*scaled_pixel[0], king.height - 2*scaled_pixel[1])
+
+        icon = objects.Object(icon_shape)
+        icon.surface.blit(king.surface, (-scaled_pixel[0], -scaled_pixel[1]))
+
         title_font = assets.title_font
+        subtitle_font = assets.half_title_font
 
         _title = phase(title_font.render("OBCHESSED", text_color), GRAYSCALE[1], copy=False)
         _shade = title_font.render("OBCHESSED", subtext_color)
+
+        _subtitle = subtitle_font.render("ONLINE")
 
         title_shape = _title.get_size()
         title_shape = (title_shape[0] + assets.pixel_shape[0], title_shape[1] + assets.pixel_shape[1])
@@ -63,7 +72,15 @@ class UserInterface:
         title.surface.blit(_shade, (0, 0))
         title.surface.blit(_title, assets.pixel_shape)
 
-        logo_shape = (max(title_shape[0], king.width), title_shape[1] + 2*assets.pixel_shape[1] + king.height)
+        title_plus_subtitle_shape = title_shape[0], title_shape[1] + assets.pixel_shape[1] + _subtitle.get_height()
+        title_plus_subtitle = objects.Object(title_plus_subtitle_shape)
+        title.blit_onto(title_plus_subtitle)
+        subtitle = objects.Object(_subtitle)
+        subtitle.center = title_plus_subtitle.center 
+        subtitle.bottom = title_plus_subtitle.bottom
+        subtitle.blit_onto(title_plus_subtitle)
+
+        logo_shape = (max(title_shape[0], king.width), title_shape[1] + assets.pixel_shape[1] + king.height)
         logo = objects.Object(logo_shape)
 
         king.center = logo.center
@@ -74,10 +91,25 @@ class UserInterface:
 
         king.blit_onto(logo.surface)
         title.blit_onto(logo.surface)
+
+        online_logo_shape = (max(title_plus_subtitle_shape[0], king.width), title_plus_subtitle_shape[1] + assets.pixel_shape[1] + king.height)
+        online_logo = objects.Object(online_logo_shape)
+
+        king.center = online_logo.center 
+        king.top = online_logo.top
+
+        title_plus_subtitle.center = online_logo.center
+        title_plus_subtitle.bottom = online_logo.bottom
+
+        king.blit_onto(online_logo.surface)
+        title_plus_subtitle.blit_onto(online_logo.surface)
         ###
 
-        this.icon = king.surface
+        this.icon = icon
         this.logo = logo
+        this.online_logo = online_logo
+
+
 
 
         class InputField(Scrollable[SystemRequest]):
@@ -1269,15 +1301,15 @@ class UserInterface:
 
                 buttons_width = login_button.width + signup_button.width + self.margins[0]
                 
-                env_shape = (max(buttons_width, username_entry.width, logo.width) + self.margins[0] * 2, signup_button.height + username_entry.height * 2 + self.margins[1] * 6 + logo.height)
+                env_shape = (max(buttons_width, username_entry.width, online_logo.width) + self.margins[0] * 2, signup_button.height + username_entry.height * 2 + self.margins[1] * 5 + online_logo.height)
 
                 super().__init__(env_shape)
                 self.surface.fill(fill_color.rgb)
 
-                logo.center = self.center 
-                logo.top = self.margins[1]
+                online_logo.center = self.center 
+                online_logo.top = self.margins[1]
 
-                logo.blit_onto(self.surface)
+                online_logo.blit_onto(self.surface)
 
                 login_button.bottomleft = (self.margins[0], env_shape[1] - self.margins[1])
                 signup_button.bottomright = (env_shape[0] - self.margins[0], env_shape[1] - self.margins[1])
@@ -1514,15 +1546,15 @@ class UserInterface:
                     int(tabs_per_view * test_button.height) + 2*view_margins[1]
                 )
 
-                shape = (max(view_shape[0], logo.width) + 2*self.margins[0], view_shape[1] + 3*self.margins[1] + logo.height)
+                shape = (max(view_shape[0], online_logo.width) + 2*self.margins[0], view_shape[1] + 3*self.margins[1] + online_logo.height)
 
                 super().__init__(shape)
                 self.surface.fill(fill_color.rgb)
 
-                logo.center = self.center 
-                logo.top = self.margins[1]
+                online_logo.center = self.center 
+                online_logo.top = self.margins[1]
 
-                logo.blit_onto(self.surface)
+                online_logo.blit_onto(self.surface)
 
                 # CHANGE THIS:
                 # instead of scrollable dropdowns, just have a separate window. it is easier.
@@ -1637,19 +1669,6 @@ class UserInterface:
         this.AuthInterface = AuthInterface
 
         this.MiddleInterface = MiddleInterface
-
-
-
-def new_window(size : Coords, caption : str | None = None, icon : Surface | objects.Object | None = None):
-
-    pg.display.init()
-    if caption is not None:
-        pg.display.set_caption(caption)
-    if icon is not None:
-        if isinstance(icon, objects.Object):
-            icon = icon.surface
-        pg.display.set_icon(icon)
-    return pg.display.set_mode(size=size)
         
 
 

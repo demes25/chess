@@ -316,13 +316,11 @@ class NetworkServer(Server):
                 if connection.current_edge is not None:
                     async with connection.current_edge.lock:
                         connection.current_edge.connections[connection.user.idstr] = None
-                        
+
                     if connection.current_edge.current_session is not None and connection.current_edge.current_session.is_on():
                         k = connection.current_edge.current_session.instance.engine.abandon(69) #TODO: this should be player_index -- but right now it does not register who won/lost...
-                        print(repr(k))
-                        print(type(k))
                         j = serialize(k) 
-                        await connection.current_edge.send_to_both(j)
+                        await connection.current_edge.send_to_other(j, connection.user.idstr)
                 
                 await connection.close() # TODO: abandonment is not registering well...
                 return False 
@@ -378,7 +376,7 @@ class NetworkServer(Server):
                 )
             else:
                 connection.current_edge = await self.network.relate(connection.user.idstr, receiver.idstr)
-                await connection.current_edge.send_to_both(message)
+                await connection.current_edge.send_to_other(message, connection.user.idstr)
                 return result 
             
         elif isinstance(msg, (EngineRequest, Text)):

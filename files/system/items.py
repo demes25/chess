@@ -305,6 +305,16 @@ class Relation(Edge):
             if c is not None:
                 await c.send(msg)
 
+    # DOES NOT CHECK FOR NONE
+    # TODO: FIX THAT
+    async def send_to_other(self, msg : str, sender : str):
+        a, b = self.ids
+
+        if a == sender:
+            await self.connections[b].send(msg)
+        else:
+            await self.connections[a].send(msg)
+
 
     def enter(self, session_index : int, save_current : bool = True) -> SessionLayout:
         if save_current:
