@@ -91,8 +91,13 @@ CristiancitoScheme = Scheme(
         Color.from_hex('#EA51C6'),
         Color.from_hex('#FF641A')
     ),
+    chat_texts= (
+        Color.from_hex("#8B0080"),
+        Color.from_hex("#BD3C00")
+    ),
 
-    plaque=Color.from_hex('#78463C')
+    plaque=Color.from_hex("#DF9DC9"),
+    button=Color.from_hex("#57355A")
 )
 
 # don't torture Raymah :(

@@ -1,4 +1,6 @@
 from files.system.client import NetworkClient, Address 
+from files.media.assets import Assets
+from files.media.schemes import CristiancitoScheme
 from netlib import logs 
 import asyncio, pygame as pg
 
@@ -12,7 +14,9 @@ if hasattr(ctypes, 'windll'):
 logs.init()
 pg.init()
 
-client = NetworkClient(6)
+assets = Assets(scaling=6, scheme=CristiancitoScheme)
+
+client = NetworkClient(assets)
 address = Address()
 
 asyncio.run(client.run(address))
