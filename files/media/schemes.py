@@ -32,10 +32,13 @@ class Scheme:
 
     checkmate : Color = Color.from_hex("#DE170C")
     stalemate : Color = Color.from_hex('#C8B496')
-    timeout : Color = Color.from_hex('#DCC0B4')
+    draw : Color = Color.from_hex('#DCC0B4')
     
     plaque : Color = Color.from_hex('#8C7864')
+    button : Color = Color.from_hex("#5A4735")
     text : Color = Color.from_hex('#DCC0B4')
+
+    error : Color = Color.from_hex("#DE170C")
 
     select : Color = Color.from_hex('#CD643288')
 
@@ -88,8 +91,13 @@ CristiancitoScheme = Scheme(
         Color.from_hex('#EA51C6'),
         Color.from_hex('#FF641A')
     ),
+    chat_texts= (
+        Color.from_hex("#8B0080"),
+        Color.from_hex("#BD3C00")
+    ),
 
-    plaque=Color.from_hex('#78463C')
+    plaque=Color.from_hex("#DF9DC9"),
+    button=Color.from_hex("#57355A")
 )
 
 # don't torture Raymah :(
