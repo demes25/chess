@@ -774,15 +774,18 @@ class UserInterface:
                     selected = self.selected_piece
 
                     if selected is not None:
-                        pos = self.board_pos(event.pos)
-
-                        if pos != selected.board_pos:
-                            result = self._request_move(selected.board_pos, pos)
-                            self.select_square(pos)
-                            self.play_sound_if_next_error = True
-
-                        else:
+                        if not self.hits(event.pos):
                             self.unhold_piece()
+                        else:
+                            pos = self.board_pos(event.pos)
+
+                            if pos != selected.board_pos:
+                                result = self._request_move(selected.board_pos, pos)
+                                self.select_square(pos)
+                                self.play_sound_if_next_error = True
+
+                            else:
+                                self.unhold_piece()
                 
                 if self.selected_piece is not None and self.hold_selected:
                     self.selected_piece.global_center = pg.mouse.get_pos()
