@@ -15,7 +15,7 @@ load_figures("files/engine/figures.json")
 load_sets("files/engine/sets.json")
 
 
-processor = Session("Wildebeest", 3, ("", ""))
+processor = Session("Wildebeest", 300, ("", ""))
 layout = processor.begin()
 
 print(layout.board_str)
@@ -24,6 +24,7 @@ board = deserialize(layout.board_str)
 pg.init()
 pg.display.init()
 
+#TODO: errors have arisen. the king was able to be next to the enemy king. This is a bug in the engine, not the UI. The engine should be fixed to prevent this from happening.
 
 frontend = ui.GameInterface(board, 0, False)
 screen = pg.display.set_mode(frontend.shape)
