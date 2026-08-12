@@ -17,6 +17,12 @@ namespace objects {
     using Board = Grid<sptr<Piece<n>>, n>;
 }
 
+namespace engines {
+    template<index_t n, index_t p>
+    struct Engine;
+}
+
+//TODO: test enforce_checks, currently all engine references are const, which prevents walks_into_check, which is not const-tagged.
 namespace moves {
     template<index_t n>
     struct Move;
@@ -49,19 +55,37 @@ namespace moves {
             return "Move";
         }
 
-        virtual bool sees(const objects::Board<n>& board, const Index<n>& start, const Index<n>& end, index_t player_index) const {
-            return (
+        template<index_t p>
+        virtual bool sees(const engines::Engine<n, p>& engine, const Index<n>& start, const Index<n>& end, index_t player_index, bool enforce_checks = false) const {
+            const Board<n>& board = engine.look();
+            
+            if (
                 this -> valid_occupancy(board, end, player_index) && this -> valid_square(board, start, end)
-            );
+            ){
+                if (enforce_checks && engine.walks_into_check(start, end, player_index)) {
+                    return false;
+                } else {
+                    return true;
+                }
+            } else {
+                return false;
+            }
         }
 
-        virtual void populate(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        template<index_t p>
+        virtual void populate(MoveMap<n>& map, const engines::Engine<n, p>& engine, const Index<n>& start, index_t player_index, bool enforce_checks = false) const {
+            const Board<n>& board = engine.look();
+
             for (const Vector<n>& v : this -> directions){
                 Index<n> end = start + v;
                 
                 if (end.is_valid() && this -> valid_occupancy(board, end, player_index)){
-                    const Move<n>*& b = map[end];
+                    if (enforce_checks && engine.walks_into_check(start, end, player_index)) {
+                        continue;
+                    }
 
+                    const Move<n>*& b = map[end];
+                    
                     if (b == nullptr){
                         b = this;
                     } else if (b != this) {
@@ -214,10 +238,11 @@ namespace moves {
             return "Span";
         }
 
-        virtual void populate(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index) const {
+        template<index_t p>
+        virtual void populate(MoveMap<n>& map, const engines::Engine<n, p>& engine, const Index<n>& start, index_t player_index, bool enforce_checks = false) const {
             for (const Vector<n>& di : this -> directions){
-                this -> positive_span(map, board, start, player_index, di);
-                this -> positive_span(map, board, start, player_index, -di);
+                this -> positive_span(map, engine, start, player_index, di, enforce_checks);
+                this -> positive_span(map, engine, start, player_index, -di, enforce_checks);
             }
         }
 
@@ -290,19 +315,25 @@ namespace moves {
                 return false;
             }
 
-            virtual void positive_span(MoveMap<n>& map, const objects::Board<n>& board, const Index<n>& start, index_t player_index, const Vector<n>& v) const {
+            template<index_t p>
+            virtual void positive_span(MoveMap<n>& map, const engines::Engine<n, p>& engine, const Index<n>& start, index_t player_index, const Vector<n>& v, bool enforce_checks = false) const {
+                const Board<n>& board = engine.look();
+
                 arith_t steps(1);
                 arith_t obstacles(0);
 
                 for (Index<n> i(start+v); i.is_valid(); i += v){
                     if (obstacles >= this -> min_obstacles && steps >= this -> min_steps){
                         if (this -> valid_occupancy(board, i, player_index)){
-                            const Move<n>*& b = map[i];
+                            if (!(enforce_checks && engine.walks_into_check(start, end, player_index))) {
 
-                            if (b == nullptr){
-                                b = this;
-                            } else if (b != this) {
-                                throw std::runtime_error("end reachable by multiple moves -- ambiguous");
+                                const Move<n>*& b = map[i];
+
+                                if (b == nullptr){
+                                    b = this;
+                                } else if (b != this) {
+                                    throw std::runtime_error("end reachable by multiple moves -- ambiguous");
+                                }
                             }   
                         }
                     }
@@ -326,6 +357,7 @@ namespace moves {
 
     };
 
+    // TODO: add enforce_checks to sees and populate, and implement them in the function bodies
     template<index_t n>
     struct Castle : public Move<n> {
 
@@ -438,6 +470,7 @@ namespace moves {
             }
     };
 
+    // TODO: add enforce_checks to all Figure functions that call sees.
     template<index_t n>
     struct Figure {
         const std::string name;

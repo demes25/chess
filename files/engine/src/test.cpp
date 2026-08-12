@@ -65,7 +65,7 @@ int main() {
         follow(e, s);
         std::cout << e.to_str() << std::endl;
         MoveMap<2> map(e.look().get_shape());
-        e.look()[Tup<2>(4, 0)] -> populate(map, e.look());
+        e.look()(4, 0) -> populate(map, e.look());
         std::cout << map.to_bitmap() << std::endl;
     }
 
@@ -80,7 +80,7 @@ int main() {
 
         std::cout << e.to_str() << std::endl;
         MoveMap<2> map(e.look().get_shape());
-        e.look()[Tup<2>(4, 0)] -> populate(map, e.look());
+        e.look()(4, 0) -> populate(map, e.look());
         std::cout << map.to_bitmap() << std::endl;
     }
 }

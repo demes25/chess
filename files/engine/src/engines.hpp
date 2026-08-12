@@ -711,25 +711,6 @@ namespace engines {
     json Engine<n, p>::game_sets = json::object();
 
     template <index_t n, index_t p>
-    struct EvaluableEngine : public Engine<n, p> {
-        using Engine<n, p>::Engine;
-
-        EvaluableEngine(EvaluableEngine&&) = default;
-        EvaluableEngine& operator=(EvaluableEngine&&) = default;
-        ~EvaluableEngine() = default;
-
-        //TODO: write
-
-        private:
-            double check_value;
-            double threat_weight;
-
-            double move_eval();
-        
-    };
-
-
-    template <index_t n, index_t p>
     struct SerializableEngine : public Engine<n, p>{
         using Engine<n, p>::Engine;
 
